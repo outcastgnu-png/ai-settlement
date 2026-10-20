@@ -199,4 +199,12 @@ npm run typecheck
 
 RLUSD, the AI judge, disputes and multisig, the x402 bridge, payments,
 mainnet, a UI, and any hosted or non-localhost deployment. The governing
-records are `CLAUDE_PHASE2.md` and `edr/EDR-012_ESCROW_PHASE2_ORACLE_REGISTRY.md`.
+records are `CLAUDE.md` (Phase 1), `CLAUDE_PHASE2.md` and
+`../edr/EDR-012_ESCROW_PHASE2_ORACLE_REGISTRY.md`.
+
+## Review
+
+Gpno is the single final reviewer for Phase 1 and Phase 2. The handoff is
+[`REVIEW_HANDOFF.md`](REVIEW_HANDOFF.md), the review brief is
+[`docs/reviews/REVIEW.md`](docs/reviews/REVIEW.md), and the verdict goes in
+[`docs/reviews/VERDICT.md`](docs/reviews/VERDICT.md).
