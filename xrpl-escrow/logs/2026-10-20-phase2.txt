@@ -1,0 +1,87 @@
+npm run demo:phase2 — XRP Ledger testnet, 2026-10-20T07:40:43.156Z
+Connected to wss://testnet.xrpl-labs.com (testnet, network_id 1). Loading or funding wallets from the faucet...
+  client   rJBVcc4ykAk3c1jfr6AqZULiVgTkSx25TD  100.000000 XRP
+  provider rJAdLowmNJq9MJKCKsW45e5PTBjiiTBUjr  100.000000 XRP
+  oracle   rGi9db59t8rpYSfCZCtaBJgDJ88RvfdjmC  100.000000 XRP
+
+Starting local services on 127.0.0.1 ...
+    | registry listening on http://127.0.0.1:8801 (db /home/user/work/escrow-demo/data/jobs.db)
+    | oracle rGi9db59t8rpYSfCZCtaBJgDJ88RvfdjmC listening on http://127.0.0.1:8802
+    | [watcher] connected to wss://testnet.xrpl-labs.com (testnet), watching jobs in http://127.0.0.1:8801
+
+1. Pass and claim: the work passes the oracle's checks and the provider claims 10 XRP
+  PASS  job registered as draft with the oracle's condition (job 2f9a70d7-09ab-4df1-a935-26f11cdab216)
+    | [watcher] subscribed to rJBVcc4ykAk3c1jfr6AqZULiVgTkSx25TD, rJAdLowmNJq9MJKCKsW45e5PTBjiiTBUjr
+    | [watcher] job 2f9a70d7-09ab-4df1-a935-26f11cdab216: status funded (EscrowCreate BD9EE907280A910B7ECD87105733860B6586CA317F0656DB4305E9AD79AC3806)
+  PASS  EscrowCreate -> tesSUCCESS (tesSUCCESS https://testnet.xrpl.org/transactions/BD9EE907280A910B7ECD87105733860B6586CA317F0656DB4305E9AD79AC3806)
+  PASS  watcher status matches the ledger: funded (registry funded, set by watcher, escrow object open)
+  PASS  oracle verdict is pass (sha256-match: sha256 matches the spec; max-latency: delivered 403 ms after funding (limit 300000 ms))
+  PASS  verdict is signed by the oracle wallet and covers this deliverable (oracle rGi9db59t8rpYSfCZCtaBJgDJ88RvfdjmC)
+  PASS  fulfillment released to the provider
+  PASS  registry shows verified_pass
+  PASS  registry database never holds the secret or fulfillment
+  PASS  vault file holds the secret only in encrypted form
+    | [watcher] job 2f9a70d7-09ab-4df1-a935-26f11cdab216: status paid (EscrowFinish E838E3D60568F2FC256370E46743350B75758F4185F44A95BA1B60091548E322)
+  PASS  EscrowFinish with the oracle's fulfillment -> tesSUCCESS (tesSUCCESS https://testnet.xrpl.org/transactions/E838E3D60568F2FC256370E46743350B75758F4185F44A95BA1B60091548E322)
+  PASS  watcher status matches the ledger: paid (registry paid, set by watcher, escrow object gone)
+  provider balance 100.000000 XRP -> 109.999577 XRP
+  PASS  provider gains the price minus the finish fee (+9.999577 XRP)
+
+2. Fail and refund: the work fails the checks; the client is refunded after the deadline
+  PASS  job registered as draft with the oracle's condition (job 346a0da5-e26c-4a64-93f6-9accc6e879c7)
+    | [watcher] job 346a0da5-e26c-4a64-93f6-9accc6e879c7: status funded (EscrowCreate 172E11EB573D29136CA4C06E79EC3451FABD99570B005D48E474FCE349375D32)
+  PASS  EscrowCreate -> tesSUCCESS (tesSUCCESS https://testnet.xrpl.org/transactions/172E11EB573D29136CA4C06E79EC3451FABD99570B005D48E474FCE349375D32)
+  PASS  watcher status matches the ledger: funded (registry funded, set by watcher, escrow object open)
+  PASS  oracle verdict is fail (sha256 a04734cf023d6fa0659ef605de13b5d869fd864657f7c6cd0f4e515059e5bd27 does not match the spec)
+  PASS  fail verdict is signed by the oracle
+  PASS  no fulfillment released
+  PASS  registry shows verified_fail
+  PASS  EscrowCancel before CancelAfter -> tecNO_PERMISSION (tecNO_PERMISSION https://testnet.xrpl.org/transactions/F232F5D0240AB1125E425A78EDD56ED5AB039D1715692DF0FE73286E812241A8)
+
+4. Deliverable is data: a deliverable full of instructions is only parsed and validated
+  PASS  job registered as draft with the oracle's condition (job 98b67157-a6f7-4884-a157-6b655aeabe53)
+    | [watcher] job 98b67157-a6f7-4884-a157-6b655aeabe53: status funded (EscrowCreate 29F5CF6B6271E5968A32CFD77654CB0FEBF029D914EF0D04673642171ECA65A5)
+  PASS  EscrowCreate -> tesSUCCESS (tesSUCCESS https://testnet.xrpl.org/transactions/29F5CF6B6271E5968A32CFD77654CB0FEBF029D914EF0D04673642171ECA65A5)
+  PASS  watcher status matches the ledger: funded (registry funded, set by watcher, escrow object open)
+  PASS  oracle verdict is fail: the schema decides, not the text (schema violation at /: must have required property 'testsPassed')
+  PASS  no fulfillment released
+  PASS  registry shows verified_fail
+  PASS  registry stored the deliverable byte for byte as data
+  PASS  nothing in the deliverable was executed (PWNED.txt absent)
+  PASS  a non-provider asking the oracle is refused (403 only the job's provider may do this)
+  PASS  verdict log records the evidence hash, not the content
+
+3. Oracle restart: the oracle stops and starts between funding and delivery
+  PASS  job registered as draft with the oracle's condition (job 88707487-a66c-4fb8-ad82-c3363aea1476)
+    | [watcher] job 88707487-a66c-4fb8-ad82-c3363aea1476: status funded (EscrowCreate 18522DD322C4BE289BE4B37B9BB45D1CBACD426EE2F1D31D9D0C308C6FC3FC4C)
+  PASS  EscrowCreate -> tesSUCCESS (tesSUCCESS https://testnet.xrpl.org/transactions/18522DD322C4BE289BE4B37B9BB45D1CBACD426EE2F1D31D9D0C308C6FC3FC4C)
+  PASS  watcher status matches the ledger: funded (registry funded, set by watcher, escrow object open)
+  PASS  oracle process stopped
+    | oracle rGi9db59t8rpYSfCZCtaBJgDJ88RvfdjmC listening on http://127.0.0.1:8802
+  PASS  oracle restarted with the same signing address (rGi9db59t8rpYSfCZCtaBJgDJ88RvfdjmC)
+  PASS  restarted oracle verifies the job and releases the fulfillment
+    | [watcher] job 88707487-a66c-4fb8-ad82-c3363aea1476: status paid (EscrowFinish D974A2A41BC00B67D1765C51298C945937ABE01D99D9910B159D15ADD3428897)
+  PASS  EscrowFinish with the fulfillment from the restarted oracle -> tesSUCCESS (tesSUCCESS https://testnet.xrpl.org/transactions/D974A2A41BC00B67D1765C51298C945937ABE01D99D9910B159D15ADD3428897)
+  PASS  watcher status matches the ledger: paid (registry paid, set by watcher, escrow object gone)
+
+2. Fail and refund (after the deadline)
+    | [watcher] job 346a0da5-e26c-4a64-93f6-9accc6e879c7: flagged (29 s left before CancelAfter)
+    | [watcher] job 98b67157-a6f7-4884-a157-6b655aeabe53: flagged (30 s left before CancelAfter)
+    | [watcher] job 346a0da5-e26c-4a64-93f6-9accc6e879c7: status refunded (EscrowCancel CC9EF7D424501DF5FD7ED4385EE5699CF173DFBA1B33CA8A6ADACD61AA76F2EA)
+  PASS  EscrowCancel after CancelAfter -> tesSUCCESS (tesSUCCESS https://testnet.xrpl.org/transactions/CC9EF7D424501DF5FD7ED4385EE5699CF173DFBA1B33CA8A6ADACD61AA76F2EA)
+  PASS  watcher status matches the ledger: refunded (registry refunded, set by watcher, escrow object gone)
+  PASS  watcher flagged the escrow as nearing CancelAfter
+  PASS  client gets the price back minus the cancel fee (+9.999988 XRP)
+
+4. Deliverable is data (after the deadline)
+    | [watcher] job 98b67157-a6f7-4884-a157-6b655aeabe53: status refunded (EscrowCancel 188736EDB965D1E1234FFD999E7C056C4DDCB0E6709F6FD2EAF7024F2204750D)
+  PASS  EscrowCancel after CancelAfter -> tesSUCCESS (tesSUCCESS https://testnet.xrpl.org/transactions/188736EDB965D1E1234FFD999E7C056C4DDCB0E6709F6FD2EAF7024F2204750D)
+  PASS  watcher status matches the ledger: refunded (registry refunded, set by watcher, escrow object gone)
+  PASS  watcher flagged the escrow as nearing CancelAfter
+  PASS  client gets the price back minus the cancel fee (+9.999988 XRP)
+  client balance over scenarios 2 to 4: 89.999988 XRP -> 79.999916 XRP (fees, plus job 3 paid out)
+
+Reputation for rJAdLowmNJq9MJKCKsW45e5PTBjiiTBUjr: {"provider":"rJAdLowmNJq9MJKCKsW45e5PTBjiiTBUjr","total":4,"passed":2,"failed":2,"paid":2,"refunded":2,"expiredUnclaimed":0}
+  PASS  reputation counts this run's jobs (+2 passed, +2 failed, +2 paid, +2 refunded)
+
+47/47 checks passed.

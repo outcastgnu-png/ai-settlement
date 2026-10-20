@@ -1,0 +1,38 @@
+{
+  "name": "xrpl-verified-escrow-demo",
+  "version": "1.0.0",
+  "description": "Verified-delivery escrow for agent jobs on the XRP Ledger testnet: local registry, oracle and watcher",
+  "scripts": {
+    "demo": "tsx src/demo.ts",
+    "demo:phase2": "tsx src/demo-phase2.ts",
+    "registry": "tsx src/registry/server.ts",
+    "oracle": "tsx src/oracle/server.ts",
+    "watcher": "tsx src/watcher.ts",
+    "setup": "tsx src/setup.ts",
+    "test": "vitest run",
+    "test:unit": "vitest run test/condition.test.ts test/registry.test.ts test/oracle.test.ts test/watcher.test.ts test/sdk.test.ts",
+    "typecheck": "tsc"
+  },
+  "license": "ISC",
+  "dependencies": {
+    "ajv": "^8.20.0",
+    "better-sqlite3": "^13.0.3",
+    "dotenv": "^18.0.8",
+    "https-proxy-agent": "^9.1.0",
+    "ripple-keypairs": "^2.1.0",
+    "xrpl": "^4.7.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^26.6.5",
+    "five-bells-condition": "^5.0.1",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  },
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  }
+}

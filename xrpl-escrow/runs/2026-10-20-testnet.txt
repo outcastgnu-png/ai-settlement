@@ -1,0 +1,43 @@
+npm run demo — XRP Ledger testnet, 2026-10-20 ~07:22 UTC
+
+Connected to wss://testnet.xrpl-labs.com (testnet). Loading or funding wallets from the faucet...
+  client   rLvL3CW9XqYKMiRNAKLTm953gVeTh66TRK  100.000000 XRP
+  provider rhSAjedobjr8zFrYkujDPhjBvEVbktBhjV  100.000000 XRP
+  oracle   rPAHjbvWQEQaCE63c2RukSGnJiuoKAGAd2  100.000000 XRP
+
+1. Happy path: work passes, provider is paid 10 XRP
+  PASS  EscrowCreate -> tesSUCCESS (tesSUCCESS https://testnet.xrpl.org/transactions/E49462AA20484A4134A8211FCFDE06811AB4D97E4B1E4B1B811B1A1C33E245F4)
+  PASS  oracle accepts the deliverable (sha256 matches the job spec)
+  PASS  EscrowFinish with oracle's fulfillment -> tesSUCCESS (tesSUCCESS https://testnet.xrpl.org/transactions/FEC7185DBD88A163B0929237C9AAEB4AE88FB88BFD200DD8CA7499621F908066)
+  provider balance 100.000000 XRP -> 109.999577 XRP
+  PASS  provider gains the price minus the finish fee (+9.999577 XRP)
+  PASS  escrow object is gone
+
+2. Bad delivery: oracle refuses, client is refunded after the deadline
+  PASS  EscrowCreate -> tesSUCCESS (tesSUCCESS https://testnet.xrpl.org/transactions/9EFF06BBBB86CA733582C05E7BFEFC5A31B8D8B87C4A398EAE56FD9D42363EA5)
+  PASS  oracle refuses the deliverable (sha256 does not match the job spec)
+  PASS  EscrowCancel before CancelAfter -> tecNO_PERMISSION (tecNO_PERMISSION https://testnet.xrpl.org/transactions/D071F95F7F4197CA8B6E5873A861862FD92CC9D506E9974C83E669E9CD6FBDFA)
+
+3. Wrong secret: the ledger rejects a forged fulfillment
+  PASS  EscrowCreate -> tesSUCCESS (tesSUCCESS https://testnet.xrpl.org/transactions/91EBCB5E1814EC73DBE859CB6F4EB930853EA7690614C3E20E3BE39E272C2CF9)
+  PASS  EscrowFinish with a forged fulfillment -> tecCRYPTOCONDITION_ERROR (tecCRYPTOCONDITION_ERROR https://testnet.xrpl.org/transactions/D6958795A0BC9A4A2048F0E3BD242CD5F830E370879F2ABAE080FEE47016EB6C)
+  PASS  escrow stays open
+
+Waiting for a validated ledger past CancelAfter (about 120 s)...
+
+2. Bad delivery (after deadline)
+  PASS  EscrowCancel after CancelAfter -> tesSUCCESS (tesSUCCESS https://testnet.xrpl.org/transactions/588D84C98776D3210C26BAF880743D1C09AF94AF681D351BB950E03DC5C99567)
+  PASS  client gets the price back minus the cancel fee (+9.999988 XRP)
+  client balance 89.999988 XRP -> 79.999940 XRP (net cost 10.000048 XRP: scenario 2 and 3 fees plus job 3 still locked)
+  PASS  escrow object is gone
+
+3. Wrong secret (after deadline)
+  PASS  oracle would release for good work
+  PASS  EscrowFinish after CancelAfter, even with the real fulfillment -> tecNO_PERMISSION (tecNO_PERMISSION https://testnet.xrpl.org/transactions/2CEFA10FDE5E2D8FDDC6D29D1C4D862802DC65404EAB98FAAD957886A8513048)
+  PASS  EscrowCancel after CancelAfter -> tesSUCCESS (tesSUCCESS https://testnet.xrpl.org/transactions/E9F286BDF1FE52DF2BC907F3CDF6A66737D85E9830281AA0B9487F68402D1145)
+  client balance 79.999940 XRP -> 89.999928 XRP
+  PASS  escrow object is gone
+
+18/18 checks passed.
+
+npm test (same session): Test Files 2 passed (2), Tests 8 passed (8)
