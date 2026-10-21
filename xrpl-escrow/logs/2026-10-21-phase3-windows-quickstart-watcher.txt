@@ -1,0 +1,13 @@
+
+> xrpl-verified-escrow-demo@0.3.0 watcher
+> tsx src/watcher.ts
+
+[watcher] connected to wss://s.altnet.rippletest.net:51233 (testnet), watching jobs in http://127.0.0.1:8801
+[watcher] subscribed to r3TEqbz72cxvwEyzq8uqnHCEwxDxzHSyGN, rRpNiqUiX5Xe5f4cVqkQ8Wy6fNSwyMrYr
+[watcher] job c4ae8cab-85a5-4426-a099-08243c0056e3: status funded (EscrowCreate 30A0BA33CB341D30659C7CB24BA93AA3E8A8840D591D4F06325C3EA79CF6808E)
+[watcher] job c4ae8cab-85a5-4426-a099-08243c0056e3: status paid (EscrowFinish EA2AF6A42404AB0E47EAF4F184ADD258883D17F1D7BB5C5CA8F08105C75EB168)
+[watcher] job 5bb57868-6f19-42c7-abf2-56842b3f6598: status funded (EscrowCreate 2A949A0F1BD47E03119EAA14A9E04ED2A00225062E849CD4CCF1D2342C5AF0B9)
+[watcher] job 5bb57868-6f19-42c7-abf2-56842b3f6598: status paid (EscrowFinish A6FDD9ABF8C5D8BD5A5F1A44ED34E713F35EC73DD494FF2F6BBD764A13BC14CE)
+[watcher] job 66ebe56b-4537-43aa-b068-53f2bc15fde5: status funded (EscrowCreate 54FD7927AFFF3BA423B2782D29EECD86FC35FE3514F1904C61DBF50253457B2F)
+[watcher] job 66ebe56b-4537-43aa-b068-53f2bc15fde5: flagged (24 s left before CancelAfter)
+[watcher] job 66ebe56b-4537-43aa-b068-53f2bc15fde5: status refunded (EscrowCancel 820C93F06B8FE980AFAE1DCEECD34B115061BF651D485FA3E0A8E7495370CC93)

@@ -96,6 +96,13 @@ describe("job registry API", () => {
     for (let k = 1; k <= 22; k++) defs[`s${k}`] = { anyOf: [{ $ref: `#/$defs/s${k - 1}` }, { $ref: `#/$defs/s${k - 1}` }] };
     expect(await status(schemaJob({ $defs: defs, $ref: "#/$defs/s22" }))).toBe(400); // Gpno N1
     expect(await status(schemaJob({ $defs: { a: { items: { $ref: "#/$defs/a" } } }, $ref: "#/$defs/a" }))).toBe(400);
+    expect(await status(schemaJob({ enum: [{ type: "string", pattern: "^(a+)+$" }], $ref: "#/enum/0" }))).toBe(400); // Gpno N8
+  });
+
+  it("limits how many checks a job may have (Gpno N9)", async () => {
+    const checks = (n: number) => Array.from({ length: n }, () => ({ type: "json-schema", schema: { type: "object" } }));
+    expect(await status(call("POST", "/jobs", newJob({ spec: { checks: checks(8) } })))).toBe(200);
+    expect(await status(call("POST", "/jobs", newJob({ spec: { checks: checks(9) } })))).toBe(400);
   });
 
   it("walks a job through draft -> funded -> delivered -> verified_pass -> paid", async () => {
@@ -162,6 +169,20 @@ describe("job registry API", () => {
     expect(c.status).toBe("draft");
     expect(await call("GET", `/providers/${other.address}/reputation`)).toEqual({
       provider: other.address, total: 3, passed: 1, failed: 1, paid: 1, refunded: 1, expiredUnclaimed: 0,
+    });
+  });
+
+  it("still counts a job as expired_unclaimed after it is refunded", async () => {
+    const other = Wallet.generate();
+    const job = await call("POST", "/jobs", newJob({ provider: other.address }));
+    await event(job.id, { source: "ledger", status: "funded", offerSequence: 3, cancelAfter: 1 });
+    await deliver(job.id, other, "w");
+    await event(job.id, { source: "oracle", status: "verified_pass" });
+    await event(job.id, { source: "ledger", status: "expired_unclaimed" });
+    expect((await call<{ expiredUnclaimed: number }>("GET", `/providers/${other.address}/reputation`)).expiredUnclaimed).toBe(1);
+    await event(job.id, { source: "ledger", status: "refunded" });
+    expect(await call("GET", `/providers/${other.address}/reputation`)).toEqual({
+      provider: other.address, total: 1, passed: 1, failed: 0, paid: 0, refunded: 1, expiredUnclaimed: 1,
     });
   });
 });

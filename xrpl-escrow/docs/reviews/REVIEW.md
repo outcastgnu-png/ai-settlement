@@ -144,3 +144,64 @@ npm test                 # 54/54, about 6 minutes
 Write it in `docs\reviews\VERDICT.md` (a blank template is there; the first verdict is kept as
 `VERDICT-2026-10-20-deb71ea.md`). Same format: PASS, PASS WITH FINDINGS or FAIL, each finding
 saying whether it blocks Phase 3. Say for each of findings 3 to 7 whether it is fixed.
+
+## Phase 3 review: the developer preview (EDR-013)
+
+Christopher accepted EDR-013 by name on 2026-10-21 at 16:45 UTC, with you as the one final
+reviewer for Phase 3 (`edr/EDR-013_ESCROW_PHASE3_DEVELOPER_PREVIEW.md`, `edr/ACCEPTANCES.md`).
+It stays testnet only and 127.0.0.1 only. Write the Phase 3 verdict in a fresh `VERDICT.md`. Whatever
+verdict is in `VERDICT.md` when you start (the second review of `af9a4db`, or your confirmation
+review of `a0f6e1b` if it has landed) is first archived next to it under its date and commit.
+
+### What to read
+
+`git diff a0f6e1b <Phase 3 commit>`. The main pieces:
+
+| Piece | Where |
+|---|---|
+| Reputation counts `expired_unclaimed` after a refund | `src/registry/db.ts` `reputation`; test in `test/registry.test.ts` |
+| npm 11 install scripts | `package.json` `allowScripts` |
+| Testnet flows for `expired_unclaimed` and watcher reconnect in `npm test` | `test/phase3-flow.test.ts` |
+| Python SDK | `../xrpl-escrow-py/` (`src/xrpl_escrow/`, `tests/`) |
+| Shared vectors and the cross-language harness | `test/vectors/make-sdk-vectors.ts`, `test/vectors/sdk-parity.json`, `test/py-harness.ts` |
+| Release packaging | `../QUICKSTART.md`, `examples/first-job.ts`, `../CHANGELOG.md`, `../CONTRIBUTING.md`, `../SECURITY.md`, `../docs/THREAT_MODEL.md` |
+| Trial kit | `../docs/trial/` |
+
+### What to check
+
+| Claim | How to break it |
+|---|---|
+| The Python SDK signs requests and verdicts byte for byte like the TypeScript kit | Change the vectors' inputs, regenerate them, and compare. Try a string with non-ASCII, control characters or ` ` in a verdict detail; try large integers |
+| A Python-signed request works once, whatever the hex case | `tests/test_kit_local.py`; replay across an oracle restart from Python |
+| The Python SDK checks verdicts only against the pinned address | Point it at an oracle with another verdict key |
+| The Python SDK is testnet only and trusts validated ledgers only | `config.py` `assert_testnet`; `escrow.py` `submit_validated` (tec results, expiry past `LastLedgerSequence`) |
+| The Python SDK never runs deliverable content and never logs a seed or secret | Read `kit.py`, `env.py`, `demo.py` |
+| Reputation fix | Revert it and check the test fails |
+| `allowScripts` silences npm 11 and the kit still works without the scripts | A clean `npx npm@11 ci` on Windows, macOS or Linux, then `npm run test:unit` |
+| The threat model is accurate and complete | Anything it claims is protected that isn't, or a gap it leaves out |
+| The quickstart works for a newcomer | Follow it from a clean clone |
+
+### Expected results
+
+```
+npm ci                    # no install-script warnings on npm 11
+npm run typecheck         # 0 errors
+npm run test:unit         # 61/61, no network
+npm run setup
+npm test                  # 65/65 (unit + Phase 1, 2 and 3 testnet flows), about 8 minutes
+cd ..\xrpl-escrow-py
+pip install -e .[test]
+python -m pytest          # 25 passed, 1 skipped (testnet), no network
+python -m pytest --testnet  # 26 passed
+python -m xrpl_escrow.demo --start-services   # 12/12
+```
+
+### Verdict
+
+Same format: PASS, PASS WITH FINDINGS or FAIL, each finding saying whether it blocks the public
+release. Windows is run separately by Claude Code on Christopher's PC.
+
+### Re-review after the Phase 3 FAIL
+
+Your Phase 3 verdict is now `VERDICT.md`; the fixes and the test for each are listed in
+`FINDINGS_RESPONSE.md`, section "Phase 3 review". Check N8, N9 and N12 first, then N13 to N17.

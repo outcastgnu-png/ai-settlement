@@ -1,0 +1,5 @@
+
+> xrpl-verified-escrow-demo@0.3.0 registry
+> tsx src/registry/server.ts
+
+registry listening on http://127.0.0.1:8801 (db C:\dev\ai-settlement\xrpl-escrow\data\jobs.db)

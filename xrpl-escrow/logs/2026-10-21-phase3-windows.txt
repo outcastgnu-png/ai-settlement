@@ -1,0 +1,29 @@
+Windows check of a0f6e1b + Phase 3 working tree (uncommitted) on testnet, 2026-10-21
+Windows 11 Pro, Node v24.18.0, Python 3.14.6 (venv), run by Claude Code via Remote Control.
+Working tree copied from handoff/ai-settlement-phase3-rereview.zip; diff vs a0f6e1b
+matches the cloud tree (20 files changed, 544 insertions, 163 deletions, plus untracked files).
+
+npm ci                         ok, 0 vulnerabilities          -npm-ci.txt
+npm run test:unit              60/61  FAIL (N9, see below)    -test-unit.txt
+npm run setup                  ok, wallets funded             -setup.txt
+npm test (testnet)             64/65  FAIL (same N9 test)     -npm-test.txt
+pytest                         25 passed, 1 skipped           -pytest.txt
+pytest --testnet               26/26                          -pytest-testnet.txt
+QUICKSTART 3 services          registry, oracle, watcher up   -quickstart-{registry,oracle,watcher}.txt
+QUICKSTART 4a first-job.ts     EscrowCreate + EscrowFinish tesSUCCESS   -quickstart-first-job-ts.txt
+QUICKSTART 4b python demo      12/12 checks                   -quickstart-python-demo.txt
+
+Failing test (deterministic here: 3/3 isolated, 4/4 in file, 1/1 in each suite):
+  test/oracle.test.ts:334 "runs a job's checks once, however many times or how fast its
+  provider asks (Gpno N9)" -> 401 "auth already used" on POST <oracle>/verify/<id>.
+  Likely cause (inferred from code): five signRequest() calls in one millisecond share a
+  timestamp, hence a replay key; ReplayGuard admits only the first.   -n9-isolated.txt
+A separate uncaught "read ECONNRESET" stderr line appears in some runs; no URL in its stack.
+
+Re-run with handoff/phase3-windows-n9-fix.patch applied (git apply -p1; auth.ts, oracle.test.ts,
+json-schema.ts, json-schema-worker.ts):
+npx vitest run test/oracle.test.ts x3   27/27 each, no ECONNRESET   -rerun-oracle-x3.txt
+npm run test:unit                       61/61                      -rerun-test-unit.txt
+npm test (testnet)                      65/65                      -rerun-npm-test.txt
+
+Logs were scanned for every .env value: only ORACLE_VERDICT_ADDRESS (public) appears.

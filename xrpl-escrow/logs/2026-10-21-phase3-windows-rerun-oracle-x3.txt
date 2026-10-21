@@ -1,0 +1,31 @@
+﻿== N9 fix applied; node v24.18.0; oracle.test.ts x3 2026-10-21T16:22:49.7386610-05:00
+---- run 1
+
+ RUN  v5.0.5 C:/dev/ai-settlement/xrpl-escrow
+
+
+ Test Files  1 passed (1)
+      Tests  27 passed (27)
+   Start at  16:22:50
+   Duration  8.27s (tests 97%, import 2%, transform 1%)
+
+---- run 2
+
+ RUN  v5.0.5 C:/dev/ai-settlement/xrpl-escrow
+
+
+ Test Files  1 passed (1)
+      Tests  27 passed (27)
+   Start at  16:22:59
+   Duration  8.20s (tests 97%, import 2%)
+
+---- run 3
+
+ RUN  v5.0.5 C:/dev/ai-settlement/xrpl-escrow
+
+
+ Test Files  1 passed (1)
+      Tests  27 passed (27)
+   Start at  16:23:08
+   Duration  8.16s (tests 97%, import 2%)
+

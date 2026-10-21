@@ -1,0 +1,9 @@
+﻿== npm run setup Wed 10/21/2026 16:10:27.91 
+
+> xrpl-verified-escrow-demo@0.3.0 setup
+> tsx src/setup.ts
+
+  client   r3TEqbz72cxvwEyzq8uqnHCEwxDxzHSyGN  129.999712 XRP
+  provider rRpNiqUiX5Xe5f4cVqkQ8Wy6fNSwyMrYr  169.996193 XRP
+  oracle   rJXKVeU64rjgGNT5uQpbNoUzoUK7kzRDYA  100.000000 XRP
+Wallet seeds, the vault key, service tokens and the verdict key are in .env (testnet only, gitignored).

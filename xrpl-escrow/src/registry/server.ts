@@ -25,6 +25,8 @@ import { JobStore, TERMINAL, canMove, type CheckSpec, type Job, type JobPatch, t
 
 const FORBIDDEN_KEYS = ["secret", "fulfillment", "preimage"];
 const CHECK_TYPES = ["sha256-match", "json-schema", "max-latency"];
+/** Each json-schema check may hold the oracle's schema worker for up to its timeout, so a job gets a few checks, not hundreds (Gpno N9). */
+export const MAX_CHECKS = 8;
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 
 function containsForbiddenKey(value: unknown): boolean {
@@ -50,6 +52,9 @@ export function parseNewJob(body: unknown): NewJob {
   if (typeof priceDrops !== "string" || !/^[1-9][0-9]{0,16}$/.test(priceDrops)) throw new HttpError(400, "priceDrops must be a positive drop string");
   if (!Number.isInteger(slaSeconds) || (slaSeconds as number) < 30 || (slaSeconds as number) > 86_400) {
     throw new HttpError(400, "slaSeconds must be an integer from 30 to 86400");
+  }
+  if (isObject(spec) && Array.isArray(spec.checks) && spec.checks.length > MAX_CHECKS) {
+    throw new HttpError(400, `spec.checks may hold at most ${MAX_CHECKS} checks`);
   }
   if (isObject(spec) && Array.isArray(spec.checks)) {
     for (const c of spec.checks) {

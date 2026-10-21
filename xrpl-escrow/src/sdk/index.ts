@@ -11,7 +11,7 @@
 import type { Client, Wallet } from "xrpl";
 import { signRequest, sha256Hex, verifyPayload } from "../auth.js";
 import { cancelEscrow, createEscrow, finishEscrow, sleep, waitPastCancelAfter, type EscrowRef, type TxResult } from "../escrow.js";
-import { callJson } from "../http.js";
+import { HttpError, callJson } from "../http.js";
 import { ORACLE_URL, REGISTRY_URL, readEnvFile } from "../local-config.js";
 import type { Job, JobEvent, JobSpec, JobStatus } from "../registry/db.js";
 import type { SignedVerdict, VerdictBody } from "../oracle/server.js";
@@ -127,9 +127,20 @@ export class EscrowKit {
     return { tx, job: await this.waitForStatus(jobId, ["funded"]) };
   }
 
-  /** Ask the oracle to verify the delivered work. Signed by `wallet`; only the job's provider gets an answer. */
-  async requestVerification(jobId: string, wallet: Wallet): Promise<{ verdict: SignedVerdict; fulfillment?: string }> {
-    return callJson("POST", `${this.oracleUrl}/verify/${jobId}`, { auth: signRequest(wallet, "verify", jobId) });
+  /**
+   * Ask the oracle to verify the delivered work. Signed by `wallet`; only the job's provider gets an answer.
+   * A 503 means the oracle could not run the checks right now (busy, or its checker restarted) and gave no
+   * verdict, so this asks again a few times, with a fresh signature each time.
+   */
+  async requestVerification(jobId: string, wallet: Wallet, attempts = 4): Promise<{ verdict: SignedVerdict; fulfillment?: string }> {
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await callJson("POST", `${this.oracleUrl}/verify/${jobId}`, { auth: signRequest(wallet, "verify", jobId) });
+      } catch (err) {
+        if (!(err instanceof HttpError && err.status === 503) || attempt >= attempts) throw err;
+        await sleep(1000 * attempt);
+      }
+    }
   }
 
   /** Provider posts the work, then asks the oracle to verify it. */

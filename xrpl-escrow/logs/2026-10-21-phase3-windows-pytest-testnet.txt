@@ -1,0 +1,38 @@
+﻿== pytest --testnet Wed 10/21/2026 16:17:45.59 
+============================= test session starts =============================
+platform win32 -- Python 3.14.6, pytest-9.1.1, pluggy-1.7.0 -- C:\dev\ai-settlement\xrpl-escrow-py\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\dev\ai-settlement\xrpl-escrow-py
+configfile: pyproject.toml
+testpaths: tests
+plugins: anyio-4.15.1
+collecting ... collected 26 items
+
+tests/test_condition.py::test_known_vector_for_a_zero_secret PASSED      [  3%]
+tests/test_condition.py::test_matches_the_typescript_kit PASSED          [  7%]
+tests/test_condition.py::test_condition_holds_the_sha256_of_the_secret PASSED [ 11%]
+tests/test_condition.py::test_rejects_secrets_that_are_not_32_bytes PASSED [ 15%]
+tests/test_condition.py::test_fresh_secret_each_time PASSED              [ 19%]
+tests/test_demo_testnet.py::test_pass_claim_and_fail_refund_on_testnet PASSED [ 23%]
+tests/test_kit_local.py::test_create_job_registers_a_draft_with_the_oracles_condition PASSED [ 26%]
+tests/test_kit_local.py::test_ledger_calls_need_an_xrpl_client PASSED    [ 30%]
+tests/test_kit_local.py::test_deliver_returns_a_checked_signed_pass_with_the_fulfillment PASSED [ 34%]
+tests/test_kit_local.py::test_deliver_returns_a_signed_fail_with_no_fulfillment PASSED [ 38%]
+tests/test_kit_local.py::test_does_not_trust_a_verdict_from_another_oracle_address PASSED [ 42%]
+tests/test_kit_local.py::test_deliver_is_refused_for_a_non_provider_and_before_funding PASSED [ 46%]
+tests/test_kit_local.py::test_a_python_signed_verify_request_works_once PASSED [ 50%]
+tests/test_kit_local.py::test_wait_for_status_times_out_with_the_current_status PASSED [ 53%]
+tests/test_kit_local.py::test_reports_provider_reputation PASSED         [ 57%]
+tests/test_kit_local.py::test_claim_refuses_a_fulfillment_that_does_not_open_the_jobs_condition PASSED [ 61%]
+tests/test_parity.py::test_content_hash PASSED                           [ 65%]
+tests/test_parity.py::test_signed_requests_are_byte_for_byte_the_same PASSED [ 69%]
+tests/test_parity.py::test_replay_key_matches_the_oracle PASSED          [ 73%]
+tests/test_parity.py::test_canonical_json_matches_including_non_ascii PASSED [ 76%]
+tests/test_parity.py::test_verdict_signature_matches_and_verifies PASSED [ 80%]
+tests/test_parity.py::test_verdict_from_another_address_or_tampered_is_refused PASSED [ 84%]
+tests/test_parity.py::test_canonical_json_refuses_values_javascript_would_encode_differently PASSED [ 88%]
+tests/test_parity.py::test_canonical_json_sorts_keys_like_javascript PASSED [ 92%]
+tests/test_retry.py::test_retries_a_503_with_fresh_signatures PASSED     [ 96%]
+tests/test_retry.py::test_gives_up_after_the_last_attempt_and_never_retries_other_errors PASSED [100%]
+
+======================== 26 passed in 95.93s (0:01:35) ========================

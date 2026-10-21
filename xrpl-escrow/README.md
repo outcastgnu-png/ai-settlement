@@ -60,9 +60,13 @@ a job spec. It only hashes the deliverable, parses it as JSON, or validates it
 against the job's schema. JSON Schemas in job specs may not use the
 regex keywords `pattern` and `patternProperties`, or `uniqueItems`, `format` or
 `$data`, and are capped at 16 KB, because those keywords can make validation
-take exponential or quadratic time. `$ref` must be local, may not be recursive,
-and the schema may not grow past 4096 nodes once every `$ref` is inlined. The
-schema check itself runs in a worker thread and is stopped after 2 seconds. The provider proves who it is by
+take exponential or quadratic time. `$ref` must be local, must point at a subschema (never into `enum`, `const`
+or other data), may not be recursive, and the schema may not grow past 4096
+nodes once every `$ref` is inlined. A job has at most 8 checks. The
+schema check itself runs in a worker thread and is stopped after 2 seconds of
+the job's own validation time. If the oracle can't run the checks right now
+(too many waiting, or its checker restarted) it answers 503 and signs nothing,
+and the SDK asks again. The provider proves who it is by
 signing each request with its wallet key; each signed request works once,
 even across oracle restarts. SDK users check verdict signatures against the
 pinned `ORACLE_VERDICT_ADDRESS`, never against what the oracle reports about
@@ -141,7 +145,7 @@ after the review fixes is
 | `POST /jobs/:id/deliverable` | Provider posts the work: `{content, auth}` |
 | `GET /jobs/:id/deliverable` | The stored deliverable and its SHA-256 |
 | `POST /jobs/:id/events`, `GET /jobs/:id/events` | Status changes from the watcher (`WATCHER_SERVICE_TOKEN`) or the oracle (`ORACLE_SERVICE_TOKEN`), and the history |
-| `GET /providers/:address/reputation` | Reputation stub: passed, failed, paid, refunded and expired counts |
+| `GET /providers/:address/reputation` | Reputation stub: passed, failed, paid, refunded and expired-unclaimed counts (a job that expired unclaimed and was then refunded counts in both) |
 
 Oracle: `GET /health` (verdict signer address and public key), `POST /jobs/:id/condition`,
 `POST /verify/:id` with `{auth}` signed by the provider.
@@ -173,10 +177,30 @@ A sample testnet run, with explorer links for every transaction, is in
 Other commands:
 
 ```
-npm test            # unit tests + Phase 1 and Phase 2 scenarios on testnet (about 6 minutes)
+npm test            # unit tests + Phase 1, 2 and 3 flows on testnet (about 8 minutes)
 npm run test:unit   # unit tests only, no network needed
 npm run typecheck
 ```
+
+`npm test` includes `test/phase3-flow.test.ts`: a passed job nobody claims goes
+`expired_unclaimed`, is refunded and still counts in the provider's reputation,
+and the watcher keeps marking jobs `funded` and `paid` after its WebSocket is cut.
+
+### npm 11 and install scripts
+
+npm 11 runs a package's install script only if `package.json` allows it.
+`allowScripts` here denies both scripts the kit's dependencies have, so
+`npm install` prints no warning: `better-sqlite3` ships prebuilt binaries for
+Windows, macOS and Linux (its script would only compile from source, which
+needs build tools), and `esbuild` uses its platform package without running its
+postinstall check. npm 10 ignores the setting.
+
+## Phase 3: Python SDK and developer preview
+
+A Python client with the same five calls lives in
+[`../xrpl-escrow-py`](../xrpl-escrow-py/README.md). It talks to these same
+services. The step-by-step setup for a new developer, in either language, is
+[`../QUICKSTART.md`](../QUICKSTART.md).
 
 ## Safety rails
 
@@ -212,17 +236,23 @@ npm run typecheck
 | `src/demo-phase2.ts` | The four Phase 2 scenarios |
 | `test/registry.test.ts`, `oracle.test.ts`, `watcher.test.ts`, `sdk.test.ts` | Phase 2 unit tests, no network needed |
 | `test/phase2-flow.test.ts` | All Phase 2 scenarios through the services on the live testnet |
+| `test/phase3-flow.test.ts` | `expired_unclaimed` then refund, and watcher reconnect, on the live testnet |
+| `test/vectors/` | `make-sdk-vectors.ts` and the `sdk-parity.json` it writes, which the Python SDK must match |
+| `test/py-harness.ts` | Throwaway registry and oracle for the Python SDK's tests |
 
 ## Not in these phases
 
 RLUSD, the AI judge, disputes and multisig, the x402 bridge, payments,
 mainnet, a UI, and any hosted or non-localhost deployment. The governing
-records are `CLAUDE.md` (Phase 1), `CLAUDE_PHASE2.md` and
-`../edr/EDR-012_ESCROW_PHASE2_ORACLE_REGISTRY.md`.
+records are `CLAUDE.md` (Phase 1), `CLAUDE_PHASE2.md`,
+`../edr/EDR-012_ESCROW_PHASE2_ORACLE_REGISTRY.md` and
+`../edr/EDR-013_ESCROW_PHASE3_DEVELOPER_PREVIEW.md`. What the kit does not
+protect against is in [`../docs/THREAT_MODEL.md`](../docs/THREAT_MODEL.md).
 
 ## Review
 
-Gpno is the single final reviewer for Phase 1 and Phase 2. The handoff is
+Gpno is the single final reviewer for each phase (Phase 1 and 2 together, then
+Phase 3). The handoff is
 [`REVIEW_HANDOFF.md`](REVIEW_HANDOFF.md), the review brief is
 [`docs/reviews/REVIEW.md`](docs/reviews/REVIEW.md), and the verdict goes in
 [`docs/reviews/VERDICT.md`](docs/reviews/VERDICT.md).

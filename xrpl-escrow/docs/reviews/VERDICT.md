@@ -1,65 +1,71 @@
-# Verdict: ESCROW-001 second review (fixes for findings 3 to 7)
+# Verdict: ESCROW-001 Phase 3 review (EDR-013 developer preview)
 
-**Reviewer:** Gpno
+**Reviewer:** Gpno (sole final reviewer under EDR-013, accepted 2026-10-21 16:45 UTC)
 **Date:** 2026-10-21
-**Commit reviewed:** `af9a4db` (main; previous verdict on `deb71ea`; handoff docs on top in `e54e6d8`)
-**Verdict:** PASS WITH FINDINGS
+**Tree reviewed:** `a0f6e1b` (main) plus uncommitted Phase 3 work. `git rev-parse HEAD` = a0f6e1b169f9; `git status` shows 23 paths (10 modified, 13 new)
+**Verdict:** FAIL (not ready for public release)
 
-The first verdict, on `deb71ea`, is kept as [`VERDICT-2026-10-20-deb71ea.md`](VERDICT-2026-10-20-deb71ea.md).
-Fill this file in. The brief for this review is the "Second review" section of [`REVIEW.md`](REVIEW.md).
+The previous verdict (`a0f6e1b`, the third review) is to be archived as `VERDICT-2026-10-21-a0f6e1b.md`.
 
 ## Summary
 
-Findings 3, 4 and 7 are fixed. Finding 6 is fixed in its listed parts, except plain HTTP, which is documented. Finding 5 is only partly fixed. Every hard rule still holds: testnet only with the `network_id` guard, 127.0.0.1 only, no secret in the registry, and the fulfillment released only on a pass to a signed provider request after a ledger escrow check. Typecheck is clean, and 52/52 unit tests pass on Node 22. Node 20 now fails `npm ci` with a clear EBADENGINE message. Each new test fails when its fix is reverted (mutation-checked). Two new bypasses were found, and both must be fixed before Phase 3. First, the schema policy still allows an exponential-time schema made of nested `anyOf` with local `$ref`s and no regex (N1). Second, the replay guard can be bypassed by changing the hex case of the signature (N2). Findings 1 and 2 are recorded in the repo. Christopher closed them, and I don't reopen them. Three process items remain (N3–N5).
+The Phase 3 work itself is mostly sound. The reputation fix is correct and its test catches a revert. The Python SDK passes its tests, and its signatures match the TypeScript kit for every input a verdict actually carries. The verdict-key pinning, the testnet check and the validated-ledger handling all hold. **But neither blocker from the third review is fixed.** Since `a0f6e1b`, the only changed source files are `src/registry/db.ts` and `src/wallets.ts`. `src/schema-policy.ts`, `src/oracle/checks/json-schema.ts` and `json-schema-worker.ts` are byte-identical. I reproduced N8 again in this tree. The third verdict said N8 and N9 must be fixed before anything leaves localhost. A public developer preview is exactly that, so the verdict is FAIL. The threat model also says "no regex keywords" are allowed, which N8 shows is untrue (N12). If N8 and N9 are fixed and N12 is corrected, I expect PASS WITH FINDINGS on re-review.
 
-Findings 1 and 2, as recorded: `edr/EDR-011_ESCROW_PHASE1_TESTNET_DEMO.md` and `edr/EDR-012_ESCROW_PHASE2_ORACLE_REGISTRY.md` both read Status "Accepted". `edr/ACCEPTANCES.md` records "I accept EDR-011 and EDR-012, reviewer Gpno" at 2026-10-20 17:04 UTC. EDR-011 is present. `git branch -a` shows only `main`, and the per-phase branches are recorded as waived ("Keep history", 16:41 UTC) in EDR-011 and REVIEW_HANDOFF.md.
+## Diff integrity
 
-## Findings from the first review
+`git add -N . && git diff a0f6e1b` gives 45 files. After stripping `index` lines it is identical to `phase3.diff`. The tree matches the diff.
 
-| # | Status (fixed / not fixed / partly) | Evidence | Blocks Phase 3? |
+## Reproduced
+
+| Step | Result |
+|---|---|
+| `npx npm@11 ci` (Node 22.22.0, Linux) | 83 packages, no install-script warnings, 0 vulnerabilities. `better-sqlite3` loads from its bundled `prebuilds/` |
+| `npm run typecheck` | 0 errors |
+| `npm run test:unit` | **55/55** (5 files) |
+| Reputation mutation: `db.ts` reverted to a0f6e1b | 1 failed / 11 passed (`still counts a job as expired_unclaimed after it is refunded`); restored |
+| Python 3.13.5 venv, `pip install -e .[test]`, `python -m pytest` | **20 passed, 1 skipped** |
+| Testnet: `npm test` 59/59, `pytest --testnet`, demo 12/12 | **Not reproduced.** I rely on the implementer's logs (Linux). Windows was not run for Phase 3 |
+
+## Prior findings
+
+| # | Status | Evidence | Blocks public release? |
 |---|---|---|---|
-| 3 | fixed | `package.json` `"node": ">=22.12"`, `.npmrc` `engine-strict=true`. On Node 20.19.2, `npm ci` exits 1 with `EBADENGINE … Required: {"node":">=22.12"}`. On Node 22.23.3 it installs, with 0 vulnerabilities. README and REVIEW.md say 22.12. | No |
-| 4 | fixed | `checkBearer` (constant-time, SHA-256 digests) on `PUT /jobs/:id/condition` and `POST /jobs/:id/events`. Probed against a scratch registry: a ledger event with no token got 401, with the oracle's token 401, with a token one byte off 401; a condition with no token 401; an oracle-source event with the watcher's token 401; a missing source 400; only the correct watcher token was accepted. The oracle's `ledgerEscrowCheck` reads `ledger_entry` (validated) and compares destination, amount, condition and CancelAfter before releasing anything (409 otherwise). Reverting either fix fails a test. | No |
-| 5 | partly | `src/schema-policy.ts` refuses `pattern` at the top level and under `$defs`, `definitions`, `items`, `allOf`, `if/then`, `propertyNames` and `dependencies`; refuses `patternProperties`, `uniqueItems`, `format` and non-local `$ref` (URL or relative); refuses a 17 KB schema and 33 nesting levels. A property *named* `pattern` is allowed. The cache is bounded at 256. **Bypass:** see N1. A 1.4 KB, policy-allowed schema takes exponential time. | Yes (N1) |
-| 6 | fixed, with a new gap | `ReplayGuard` persists to `data/oracle-replay.json`: replaying the same request after a restart gives 401 "auth already used". Verdicts are signed with a separate ed25519 `ORACLE_VERDICT_SEED`. `verifyVerdict` requires the pinned address, and the SDK reads `ORACLE_VERDICT_ADDRESS` and no longer calls `/health`. `fundedAt` is the ledger close time and needs the watcher token. The verdict log moved to `data/verdicts.jsonl`. Plain HTTP on 127.0.0.1 is unchanged and documented. High-S secp256k1 signatures are rejected. **New gap:** N2. | Yes (N2) |
-| 7 | fixed | `logs/2026-10-20-phase2-fixes-txs.json` holds 9 validated transactions, and their hashes are identical to the 9 unique hashes in `logs/2026-10-20-phase2-fixes.txt` (49 PASS lines, "49/49 checks passed"). `demo-phase2.ts` moves to a new `-N` base name rather than overwriting an existing log. | No |
+| N8 `$ref` into data keywords bypasses the policy | **not fixed** | `src/schema-policy.ts:23` still skips `DATA_VALUES` (enum/const/default/examples) when walking, but `expand` (lines 91–109) follows `$ref` into them. Reproduced: `schemaProblem({"$defs":{"x":{"enum":[{"type":"string","pattern":"^(a+)+$"}]}},"properties":{"v":{"$ref":"#/$defs/x/enum/0"}}})` returns `null` (accepted) | **Yes** |
+| N9 single-worker head-of-line blocking | **not fixed** | `src/oracle/checks/json-schema.ts` has not changed since a0f6e1b: there is still one worker, a 2 s kill, serial validation, and no rate limit on a provider re-requesting `/verify` | **Yes** |
+| N5 blank owner signature | open | `edr/ACCEPTANCES.md:26`: `Signed: ____ (Christopher Terrell), date: ____`. The EDR-013 row (line 7) records the acceptance with a quote, but the owner signature is still unsigned across EDR-011, 012 and 013 | Yes (governance). Christopher must sign it in a commit |
+| N10 Windows run stale | open, carries over | The brief says Windows has not been run for Phase 3. The last Windows run was at e54e6d8 | Yes. The quickstart is written for Windows |
+| N11 placeholder git identity | open | `git log -1 --format=%ae` = `noreply@anthropic.com` | No, but fix it before the public repo |
+| N1–N4, N6, N7 | no regression seen | — | — |
 
 ## New findings
 
-| # | Severity | Where | What | Fix | Blocks Phase 3? |
-|---|---|---|---|---|---|
-| N1 | major | `src/schema-policy.ts`; `src/oracle/checks/json-schema.ts` | Exponential validation without any regex. `$defs` s0 = `{type:"string"}`, sK = `{anyOf:[{$ref:"#/$defs/s(K-1)"},{$ref:"#/$defs/s(K-1)"}]}`, root `$ref` to sN. The policy allows it (1.4 KB at N=22), and the registry would accept it too. Validating the deliverable `1` took 80 / 175 / 566 / 3884 ms at N = 16 / 18 / 20 / 22, so N≈30 would block the single-threaded oracle for minutes, and N≈40 for far longer. This defeats the goal of finding 5. | Run checks in a worker with a hard timeout (the gap already noted in FINDINGS_RESPONSE.md). Also limit `$ref` count and fan-out, or reject `$ref` cycles and reuse, and cap the total size of the combinator tree. | Yes |
-| N2 | major | `src/auth.ts` `checkRequest` / `ReplayGuard.use` | The replay key is the raw signature string, but `verify` accepts the same signature in lowercase (and in any mixed case). A captured signed `verify` request replayed with `signature.toLowerCase()` was ACCEPTED (ed25519 and secp256k1 both tested). Any of the 2^k case variants works within the 2-minute window, and each replay returns the fulfillment. On 127.0.0.1 an attacker would first have to see the request. | Normalize the signature (uppercase, and canonical DER) before the replay check, or key replay on `sha256(publicKey | action | jobId | timestamp | payloadHash)`. Add a test. | Yes |
-| N3 | medium (process) | `edr/EDR-011_ESCROW_PHASE1_TESTNET_DEMO.md`; `edr/ACCEPTANCES.md` | ACCEPTANCES.md says "No EDR-011 document existed before 2026-10-20" and that EDR-011 was written down at 17:10 UTC, six minutes *after* the 17:04 acceptance. A Proposed EDR-011 drafted for Christopher on 2026-10-20 did exist outside the repo. The repo version was rebuilt from `CLAUDE.md` and differs from it. It drops these: the boundary forbidding contact with the XRP Intelligence Core (`xrp_*.py`, `decision/`, `frozen_xrp_engine/`, `live_shadow/`, `data/xrp_brain.db`); the `Agents.md` A3 "data channel is not control channel" boundary; "a Gpno review verdict is recorded"; and "merge and push need separate owner approval". The accepted text is therefore ambiguous. | Christopher confirms which EDR-011 text he accepted. Either restore the dropped clauses or record that dropping them is intended. | No (governance) |
-| N4 | medium (process) | commit `e54e6d8` | Claude committed `e54e6d8` citing "Handoff requested by Christopher 2026-10-21 05:12 UTC ('Gpno reviews the fixes')". That is a review request, not commit approval. The approval quoted for `af9a4db`, "Yes proceed" (05:07 UTC), came before this commit and covered the fixes. CLAUDE.md and EDR-011: "No commit, merge or push without Christopher's approval." | Christopher approves `e54e6d8` after the fact or has it reverted. Claude asks for explicit commit approval for each commit. | No |
-| N5 | minor (process) | `edr/ACCEPTANCES.md`, `REVIEW_HANDOFF.md`, `FINDINGS_RESPONSE.md` | Every approval and waiver ("Keep history" 16:41 UTC, the git-init approval at 08:14 UTC, the 17:04 acceptance, "Yes proceed" 05:07 UTC) exists only as text written by the implementer, in commits by the implementer. Nothing in the repo is signed or authored by the owner. | Christopher commits ACCEPTANCES.md himself, or signs it off. | No |
-| N6 | nit | `xrpl-escrow/.gitignore`; root `.gitignore` | `node_modules` is listed twice. The explicit `verdicts.jsonl` ignore lines were removed. That's fine, since `data/` now covers the log, but an old `src/oracle/verdicts.jsonl` from earlier runs would no longer be ignored. | Remove the duplicate line, and keep or delete the old path. | No |
-| N7 | info | `docs/ESCROW-001_EARNED_STATUS.md` | EDR-011 and EDR-012 continue PersonalAi's EDR numbering but live only in `ai-settlement/edr/`. The document itself notes that they aren't tier-3 governance in PersonalAi. Numbers may collide later. | Use a separate prefix (for example AS-EDR-) or reserve the numbers in PersonalAi. | No |
+| # | Severity | Finding | Evidence | Blocks public release? |
+|---|---|---|---|---|
+| N12 | Medium | The threat model claims a protection that does not hold: "JSON Schemas are limited (no regex keywords …)". N8 smuggles `pattern` through. The only thing left is the 2 s worker kill, and N9 makes that a denial-of-service lever. Neither limitation is listed | `docs/THREAT_MODEL.md:35-38` | Yes (fix the code or state the gap) |
+| N13 | Low | Python `canonical_json` differs from JS `JSON.stringify` outside the documented types: `1e-7` becomes `1e-07` (JS: `1e-7`); integers above 2^53 stay exact (JS rounds, so 2^53+1 becomes …992); `NaN` becomes `NaN` (JS: `null`); a lone surrogate raises an error (JS escapes it as `\ud800`). These all agree: non-ASCII, U+2028, control characters, `0.1`, `1.5e300`, `1e21`. Verdicts only carry ints and strings, and a mismatch makes verification fail closed, so there is no forgery. Either reject floats, NaN and out-of-range ints, or match JS | `xrpl-escrow-py/src/xrpl_escrow/auth.py:46-73` | No |
+| N14 | Low | Key sort order may differ for keys outside the BMP: Python sorts by code point, JS by UTF-16 code unit. Fails closed. Not exercised by the vectors | `auth.py:63` | No |
+| N15 | Low | `DeliverResult.verdict_signature_valid` is only advisory. `claim()` does not check it before submitting EscrowFinish. The ledger condition protects the funds, but SDK users may assume a check that is not there. Document it or enforce it | `kit.py:~139-148` | No |
+| N16 | Low | `submit_validated` ignores the preliminary engine result. A `tem`/`tef` rejection is polled until `LastLedgerSequence` passes, then reported as "expired", which hides the real error. It still never reports success wrongly, and `tec` codes are returned from the validated meta correctly | `escrow.py:32-50` | No |
+| N17 | Low | Quickstart: `git clone <repo URL>` is a placeholder; it uses `npm install` (not `npm ci`) and Windows-only `\` paths. The offline parts work on Linux with `/` paths | `QUICKSTART.md:20-23,55-59` | Yes (needs the real URL) |
+| N18 | Info | `services.py` starts Node services with `subprocess.Popen` (fixed argv, no shell, stdin DEVNULL). Nothing runs deliverable content: there is no `exec`, `eval` or shell in the SDK. I found no seed or secret printed in `env.py`, `demo.py` or `services.py` | — | No |
 
-## What I ran
+## Checks that held
 
-Linux (shared review box). Node 22.23.3 for the build and tests; Node 20.19.2 for the engine check. All runs used a scratch copy of the repo, with no `.env`, no secrets and no testnet transactions.
+- Verdict pinning: `verify_verdict` requires `verdict.oracle == pinned` **and** that the public key derives to that address. A `None` pin fails. The pin comes only from the env file or the constructor, never from the oracle (`auth.py:86-91`, `kit.py:65-71`).
+- Testnet only: `assert_testnet` aborts if `network_id != 1` or the id is missing (`config.py:24-33`).
+- Hex-case replay: `replay_key` upper-cases the public key over the exact message (`auth.py:41-43`), matching N2's TS fix. `test_kit_local.py` passes. I did not run a replay across an oracle restart from Python; TS behaviour was verified in review 3.
+- The reputation fix counts jobs from the event log, and the mutation test fails when it is reverted.
+- `allowScripts` gives a quiet npm 11 install, and the kit works without the scripts.
 
-| Command | Expected | Result |
-|---|---|---|
-| `npm ci` (Node 20.19.2) | fails clearly | exit 1, `EBADENGINE`, "Required: {"node":">=22.12"}" |
-| `npm ci` (Node 22.23.3) | installs | OK, 0 vulnerabilities |
-| `npm run typecheck` | 0 errors | 0 errors |
-| `npm run test:unit` | 52/52 | **52/52 passed** (5 files, 2.9 s) |
-| `npm run demo` | 18/18 | not run (needs testnet and `.env`); Phase 1 code is unchanged since `deb71ea` |
-| `npm run demo:phase2` | 49/49 | not run; log reviewed: 49/49, and 9/9 tx hashes in the log match the txs JSON (all validated) |
-| `npm test` | 54/54 | not run in full; 52/52 unit tests, and the 2 testnet flows were skipped (optional, need secrets) |
+## Release blockers outside the code
 
-Probes (scratch scripts):
-- Token probe: no token, wrong token, one byte off, cross-service token.
-- Schema-policy probe: 18 cases plus the anyOf/`$ref` bomb (N1).
-- Replay probe: across a restart, high-S, hex-case (N2).
-- Mutation check: each fix (bearer, escrow check, schema policy, replay persistence, pinned verdict address, ledger `fundedAt`, bounded cache) was reverted in turn. At least one unit test failed every time.
+- No `LICENSE` file.
+- `SECURITY.md:13` contact is "[contact to be added before the public release]".
+- The tree is uncommitted. The commit needs Christopher's approval.
+- Windows has not been run for Phase 3 (N10).
+- The owner signature is blank (N5).
+- The testnet results have not been reproduced independently.
 
-Anything you could not run, and why: the testnet demos and flow tests, because they would need faucet funding and `.env` secrets (optional and out of scope for this review). Windows was not expected from me; Claude Code runs it separately.
+## Required for PASS
 
-## NOT DEMONSTRATED items
-- Windows run: Still open. Christopher assigned it to a separate Claude Code run.
-- README quickstart: Still open. Not driven by hand.
-- `expired_unclaimed` on testnet: Still open. Unit tests only.
-- Watcher reconnect: Still open. Code present, never exercised.
+Fix N8: walk or refuse `$ref` targets inside data keywords, with a test that fails when the fix is reverted. Fix N9: per-provider verify rate or concurrency limits, or a worker pool with a queue budget, with a test. Correct the threat model (N12). Then re-run the Windows tests (N10).

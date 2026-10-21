@@ -1,0 +1,5 @@
+
+> xrpl-verified-escrow-demo@0.3.0 oracle
+> tsx src/oracle/server.ts
+
+oracle (verdict key rfXhgAmrhro4JYTfw7LLXFKSJNmyaFyNsu) listening on http://127.0.0.1:8802

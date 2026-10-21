@@ -1,0 +1,10 @@
+﻿== npm ci Wed 10/21/2026 16:08:57.05 node 
+v24.18.0
+11.16.0
+
+added 81 packages, and audited 82 packages in 9s
+
+22 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities

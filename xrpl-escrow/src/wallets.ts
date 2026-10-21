@@ -11,8 +11,13 @@ export type Wallets = Record<Role, Wallet>;
 
 const seedKey = (role: Role) => `${role.toUpperCase()}_SEED`;
 
-/** Top up below this balance so a rerun always has enough for a 10 XRP job plus reserves. */
-const MIN_BALANCE_XRP = 30;
+/**
+ * Top up below this balance. The Phase 2 demo locks three 10 XRP escrows at once
+ * after paying a fourth, plus their owner reserves, and every paid job moves 10 XRP
+ * from the client to the provider for good, so 30 was too little once a few runs
+ * had drained the client (npm test, 2026-10-21: EscrowCreate failed in scenario 3).
+ */
+export const MIN_BALANCE_XRP = 60;
 
 export async function xrpBalance(client: Client, address: string): Promise<number> {
   try {

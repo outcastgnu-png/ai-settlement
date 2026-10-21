@@ -1,0 +1,7 @@
+﻿== npx tsx examples/first-job.ts Wed 10/21/2026 16:19:46.11 
+before: client 79.99949 XRP, provider 219.99328 XRP
+job c4ae8cab-85a5-4426-a099-08243c0056e3 registered, condition A0258020F500B73DD696E661AFEE9ACBF0CB282933829FAB7943AD97FABBF83259559212810120
+EscrowCreate tesSUCCESS, job funded: https://testnet.xrpl.org/transactions/30A0BA33CB341D30659C7CB24BA93AA3E8A8840D591D4F06325C3EA79CF6808E
+oracle verdict pass, signature valid: true
+EscrowFinish tesSUCCESS, job paid: https://testnet.xrpl.org/transactions/EA2AF6A42404AB0E47EAF4F184ADD258883D17F1D7BB5C5CA8F08105C75EB168
+after: client 69.999478 XRP, provider 229.992857 XRP

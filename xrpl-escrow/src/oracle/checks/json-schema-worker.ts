@@ -13,13 +13,13 @@ export interface SchemaRequest {
   schema: Record<string, unknown>;
   content: string;
   busyMs?: number; // tests only: spin for this long instead of validating
+  crash?: boolean; // tests only: end the worker thread instead of answering
+  startDelayMs?: number; // tests only: wait this long before taking the request up, like a slow start
 }
 
-export interface SchemaResponse {
-  id: number;
-  result: CheckResult;
-  cached: number; // validators held, for tests
-}
+export type SchemaResponse =
+  | { id: number; started: true } // sent first: the oracle starts the timeout clock here
+  | { id: number; started?: false; result: CheckResult; cached: number }; // cached: validators held, for tests
 
 const ajv = new Ajv({ strict: true, allErrors: false });
 const MAX_CACHED = 256;
@@ -61,6 +61,12 @@ export function validateInProcess(schema: Record<string, unknown>, content: stri
 
 if (parentPort) {
   parentPort.on("message", (req: SchemaRequest) => {
+    if (req.startDelayMs) {
+      const until = Date.now() + req.startDelayMs;
+      while (Date.now() < until) { /* stand-in for a slow start, before the clock starts */ }
+    }
+    parentPort!.postMessage({ id: req.id, started: true } satisfies SchemaResponse);
+    if (req.crash) process.exit(1); // in a worker this ends only the worker thread
     if (req.busyMs) {
       const until = Date.now() + req.busyMs;
       while (Date.now() < until) { /* hold the thread, so the timeout can be tested */ }

@@ -1,0 +1,14 @@
+﻿== N9 fix applied; npm run test:unit Wed 10/21/2026 16:23:23.29 
+
+> xrpl-verified-escrow-demo@0.3.0 test:unit
+> vitest run test/condition.test.ts test/registry.test.ts test/oracle.test.ts test/watcher.test.ts test/sdk.test.ts
+
+
+ RUN  v5.0.5 C:/dev/ai-settlement/xrpl-escrow
+
+
+ Test Files  5 passed (5)
+      Tests  61 passed (61)
+   Start at  16:23:23
+   Duration  9.94s (tests 92%, import 8%)
+

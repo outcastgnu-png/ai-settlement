@@ -4,6 +4,7 @@
 |---|---|---|---|---|---|
 | EDR-011, ESCROW-001 Phase 1 testnet demo | Accepted | Christopher (owner) | 2026-10-20 17:04 | "I accept EDR-011 and EDR-012, reviewer Gpno" | Gpno |
 | EDR-012, ESCROW-001 Phase 2 oracle and registry | Accepted | Christopher (owner) | 2026-10-20 17:04 | Same statement. He had also chosen "Accept and build" on a decision card at 07:31 | Gpno |
+| EDR-013, ESCROW-001 Phase 3 developer preview | Accepted | Christopher (owner) | 2026-10-21 16:45 | "I accept EDR. As proposed, as Christopher is the owner, implementer is Claude, builds end-to-end. Reviewer, GPNO, one final review for phase three, drafted by Claude." Scope "Developer preview (as drafted)" chosen on a decision card at 16:39 | Gpno |
 
 ## Decisions on Gpno's second review (2026-10-21 05:40 UTC)
 

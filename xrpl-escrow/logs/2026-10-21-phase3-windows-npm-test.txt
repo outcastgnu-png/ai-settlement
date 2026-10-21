@@ -1,0 +1,39 @@
+﻿== npm test Wed 10/21/2026 16:10:36.86 
+
+> xrpl-verified-escrow-demo@0.3.0 test
+> vitest run
+
+
+ RUN  v5.0.5 C:/dev/ai-settlement/xrpl-escrow
+
+ ❯ test/oracle.test.ts (27 tests | 1 failed) 3893ms
+   ❯ oracle service (12)
+     × runs a job's checks once, however many times or how fast its provider asks (Gpno N9) 134ms
+cmd : 
+At line:1 char:621
++ ... t -Last 12; cmd /c "echo == npm test %DATE% %TIME% & npm.cmd test" >  ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/oracle.test.ts > oracle service > runs a job's checks once, however many times or how fast its provider 
+asks (Gpno N9)
+Error: auth already used
+ ❯ ClientRequest.<anonymous> src/http.ts:101:49
+     99|       const parsed = text ? JSON.parse(text) : undefined;
+    100|       const status = res.statusCode ?? 0;
+    101|       if (status < 200 || status >= 300) reject(new HttpError(status, …
+       |                                                 ^
+    102|       else resolveCall(parsed as T);
+    103|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 7 passed (8)
+      Tests  1 failed | 64 passed (65)
+   Start at  16:10:37
+   Duration  411.20s (tests 100%)
+

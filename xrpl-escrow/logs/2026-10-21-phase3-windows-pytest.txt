@@ -1,0 +1,17 @@
+﻿== pytest Wed 10/21/2026 16:17:40.79 
+Python 3.14.6
+============================= test session starts =============================
+platform win32 -- Python 3.14.6, pytest-9.1.1, pluggy-1.7.0
+rootdir: C:\dev\ai-settlement\xrpl-escrow-py
+configfile: pyproject.toml
+testpaths: tests
+plugins: anyio-4.15.1
+collected 26 items
+
+tests\test_condition.py .....                                            [ 19%]
+tests\test_demo_testnet.py s                                             [ 23%]
+tests\test_kit_local.py ..........                                       [ 61%]
+tests\test_parity.py ........                                            [ 92%]
+tests\test_retry.py ..                                                   [100%]
+
+======================== 25 passed, 1 skipped in 4.23s ========================

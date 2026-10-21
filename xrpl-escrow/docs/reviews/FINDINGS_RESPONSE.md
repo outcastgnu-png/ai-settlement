@@ -103,9 +103,33 @@ Evidence:
   **49/49** on testnet (`logs/2026-10-21-phase2-fixes2.txt`, transactions in
   `logs/2026-10-21-phase2-fixes2-txs.json`). `npm test` in full not yet re-run.
 
+## Phase 3 review (2026-10-21, `VERDICT.md`, on `a0f6e1b` plus the uncommitted Phase 3 tree): FAIL
+
+The second review's verdict is archived as `VERDICT-2026-10-21-af9a4db.md`. The third
+(confirmation) verdict on `a0f6e1b` was never placed in the repo; it should be archived as
+`VERDICT-2026-10-21-a0f6e1b.md` once Christopher shares its text.
+
+| # | Status | Where | Test that fails when the fix is reverted |
+|---|---|---|---|
+| N8 | fixed | `src/schema-policy.ts`: one walk over the schema as Ajv will see it. A `$ref` must point at a subschema; `resolveSchemaPointer` follows the pointer and refuses one that passes through `enum`, `const`, `default`, `examples` or other data, ends on a name map (`properties`), a list (`anyOf`) or a scalar, or indexes an array that isn't a schema list. Every `$ref` target is then checked for banned keywords like the rest. | `test/oracle.test.ts` "refuses a $ref into enum, const or other data" (includes your exact schema); `test/registry.test.ts` 400 for the same at job creation. The old policy file fails the oracle test |
+| N9 | fixed | `src/oracle/checks/json-schema.ts`: the 2 s clock starts when the worker says it has started the request, so start-up after a kill and queue time never count; a crashed or slow-to-start worker and a full queue (8 waiting) throw `CheckUnavailable`. `src/oracle/server.ts`: that becomes 503 with no verdict signed, logged or recorded; one run of a job's checks at a time (concurrent asks share it); results remembered per job and deliverable, so asking again costs nothing. `src/registry/server.ts`: at most 8 checks per job. Both SDKs retry a 503 with a fresh signature | `test/oracle.test.ts`: "does not count a fresh worker's start-up", "turns a crashed worker or a full queue into CheckUnavailable", "answers 503 ... then verifies on a retry", "runs a job's checks once"; `test/registry.test.ts` "limits how many checks"; `xrpl-escrow-py/tests/test_retry.py`. All four oracle tests fail on the old code |
+| N12 | fixed | `docs/THREAT_MODEL.md`: states the schema limits exactly, says N8 existed before 0.3.0, and adds the availability row (one worker, delays not fails, 503 and retry, a deadline can still pass) | — |
+| N13 | fixed | `auth.py` `canonical_json` raises on floats, NaN, integers past 2^53 and lone surrogates | `tests/test_parity.py` |
+| N14 | fixed | keys sort by UTF-16 code unit | `tests/test_parity.py` (checked against the TypeScript output) |
+| N15 | fixed | `claim()` refuses a fulfillment that doesn't open the job's condition; the docs say it does not check the verdict | `tests/test_kit_local.py` |
+| N16 | fixed | `submit_validated` raises a tem/tef/tel preliminary result at once | — (exercised only on testnet) |
+| N17 | fixed | `QUICKSTART.md`: release zip until the public repository exists, `npm ci`, macOS/Linux spellings | — |
+| N5 | wording given | Christopher gave the signature wording at 20:47 UTC; written into `edr/ACCEPTANCES.md`. Committed only with his approval | — |
+| N10 | fixed | Windows run for Phase 3 on Christopher's PC (Windows 11, Node 24.18.0, Python 3.14.6). It found one test bug: five verify requests signed in the same millisecond were the same request, so four got "auth already used". The test now signs distinct timestamps; `signRequest` takes an optional timestamp and its docs say so. After that: oracle tests 27/27 on 3 runs, unit 61/61, npm test 65/65, pytest 25+1 and 26 with --testnet, quickstart first job paid, Python demo 12/12 | `logs/2026-10-21-phase3-windows*.txt` |
+| N11 | open | Commit identity: to be decided with the commit | — |
+| N18 | info | — | — |
+
+Also done: Apache-2.0 `LICENSE` and `NOTICE`, and the `SECURITY.md` contact (Christopher's
+choice, 20:47 UTC).
+
 ## Still open
 
-- N5: Christopher's signature in `edr/ACCEPTANCES.md`.
+- N5: Christopher's signature in `edr/ACCEPTANCES.md` is written with his wording; the commit needs his approval.
 - The NOT DEMONSTRATED items from the first review were all run on Christopher's Windows PC on
   2026-10-21 at `e54e6d8` and passed (commit `7317e48`). Not re-run after the N1/N2 fixes.
 - TLS for any non-localhost deployment (finding 6).

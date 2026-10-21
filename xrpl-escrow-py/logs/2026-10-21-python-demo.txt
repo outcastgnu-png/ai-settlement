@@ -1,0 +1,25 @@
+connected to wss://testnet.xrpl-labs.com (network_id checked = 1)
+oracle verdict key pinned to rQwBsdpvEpXHxVdRLstfKGhe7jJDLMQXj9
+
+1. Pass and claim: the work passes the oracle's checks and the provider claims 10 XRP
+  before: client 89.999964 XRP, provider 109.999577 XRP
+  PASS  job registered as draft with the oracle's condition (job 5ffd20a4-dc8a-4963-a1a2-5e7c2569636f)
+  PASS  EscrowCreate -> tesSUCCESS, watcher -> funded (tesSUCCESS https://testnet.xrpl.org/transactions/F1239BEA3594521B0D5F835330827C986CC3378D424BFA704DADEE9774AF4A1D)
+  PASS  oracle verdict is pass, signed by the pinned oracle address (oracle rQwBsdpvEpXHxVdRLstfKGhe7jJDLMQXj9)
+  PASS  fulfillment released to the provider
+  PASS  EscrowFinish -> tesSUCCESS, watcher -> paid (tesSUCCESS https://testnet.xrpl.org/transactions/6C6AA0BCF89430A4635E567F6DE6063ED0195BF74BAAE2ED61A1EEAFDB013F8B)
+  PASS  escrow object is gone from the ledger
+  PASS  provider gains the price minus the finish fee (+9.999625 XRP)
+  after: client 79.999954 XRP, provider 119.999202 XRP
+
+2. Fail and refund: the work fails the checks; the client is refunded after the deadline
+  before: client 79.999954 XRP, provider 119.999202 XRP
+  PASS  EscrowCreate -> tesSUCCESS, watcher -> funded (tesSUCCESS https://testnet.xrpl.org/transactions/05320DB9179870B23B5723BA44F762C7B46ACD193DFCB90BBCCDFBF4D716FBC0)
+  PASS  oracle verdict is fail, signed, and no fulfillment (sha256 135abd55cf3be6f74eaceae432a4b21f653b8e82640bc2c90e2fc9cf156fcb65 does not match the spec)
+  PASS  the client cannot get a verdict or fulfillment for the provider's job (403)
+  waiting for a validated ledger past CancelAfter ...
+  PASS  EscrowCancel -> tesSUCCESS, watcher -> refunded (tesSUCCESS https://testnet.xrpl.org/transactions/625BF2F57A2A890D1D720CB4AF03CA69DF38DDC656FA61718B4A03315CDFCBBF)
+  PASS  client gets the price back minus the cancel fee (+9.999990 XRP)
+  after: client 79.999934 XRP, provider 119.999202 XRP
+
+12/12 checks passed

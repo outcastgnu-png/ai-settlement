@@ -25,8 +25,12 @@ const MAX_SKEW_MS = 120_000;
 const requestMessage = (action: string, jobId: string, timestamp: number, payloadHash: string) =>
   hexOf(`${action}|${jobId}|${timestamp}|${payloadHash}`);
 
-export function signRequest(wallet: Wallet, action: string, jobId: string, payloadHash = ""): RequestAuth {
-  const timestamp = Date.now();
+/**
+ * Two requests signed for the same action and job in the same millisecond are the
+ * same request (the signature is deterministic), so the oracle accepts only one.
+ * Pass `timestamp` to sign for a specific time.
+ */
+export function signRequest(wallet: Wallet, action: string, jobId: string, payloadHash = "", timestamp = Date.now()): RequestAuth {
   return {
     publicKey: wallet.publicKey,
     timestamp,

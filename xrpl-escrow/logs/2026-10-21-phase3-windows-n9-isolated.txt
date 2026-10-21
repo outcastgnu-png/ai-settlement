@@ -1,0 +1,93 @@
+﻿== node v24.18.0, isolated N9 x3, 2026-10-21T16:16:41.1375332-05:00
+---- run 1
+
+ RUN  v5.0.5 C:/dev/ai-settlement/xrpl-escrow
+
+ ❯ test/oracle.test.ts (27 tests | 1 failed | 26 skipped) 174ms
+   ❯ oracle service (12)
+     × runs a job's checks once, however many times or how fast its provider asks (Gpno N9) 143ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/oracle.test.ts > oracle service > runs a job's checks once, however many times or how fast its provider asks (Gpno N9)
+Error: auth already used
+ ❯ ClientRequest.<anonymous> src/http.ts:101:49
+     99|       const parsed = text ? JSON.parse(text) : undefined;
+    100|       const status = res.statusCode ?? 0;
+    101|       if (status < 200 || status >= 300) reject(new HttpError(status, …
+       |                                                 ^
+    102|       else resolveCall(parsed as T);
+    103|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 26 skipped (27)
+   Start at  16:16:41
+   Duration  490ms (import 50%, tests 43%, transform 7%, worker 1%)
+
+---- run 2
+
+ RUN  v5.0.5 C:/dev/ai-settlement/xrpl-escrow
+
+stderr | test/oracle.test.ts
+Error: read ECONNRESET
+    at TCP.onStreamRead (node:internal/stream_base_commons:216:20) {
+  errno: -4077,
+  code: 'ECONNRESET',
+  syscall: 'read'
+}
+
+ ❯ test/oracle.test.ts (27 tests | 1 failed | 26 skipped) 180ms
+   ❯ oracle service (12)
+     × runs a job's checks once, however many times or how fast its provider asks (Gpno N9) 139ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/oracle.test.ts > oracle service > runs a job's checks once, however many times or how fast its provider asks (Gpno N9)
+Error: auth already used
+ ❯ ClientRequest.<anonymous> src/http.ts:101:49
+     99|       const parsed = text ? JSON.parse(text) : undefined;
+    100|       const status = res.statusCode ?? 0;
+    101|       if (status < 200 || status >= 300) reject(new HttpError(status, …
+       |                                                 ^
+    102|       else resolveCall(parsed as T);
+    103|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 26 skipped (27)
+   Start at  16:16:42
+   Duration  489ms (import 49%, tests 44%, transform 7%, worker 1%)
+
+---- run 3
+
+ RUN  v5.0.5 C:/dev/ai-settlement/xrpl-escrow
+
+ ❯ test/oracle.test.ts (27 tests | 1 failed | 26 skipped) 190ms
+   ❯ oracle service (12)
+     × runs a job's checks once, however many times or how fast its provider asks (Gpno N9) 151ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/oracle.test.ts > oracle service > runs a job's checks once, however many times or how fast its provider asks (Gpno N9)
+Error: auth already used
+ ❯ ClientRequest.<anonymous> src/http.ts:101:49
+     99|       const parsed = text ? JSON.parse(text) : undefined;
+    100|       const status = res.statusCode ?? 0;
+    101|       if (status < 200 || status >= 300) reject(new HttpError(status, …
+       |                                                 ^
+    102|       else resolveCall(parsed as T);
+    103|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 26 skipped (27)
+   Start at  16:16:44
+   Duration  499ms (import 47%, tests 46%, transform 7%, worker 1%)
+

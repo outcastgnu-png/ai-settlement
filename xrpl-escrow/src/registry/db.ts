@@ -218,7 +218,12 @@ export class JobStore {
     }));
   }
 
-  /** Reputation stub: per-provider counts computed from the registry. */
+  /**
+   * Reputation stub: per-provider counts computed from the registry. A passed
+   * job nobody claimed in time is later refunded, so `expiredUnclaimed` counts
+   * jobs that ever reached that status (from the event log), not jobs whose
+   * current status is still expired_unclaimed.
+   */
   reputation(provider: string) {
     const r = this.db.prepare(`SELECT
         COUNT(*) AS total,
@@ -226,7 +231,7 @@ export class JobStore {
         SUM(verdict = 'fail') AS failed,
         SUM(status = 'paid') AS paid,
         SUM(status = 'refunded') AS refunded,
-        SUM(status = 'expired_unclaimed') AS expiredUnclaimed
+        SUM(EXISTS (SELECT 1 FROM events e WHERE e.job_id = jobs.id AND e.status = 'expired_unclaimed')) AS expiredUnclaimed
       FROM jobs WHERE provider = ?`).get(provider) as Record<string, number | null>;
     const n = (k: string) => r[k] ?? 0;
     return {

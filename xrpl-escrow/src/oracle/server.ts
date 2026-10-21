@@ -11,7 +11,11 @@
 // amount, provider, condition and deadline, so a forged registry status can't
 // get a fulfillment released. A verify call returns a verdict signed with the
 // oracle's ed25519 verdict key, and the fulfillment only on a pass and only to
-// the job's provider. Every verdict is appended to a JSONL log.
+// the job's provider. Every verdict is appended to a JSONL log. If the checks
+// can't run for a reason that isn't the job's (the schema checker is busy or
+// restarting), it answers 503 and signs nothing, so the provider can ask again
+// (Gpno N9). A job's check results are remembered, so asking again after a
+// verdict doesn't run the checks a second time.
 import { appendFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -23,7 +27,7 @@ import { getEscrow } from "../escrow.js";
 import { HttpError, callJson, jsonServer, listenLocal, type Route } from "../http.js";
 import { ORACLE_PORT, REGISTRY_URL, REPLAY_FILE, VAULT_FILE, VERDICT_LOG, readEnvFile, requireEnv } from "../local-config.js";
 import type { Deliverable, Job } from "../registry/db.js";
-import { runChecks, stopSchemaWorker, type CheckResult } from "./checks/index.js";
+import { CheckUnavailable, runChecks, stopSchemaWorker, type CheckResult } from "./checks/index.js";
 import { SecretVault, parseVaultKey } from "./vault.js";
 
 export interface VerdictBody {
@@ -71,8 +75,18 @@ export function ledgerEscrowCheck(client: Client): EscrowCheck {
   };
 }
 
+/** Verified jobs whose check results are kept, so asking again doesn't run the checks again. */
+const MAX_REMEMBERED_RESULTS = 1_024;
+
 export function oracleRoutes(opts: OracleOptions): Route[] {
   const registry = opts.registryUrl ?? REGISTRY_URL;
+  // jobId|evidenceHash -> results. A deliverable can't change once posted, so a
+  // second verify of the same job gets the same results without spending the
+  // schema worker's time again (Gpno N9).
+  const remembered = new Map<string, { pass: boolean; results: CheckResult[] }>();
+  // Checks still running, by the same key: a provider asking again before the first
+  // answer waits for that run instead of starting another one.
+  const running = new Map<string, Promise<{ pass: boolean; results: CheckResult[] }>>();
   const verdictLog = opts.verdictLog ?? VERDICT_LOG;
   const replay = opts.replay ?? new ReplayGuard();
   const getJob = async (id: string) => {
@@ -122,9 +136,29 @@ export function oracleRoutes(opts: OracleOptions): Route[] {
         if (escrowProblem) throw new HttpError(409, `escrow check failed: ${escrowProblem}`);
         const deliverable = await callJson<Deliverable>("GET", `${registry}/jobs/${encodeURIComponent(jobId)}/deliverable`);
 
-        const { pass, results } = await runChecks(job.spec.checks, { job, content: deliverable.content, deliveredAt: deliverable.deliveredAt });
+        const evidenceHash = sha256Hex(deliverable.content);
+        const key = `${jobId}|${evidenceHash}`;
+        let outcome = remembered.get(key);
+        if (!outcome) {
+          let run = running.get(key);
+          if (!run) {
+            run = runChecks(job.spec.checks, { job, content: deliverable.content, deliveredAt: deliverable.deliveredAt })
+              .finally(() => running.delete(key));
+            running.set(key, run);
+          }
+          try {
+            outcome = await run;
+          } catch (err) {
+            // The oracle's problem, not the job's: no verdict, no status change. Ask again.
+            if (err instanceof CheckUnavailable) throw new HttpError(503, err.message);
+            throw err;
+          }
+          if (remembered.size >= MAX_REMEMBERED_RESULTS) remembered.delete(remembered.keys().next().value!);
+          remembered.set(key, outcome);
+        }
+        const { pass, results } = outcome;
         const unsigned: VerdictBody = {
-          jobId, verdict: pass ? "pass" : "fail", checks: results, evidenceHash: sha256Hex(deliverable.content),
+          jobId, verdict: pass ? "pass" : "fail", checks: results, evidenceHash,
           condition: job.condition, provider: job.provider, oracle: opts.verdictKey.address,
           publicKey: opts.verdictKey.publicKey, issuedAt: Date.now(),
         };

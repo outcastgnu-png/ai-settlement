@@ -8,7 +8,7 @@ import { Wallet } from "xrpl";
 import { sha256Hex, signRequest } from "../src/auth.js";
 import { HttpError, callJson } from "../src/http.js";
 import { runChecks, stopSchemaWorker } from "../src/oracle/checks/index.js";
-import { busySchemaCheck, cachedValidators, jsonSchema } from "../src/oracle/checks/json-schema.js";
+import { CheckUnavailable, MAX_WAITING, busySchemaCheck, cachedValidators, schemaRuns, jsonSchema } from "../src/oracle/checks/json-schema.js";
 import { schemaProblem } from "../src/schema-policy.js";
 import { maxLatency } from "../src/oracle/checks/max-latency.js";
 import { sha256Match } from "../src/oracle/checks/sha256-match.js";
@@ -71,11 +71,65 @@ describe("oracle checks", () => {
     expect((await jsonSchema({ schema: reuse }, ctx('{"a":"x","b":"y"}'))).pass).toBe(true);
   });
 
+  it("json-schema refuses a $ref into enum, const or other data, where a banned keyword could hide (Gpno N8)", async () => {
+    const redos = { type: "string", pattern: "^(a+)+$" };
+    for (const [key, ref] of [["enum", "#/enum/0"], ["const", "#/const"], ["default", "#/default"], ["examples", "#/examples/0"]] as const) {
+      const schema = { [key]: key === "enum" || key === "examples" ? [redos] : redos, $ref: ref };
+      expect(schemaProblem(schema), key).toMatch(/not a subschema/);
+    }
+    // Gpno's own case from the Phase 3 verdict
+    expect(schemaProblem({ $defs: { x: { enum: [redos] } }, properties: { v: { $ref: "#/$defs/x/enum/0" } } })).toMatch(/not a subschema/);
+    // deeper: data inside a definition, and data reached through a property
+    expect(schemaProblem({ $defs: { d: { enum: [redos] } }, $ref: "#/$defs/d/enum/0" })).toMatch(/not a subschema/);
+    expect(schemaProblem({ properties: { x: { const: redos } }, $ref: "#/properties/x/const" })).toMatch(/not a subschema/);
+    // a ref may not point at a name map, a list, or a scalar either
+    expect(schemaProblem({ properties: { a: { type: "string" } }, $ref: "#/properties" })).toMatch(/not a subschema/);
+    expect(schemaProblem({ anyOf: [{ type: "string" }], $ref: "#/anyOf" })).toMatch(/not a subschema/);
+    expect(schemaProblem({ type: "string", $ref: "#/type" })).toMatch(/not a subschema/);
+    expect(schemaProblem({ required: ["a"], $ref: "#/required/0" })).toMatch(/not a subschema/);
+    // a banned keyword reached through an ordinary ref is refused too
+    expect(schemaProblem({ $defs: { d: redos }, $ref: "#/$defs/d" })).toMatch(/"pattern" is not allowed/);
+    // ordinary refs still work: into $defs, properties (even one named "pattern") and anyOf items
+    const ok = {
+      $defs: { s: { type: "string" } }, type: "object",
+      properties: { pattern: { type: "string" }, a: { $ref: "#/$defs/s" }, b: { $ref: "#/properties/pattern" }, c: { anyOf: [{ type: "integer" }] }, d: { $ref: "#/properties/c/anyOf/0" } },
+    };
+    expect(schemaProblem(ok)).toBeNull();
+    expect((await jsonSchema({ schema: ok }, ctx('{"pattern":"x","a":"y","b":"z","c":1,"d":2}'))).pass).toBe(true);
+    // the oracle refuses the bypass before it ever reaches Ajv, so it takes no time
+    const started = Date.now();
+    const res = await jsonSchema({ schema: { enum: [redos], $ref: "#/enum/0" } }, ctx(JSON.stringify(`${"a".repeat(28)}!`)));
+    expect(res).toMatchObject({ pass: false, detail: expect.stringContaining("job schema refused") });
+    expect(Date.now() - started).toBeLessThan(500);
+  });
+
   it("json-schema stops a validation that runs past the timeout and keeps working afterwards", async () => {
     const started = Date.now();
     expect(await busySchemaCheck(5_000, 300)).toMatchObject({ pass: false, detail: expect.stringContaining("longer than 300 ms") });
     expect(Date.now() - started).toBeLessThan(2_500);
     expect((await jsonSchema({ schema: { type: "object" } }, ctx("{}"))).pass).toBe(true);
+  });
+
+  it("json-schema does not count a fresh worker's start-up against the job (Gpno N9)", async () => {
+    // A worker that takes 1.5 s to pick the request up, against a 500 ms limit: only the
+    // job's own validation counts, so it passes. (A cold worker loads tsx and Ajv first,
+    // which takes about this long on a slow machine.)
+    expect(await busySchemaCheck(0, 500, false, 1_500)).toMatchObject({ pass: true });
+    // and a real cold start, right after a timeout killed the worker
+    expect((await busySchemaCheck(2_000, 500)).pass).toBe(false);
+    expect((await jsonSchema({ schema: { type: "object" } }, ctx("{}"), 1_000)).pass).toBe(true);
+  });
+
+  it("json-schema turns a crashed worker or a full queue into CheckUnavailable, never a fail (Gpno N9)", async () => {
+    await expect(busySchemaCheck(0, 1_000, true)).rejects.toBeInstanceOf(CheckUnavailable);
+    expect((await jsonSchema({ schema: { type: "object" } }, ctx("{}"))).pass).toBe(true); // a fresh worker serves the next one
+    const running = busySchemaCheck(600, 2_000);
+    await new Promise((r) => setTimeout(r, 100)); // the first one is running; the queue is empty
+    const queued = Array.from({ length: MAX_WAITING + 2 }, () => busySchemaCheck(10, 2_000).then(() => "ran", (e) => e));
+    const outcomes = await Promise.all(queued);
+    await running;
+    expect(outcomes.filter((o) => o === "ran")).toHaveLength(MAX_WAITING);
+    expect(outcomes.filter((o) => o instanceof CheckUnavailable)).toHaveLength(2);
   });
 
   it("json-schema keeps a bounded cache of compiled schemas", async () => {
@@ -252,6 +306,58 @@ describe("oracle service", () => {
     const { verdict, fulfillment } = await verify(id);
     expect(verdict.verdict).toBe("pass");
     expect(cc.Fulfillment.fromBinary(Buffer.from(fulfillment!, "hex")).getConditionBinary().toString("hex").toUpperCase()).toBe(condition);
+  });
+
+  it("answers 503 with no verdict and no status change when the checker is unavailable, then verifies on a retry (Gpno N9)", async () => {
+    const work = JSON.stringify({ ok: true });
+    const { id } = await deliveredJob(work, [{ type: "json-schema", schema: { type: "object", required: ["ok"], properties: { ok: { const: true } } } }]);
+    const logLines = () => (existsSync(local.verdictLog) ? readFileSync(local.verdictLog, "utf8").trim().split("\n").length : 0);
+    const linesBefore = logLines();
+    const fill = async () => {
+      const head = busySchemaCheck(800, 2_000);
+      await new Promise((r) => setTimeout(r, 100));
+      return [head, ...Array.from({ length: MAX_WAITING }, () => busySchemaCheck(1, 2_000))];
+    };
+    let busy = await fill();
+    const refused = await verify(id).then(() => null, (e: HttpError) => e);
+    expect(refused?.status).toBe(503);
+    expect(logLines()).toBe(linesBefore);
+    expect((await callJson<Job>("GET", `${local.registry.url}/jobs/${id}`)).status).toBe("delivered");
+    await Promise.all(busy);
+    const { verdict, fulfillment } = await verify(id); // a new signed request
+    expect(verdict.verdict).toBe("pass");
+    expect(fulfillment).toBeDefined();
+    // Asking again gets the remembered results, even while the checker is full.
+    busy = await fill();
+    expect((await verify(id)).verdict.verdict).toBe("pass");
+    await Promise.all(busy);
+  });
+
+  it("runs a job's checks once, however many times or how fast its provider asks (Gpno N9)", async () => {
+    const work = JSON.stringify({ ok: true });
+    const { id } = await deliveredJob(work, [{ type: "json-schema", schema: { type: "object", properties: { ok: { const: true } } } }]);
+    // Five requests at once while the checker is held by someone else: they all
+    // wait for one run of this job's checks, and get identical answers.
+    let held = busySchemaCheck(800, 3_000);
+    await new Promise((r) => setTimeout(r, 100));
+    const before = schemaRuns();
+    // Five different signed requests (one millisecond apart: two signed in the same
+    // millisecond would be the same request, and the replay guard would refuse it).
+    const now = Date.now();
+    const auths = Array.from({ length: 5 }, (_v, i) => signRequest(provider, "verify", id, "", now + i));
+    const answers = await Promise.all(auths.map((auth) =>
+      callJson<{ verdict: SignedVerdict }>("POST", `${local.oracle.url}/verify/${id}`, { auth })));
+    await held;
+    expect(schemaRuns() - before).toBe(1);
+    expect(new Set(answers.map((a) => JSON.stringify(a.verdict.checks))).size).toBe(1);
+    // Asking again later is answered at once, even while the checker is held.
+    held = busySchemaCheck(1_500, 3_000);
+    await new Promise((r) => setTimeout(r, 100));
+    const started = Date.now();
+    expect((await verify(id)).verdict.verdict).toBe("pass");
+    expect(Date.now() - started).toBeLessThan(1_000);
+    await held;
+    expect(schemaRuns() - before).toBe(2); // only the busy run was added
   });
 
   it("appends one JSONL line per verdict and never logs the fulfillment", async () => {

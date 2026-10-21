@@ -1,0 +1,47 @@
+﻿== npm run test:unit Wed 10/21/2026 16:09:06.21 
+
+> xrpl-verified-escrow-demo@0.3.0 test:unit
+> vitest run test/condition.test.ts test/registry.test.ts test/oracle.test.ts test/watcher.test.ts test/sdk.test.ts
+
+
+ RUN  v5.0.5 C:/dev/ai-settlement/xrpl-escrow
+
+cmd : stderr | test/oracle.test.ts
+At line:1 char:541
++ ... t" -Tail 5; cmd /c "echo == npm run test:unit %DATE% %TIME% & npm.cmd ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (stderr | test/oracle.test.ts:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Error: read ECONNRESET
+    at TCP.onStreamRead (node:internal/stream_base_commons:216:20) {
+  errno: -4077,
+  code: 'ECONNRESET',
+  syscall: 'read'
+}
+
+ ❯ test/oracle.test.ts (27 tests | 1 failed) 4076ms
+   ❯ oracle service (12)
+     × runs a job's checks once, however many times or how fast its provider asks (Gpno N9) 141ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/oracle.test.ts > oracle service > runs a job's checks once, however many times or how fast its provider 
+asks (Gpno N9)
+Error: auth already used
+ ❯ ClientRequest.<anonymous> src/http.ts:101:49
+     99|       const parsed = text ? JSON.parse(text) : undefined;
+    100|       const status = res.statusCode ?? 0;
+    101|       if (status < 200 || status >= 300) reject(new HttpError(status, …
+       |                                                 ^
+    102|       else resolveCall(parsed as T);
+    103|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 4 passed (5)
+      Tests  1 failed | 60 passed (61)
+   Start at  16:09:06
+   Duration  6.22s (tests 84%, import 13%, transform 2%)
+

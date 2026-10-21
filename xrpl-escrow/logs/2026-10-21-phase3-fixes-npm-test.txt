@@ -1,0 +1,14 @@
+
+> xrpl-verified-escrow-demo@0.3.0 test
+> vitest run
+
+
+ RUN  v5.0.5 /tmp/claude-0/build/xrpl-escrow
+
+
+ Test Files  8 passed (8)
+      Tests  65 passed (65)
+   Start at  20:55:32
+   Duration  470.60s (tests 100%)
+
+npm exit 0

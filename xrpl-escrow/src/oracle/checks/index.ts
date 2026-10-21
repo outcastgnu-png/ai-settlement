@@ -5,7 +5,7 @@ import { sha256Match } from "./sha256-match.js";
 import type { CheckContext, CheckResult } from "./types.js";
 
 export type { CheckContext, CheckResult } from "./types.js";
-export { stopSchemaWorker } from "./json-schema.js";
+export { CheckUnavailable, stopSchemaWorker } from "./json-schema.js";
 
 export interface CheckOptions {
   timeoutMs?: number; // for checks that run in a worker

@@ -7,7 +7,10 @@
 //   $ref                        a chain of local refs with anyOf fan-out makes
 //                               the validator exponential in the schema's size
 //                               (Gpno finding N1), so refs are expanded and
-//                               the expanded tree is capped; recursion is refused
+//                               the expanded tree is capped; recursion is refused.
+//                               A $ref may only point at a subschema, never into
+//                               enum, const or other data, and its target is
+//                               checked like the rest (Gpno finding N8)
 // Both the registry (when a job is created) and the oracle (before compiling)
 // apply this policy. The oracle also runs the validation in a worker with a
 // hard timeout, in case something gets past these static limits.
@@ -17,28 +20,61 @@ export const MAX_REFS = 64; // $ref occurrences in the schema as written
 export const MAX_EXPANDED_NODES = 4_096; // objects and arrays after every $ref is inlined
 export const BANNED_KEYWORDS = ["pattern", "patternProperties", "uniqueItems", "format", "$data"];
 
-// Keywords whose values are maps of user-chosen names to subschemas, and
-// keywords whose values are plain data, not schemas.
-const NAME_MAPS = ["properties", "$defs", "definitions", "dependentSchemas"];
+// Keywords whose values are maps of user-chosen names to subschemas, keywords
+// whose values are lists of subschemas, and keywords whose values are plain
+// data, not schemas. Anything else is a keyword whose value is one subschema
+// (or, like "type" or "minLength", a scalar that holds no schema).
+const NAME_MAPS = ["properties", "$defs", "definitions", "dependentSchemas", "dependencies"];
+const SCHEMA_LISTS = ["allOf", "anyOf", "oneOf", "prefixItems", "items"];
 const DATA_VALUES = ["enum", "const", "default", "examples", "required", "dependentRequired", "title", "description"];
 
-/** Resolve a local JSON pointer such as "#/$defs/a~1b" against `root`; undefined if it points nowhere. */
-function resolvePointer(root: unknown, ref: string): unknown {
-  if (ref === "#") return root;
+type Position = "schema" | "names" | "list" | "data";
+
+/** What sits under `key` in a schema object. */
+function childPosition(key: string, value: unknown): Position {
+  if (DATA_VALUES.includes(key)) return "data";
+  if (NAME_MAPS.includes(key)) return "names";
+  if (SCHEMA_LISTS.includes(key) && Array.isArray(value)) return "list";
+  return "schema";
+}
+
+const pointerTokens = (ref: string): string[] | undefined => {
+  if (ref === "#") return [];
   if (!ref.startsWith("#/")) return undefined;
+  try {
+    return ref.slice(2).split("/").map((raw) => decodeURIComponent(raw).replaceAll("~1", "/").replaceAll("~0", "~"));
+  } catch {
+    return undefined;
+  }
+};
+
+/**
+ * Resolve a local JSON pointer such as "#/$defs/a~1b" against `root`. Returns
+ * undefined if it points nowhere, or anywhere that is not a subschema: into
+ * `enum`, `const`, `default` or other data, or at a name map such as
+ * `properties` itself. Ajv would compile whatever a $ref points at as a
+ * schema, so data hidden under `enum` must never be reachable (Gpno N8).
+ */
+function resolveSchemaPointer(root: unknown, ref: string): unknown {
+  const tokens = pointerTokens(ref);
+  if (!tokens) return undefined;
   let node = root;
-  for (const raw of ref.slice(2).split("/")) {
-    let token: string;
-    try {
-      token = decodeURIComponent(raw).replaceAll("~1", "/").replaceAll("~0", "~");
-    } catch {
+  let position: Position = "schema";
+  for (const token of tokens) {
+    if (position === "data") return undefined;
+    if (Array.isArray(node)) {
+      if (position !== "list" || !/^(0|[1-9][0-9]*)$/.test(token)) return undefined;
+      node = node[Number(token)];
+      position = "schema";
+    } else if (typeof node === "object" && node !== null && Object.hasOwn(node, token)) {
+      const value = (node as Record<string, unknown>)[token];
+      position = position === "names" ? "schema" : position === "schema" ? childPosition(token, value) : "data";
+      node = value;
+    } else {
       return undefined;
     }
-    if (Array.isArray(node)) node = node[Number(token)];
-    else if (typeof node === "object" && node !== null && Object.hasOwn(node, token)) node = (node as Record<string, unknown>)[token];
-    else return undefined;
   }
-  return node;
+  return position === "schema" && typeof node === "object" && node !== null && !Array.isArray(node) ? node : undefined;
 }
 
 /** Why `schema` is not allowed, or null if it is. */
@@ -51,65 +87,52 @@ export function schemaProblem(schema: unknown): string | null {
   }
   if (Buffer.byteLength(text, "utf8") > MAX_SCHEMA_BYTES) return `schema is larger than ${MAX_SCHEMA_BYTES} bytes`;
 
+  // One walk over the schema as Ajv will see it: every $ref is followed and
+  // its target checked like any other subschema, so a banned keyword can't hide
+  // behind a ref. Inlining also bounds the expanded size: a ref chain that
+  // doubles at each step hits the node cap after a few thousand nodes instead
+  // of running for hours (Gpno N1).
+  // The first pass reads the schema as written (depth, $ref count); the second
+  // follows every $ref.
   let refs = 0;
-  const walk = (node: unknown, depth: number): string | null => {
-    if (depth > MAX_SCHEMA_DEPTH) return `schema is nested deeper than ${MAX_SCHEMA_DEPTH} levels`;
+  let nodes = 0;
+  const walk = (node: unknown, position: Position, depth: number, stack: string[] | null): string | null => {
+    if (stack === null && depth > MAX_SCHEMA_DEPTH) return `schema is nested deeper than ${MAX_SCHEMA_DEPTH} levels`;
+    if (position === "data" || typeof node !== "object" || node === null) return null;
+    if (stack !== null && ++nodes > MAX_EXPANDED_NODES) {
+      return `schema expands to more than ${MAX_EXPANDED_NODES} nodes once $ref is resolved`;
+    }
     if (Array.isArray(node)) {
       for (const item of node) {
-        const problem = walk(item, depth + 1);
+        const problem = walk(item, position === "list" ? "schema" : "data", depth + 1, stack);
         if (problem) return problem;
       }
       return null;
     }
-    if (typeof node !== "object" || node === null) return null;
     for (const [key, value] of Object.entries(node)) {
+      if (position === "names") {
+        const problem = walk(value, "schema", depth + 1, stack);
+        if (problem) return problem;
+        continue;
+      }
       if (BANNED_KEYWORDS.includes(key)) return `schema keyword "${key}" is not allowed`;
       if (key === "$ref") {
         if (typeof value !== "string" || !value.startsWith("#")) return "only local $ref (#...) is allowed";
-        if (resolvePointer(schema, value) === undefined) return `$ref "${value}" points nowhere in the schema`;
-        if (++refs > MAX_REFS) return `schema has more than ${MAX_REFS} $ref`;
-      }
-      if (DATA_VALUES.includes(key)) continue;
-      if (NAME_MAPS.includes(key) && typeof value === "object" && value !== null) {
-        for (const sub of Object.values(value)) {
-          const problem = walk(sub, depth + 1);
-          if (problem) return problem;
+        const target = resolveSchemaPointer(schema, value);
+        if (target === undefined) return `$ref "${value}" points nowhere in the schema, or at something that is not a subschema`;
+        if (stack === null) {
+          if (++refs > MAX_REFS) return `schema has more than ${MAX_REFS} $ref`;
+          continue;
         }
-        continue;
-      }
-      const problem = walk(value, depth + 1);
-      if (problem) return problem;
-    }
-    return null;
-  };
-  const problem = walk(schema, 0);
-  if (problem) return problem;
-
-  // Inline every $ref and count the result. A ref chain that doubles at each
-  // step hits the cap after a few thousand nodes instead of running for hours.
-  let nodes = 0;
-  const expand = (node: unknown, stack: string[]): string | null => {
-    if (typeof node !== "object" || node === null) return null;
-    if (++nodes > MAX_EXPANDED_NODES) return `schema expands to more than ${MAX_EXPANDED_NODES} nodes once $ref is resolved`;
-    if (Array.isArray(node)) {
-      for (const item of node) {
-        const problem = expand(item, stack);
-        if (problem) return problem;
-      }
-      return null;
-    }
-    for (const [key, value] of Object.entries(node)) {
-      if (key === "$ref" && typeof value === "string") {
         if (stack.includes(value)) return `recursive $ref "${value}" is not allowed`;
-        const problem = expand(resolvePointer(schema, value), [...stack, value]);
+        const problem = walk(target, "schema", depth + 1, [...stack, value]);
         if (problem) return problem;
         continue;
       }
-      if (DATA_VALUES.includes(key)) continue;
-      const problem = expand(value, stack);
+      const problem = walk(value, childPosition(key, value), depth + 1, stack);
       if (problem) return problem;
     }
     return null;
   };
-  return expand(schema, []);
+  return walk(schema, "schema", 0, null) ?? walk(schema, "schema", 0, []);
 }

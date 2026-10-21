@@ -1,0 +1,26 @@
+﻿== python -m xrpl_escrow.demo Wed 10/21/2026 16:20:00.52 
+connected to wss://s.altnet.rippletest.net:51233 (network_id checked = 1)
+oracle verdict key pinned to rfXhgAmrhro4JYTfw7LLXFKSJNmyaFyNsu
+
+1. Pass and claim: the work passes the oracle's checks and the provider claims 10 XRP
+  before: client 69.999478 XRP, provider 229.992857 XRP
+  PASS  job registered as draft with the oracle's condition (job 5bb57868-6f19-42c7-abf2-56842b3f6598)
+  PASS  EscrowCreate -> tesSUCCESS, watcher -> funded (tesSUCCESS https://testnet.xrpl.org/transactions/2A949A0F1BD47E03119EAA14A9E04ED2A00225062E849CD4CCF1D2342C5AF0B9)
+  PASS  oracle verdict is pass, signed by the pinned oracle address (oracle rfXhgAmrhro4JYTfw7LLXFKSJNmyaFyNsu)
+  PASS  fulfillment released to the provider
+  PASS  EscrowFinish -> tesSUCCESS, watcher -> paid (tesSUCCESS https://testnet.xrpl.org/transactions/A6FDD9ABF8C5D8BD5A5F1A44ED34E713F35EC73DD494FF2F6BBD764A13BC14CE)
+  PASS  escrow object is gone from the ledger
+  PASS  provider gains the price minus the finish fee (+9.999625 XRP)
+  after: client 59.999468 XRP, provider 239.992482 XRP
+
+2. Fail and refund: the work fails the checks; the client is refunded after the deadline
+  before: client 59.999468 XRP, provider 239.992482 XRP
+  PASS  EscrowCreate -> tesSUCCESS, watcher -> funded (tesSUCCESS https://testnet.xrpl.org/transactions/54FD7927AFFF3BA423B2782D29EECD86FC35FE3514F1904C61DBF50253457B2F)
+  PASS  oracle verdict is fail, signed, and no fulfillment (sha256 135abd55cf3be6f74eaceae432a4b21f653b8e82640bc2c90e2fc9cf156fcb65 does not match the spec)
+  PASS  the client cannot get a verdict or fulfillment for the provider's job (403)
+  waiting for a validated ledger past CancelAfter ...
+  PASS  EscrowCancel -> tesSUCCESS, watcher -> refunded (tesSUCCESS https://testnet.xrpl.org/transactions/820C93F06B8FE980AFAE1DCEECD34B115061BF651D485FA3E0A8E7495370CC93)
+  PASS  client gets the price back minus the cancel fee (+9.999990 XRP)
+  after: client 59.999448 XRP, provider 239.992482 XRP
+
+12/12 checks passed
