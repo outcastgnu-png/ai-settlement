@@ -1,0 +1,103 @@
+Windows check of commit e54e6d8, XRP Ledger testnet, 2026-10-21 ~05:15-05:33 UTC
+Run by Claude Code on Christopher's PC.
+
+Environment: Windows 11 Pro 10.0.26300, Node v24.18.0, npm 11.16.0, git 2.55.0.windows.2,
+PowerShell 5.1. Repo cloned to C:\dev\ai-settlement from handoff/ai-settlement-gpno-review.zip
+(HEAD e54e6d8, clean tree). Testnet server: wss://s.altnet.rippletest.net:51233 (the primary
+answered directly; no fallback needed). Fresh faucet wallets from `npm run setup`:
+  client   r3TEqbz72cxvwEyzq8uqnHCEwxDxzHSyGN
+  provider rRpNiqUiX5Xe5f4cVqkQ8Wy6fNSwyMrYr
+  oracle verdict key rfXhgAmrhro4JYTfw7LLXFKSJNmyaFyNsu
+
+Summary
+| Item | Result |
+|---|---|
+| npm install | OK, 81 packages, 0 vulnerabilities (see note 1) |
+| npm run typecheck | 0 errors |
+| npm run test:unit | 52/52 in 2.5 s |
+| npm run setup | OK, 3 wallets funded with 100 XRP each; .env has seeds, vault key, 2 tokens, verdict key; .env is gitignored |
+| README quickstart, job driven by hand through `npm run registry/oracle/watcher` | PASS 4/4 (section A) |
+| expired_unclaimed on testnet | PASS 4/4 (section B) |
+| Watcher reconnect | PASS 6/6 (section C) |
+| npm run demo:phase2 | PASS 49/49 in 158 s, log logs/2026-10-21-phase2.txt (+ -txs.json) |
+| npm test | PASS 54/54 (7 files) in 326.5 s |
+
+Notes
+1. npm 11 does not run install scripts unless they are allowed, and warned about better-sqlite3
+   (node-gyp rebuild) and esbuild (postinstall). Both still loaded and worked (checked with a
+   :memory: SQLite query and an esbuild transform). npm 11 also added `"hasInstallScript": true`
+   for better-sqlite3 to package-lock.json; that one-line change was reverted, not kept.
+2. The README's Windows quickstart says to open PowerShell in the `escrow-demo` folder, and the
+   Phase 1 section says `cd escrow-demo`. The folder in this repo is `xrpl-escrow`.
+3. Reputation counts each job by its current status, so a job that went expired_unclaimed and
+   was then refunded counts as refunded, with expiredUnclaimed staying 0 (see section B).
+4. The reconnect check runs the repo's LedgerWatcher class in-process (runs/2026-10-21-windows/
+   reconnect.mts), not the `npm run watcher` process, because the socket has to be cut from
+   inside. The drop is ws.terminate(): an abrupt close 1006 with no close handshake, after which
+   xrpl.js reconnects on its own. The npm-started watcher was stopped first.
+5. Sections A and B used runs/2026-10-21-windows/quickstart.mts against services started with
+   `npm run registry`, `npm run oracle`, `npm run watcher` (each its own process), run as
+   `npx tsx <script> quickstart|expired` from xrpl-escrow\.
+
+=== A. README quickstart (npx tsx runs/2026-10-21-windows/quickstart.mts quickstart)
+﻿connected to wss://s.altnet.rippletest.net:51233 (network_id checked = 1)
+oracle verdict key rfXhgAmrhro4JYTfw7LLXFKSJNmyaFyNsu, pinned rfXhgAmrhro4JYTfw7LLXFKSJNmyaFyNsu
+
+A. Hand-driven job through the npm-started services (pass and claim)
+  before: client 100 / provider 100 XRP
+  PASS  createJob -> draft with condition (job ca4a83e6-74bc-4f9c-b968-bf5ef7e2ad42)
+  PASS  fundJob EscrowCreate tesSUCCESS, watcher -> funded https://testnet.xrpl.org/transactions/1B8CAB97D728477DDE9B0985690C604ABBE2605923A1321309CFAA470A0973C8
+  PASS  deliver -> verdict=pass, signature valid=true, fulfillment returned=true, status verified_pass
+  PASS  claim EscrowFinish tesSUCCESS, watcher -> paid https://testnet.xrpl.org/transactions/4411372ABD2F4BFF46B26CB44424E7721D43F326FD9D40ED03CAB8176422E63A
+  after: client 89.999988 / provider 109.999577 XRP
+  events: draft -> flag -> funded -> delivered -> verified_pass -> paid
+
+quickstart: 4/4 checks passed
+
+=== B. expired_unclaimed (npx tsx runs/2026-10-21-windows/quickstart.mts expired)
+﻿connected to wss://s.altnet.rippletest.net:51233 (network_id checked = 1)
+oracle verdict key rfXhgAmrhro4JYTfw7LLXFKSJNmyaFyNsu, pinned rfXhgAmrhro4JYTfw7LLXFKSJNmyaFyNsu
+
+B. expired_unclaimed on testnet: pass, provider never claims
+  before: client 89.999988 / provider 109.999577 XRP
+  PASS  fundJob EscrowCreate tesSUCCESS, watcher -> funded https://testnet.xrpl.org/transactions/B2E1286815B7DBCAE3E7F0EF8F7B978FD19F72C3DD2079A6D6F73CE509FB5FBB (CancelAfter 845875100)
+  PASS  deliver -> verified_pass, fulfillment returned and deliberately not used
+  PASS  watcher -> expired_unclaimed after 58 s (expiringSoon flag seen: true)
+  events: draft (job created) | flag (condition set) | funded (EscrowCreate B2E1286815B7DBCAE3E7F0EF8F7B978FD19F72C3DD2079A6D6F73CE509FB5FBB) | delivered (deliverable sha256 5c624ad73edede44ae86249fcdc5cd57f393220f74aa532d49e3d1c9b6091b83) | verified_pass (sha256-match: pass) | flag (30 s left before CancelAfter) | expired_unclaimed (ledger closed 1 s after CancelAfter)
+  PASS  refund EscrowCancel tesSUCCESS, watcher -> refunded https://testnet.xrpl.org/transactions/14A77BF35A3B7A69A4DE271C850D4F09706E71B478F363F38D1900FA7AC35F35
+  after: client 89.999964 / provider 109.999577 XRP
+  provider reputation: {"provider":"rRpNiqUiX5Xe5f4cVqkQ8Wy6fNSwyMrYr","total":2,"passed":2,"failed":0,"paid":1,"refunded":1,"expiredUnclaimed":0}
+
+expired: 4/4 checks passed
+
+=== Watcher log from the npm-started watcher during A and B
+[watcher] connected to wss://s.altnet.rippletest.net:51233 (testnet), watching jobs in http://127.0.0.1:8801
+[watcher] subscribed to r3TEqbz72cxvwEyzq8uqnHCEwxDxzHSyGN, rRpNiqUiX5Xe5f4cVqkQ8Wy6fNSwyMrYr
+[watcher] job ca4a83e6-74bc-4f9c-b968-bf5ef7e2ad42: status funded (EscrowCreate 1B8CAB97D728477DDE9B0985690C604ABBE2605923A1321309CFAA470A0973C8)
+[watcher] job ca4a83e6-74bc-4f9c-b968-bf5ef7e2ad42: status paid (EscrowFinish 4411372ABD2F4BFF46B26CB44424E7721D43F326FD9D40ED03CAB8176422E63A)
+[watcher] job 697c1772-66ab-4017-aef4-54f5ce974f42: status funded (EscrowCreate B2E1286815B7DBCAE3E7F0EF8F7B978FD19F72C3DD2079A6D6F73CE509FB5FBB)
+[watcher] job 697c1772-66ab-4017-aef4-54f5ce974f42: flagged (30 s left before CancelAfter)
+[watcher] job 697c1772-66ab-4017-aef4-54f5ce974f42: status expired_unclaimed (ledger closed 1 s after CancelAfter)
+[watcher] job 697c1772-66ab-4017-aef4-54f5ce974f42: status refunded (EscrowCancel 14A77BF35A3B7A69A4DE271C850D4F09706E71B478F363F38D1900FA7AC35F35)
+
+=== C. Watcher reconnect (npx tsx runs/2026-10-21-windows/reconnect.mts)
+﻿
+C. Watcher reconnect (watcher on wss://s.altnet.rippletest.net:51233)
+    [watcher] subscribed to r3TEqbz72cxvwEyzq8uqnHCEwxDxzHSyGN, rRpNiqUiX5Xe5f4cVqkQ8Wy6fNSwyMrYr
+  PASS  watcher subscribed to the job's accounts before the drop (job 5b869043-0792-48cd-922e-430a8f140206)
+    [watcher] subscribed to r3TEqbz72cxvwEyzq8uqnHCEwxDxzHSyGN, rRpNiqUiX5Xe5f4cVqkQ8Wy6fNSwyMrYr
+  PASS  socket dropped and xrpl.js reconnected (disconnected 1006, connected)
+  PASS  watcher resubscribed to the accounts after the reconnect
+    [watcher] job 5b869043-0792-48cd-922e-430a8f140206: status funded (EscrowCreate 5684E8BE76751A6125F503854339482A5E8D92333AEF4FDDAB9BCFFE1E624AD9)
+  PASS  EscrowCreate after reconnect tesSUCCESS, watcher -> funded https://testnet.xrpl.org/transactions/5684E8BE76751A6125F503854339482A5E8D92333AEF4FDDAB9BCFFE1E624AD9
+    [watcher] job 5b869043-0792-48cd-922e-430a8f140206: status paid (EscrowFinish 6F540D64D8617D6ABB37393E0FEA591106FB179A487210953A5DE422DB20A918)
+  PASS  EscrowFinish after reconnect tesSUCCESS, watcher -> paid https://testnet.xrpl.org/transactions/6F540D64D8617D6ABB37393E0FEA591106FB179A487210953A5DE422DB20A918
+  PASS  paid came from the live transaction stream (no new subscribe/backfill in between)
+
+reconnect: 6/6 checks passed
+
+=== npm test
+ Test Files  7 passed (7)
+      Tests  54 passed (54)
+   Start at  00:22:29
+   Duration  326.48s (tests 99%, import 1%)
