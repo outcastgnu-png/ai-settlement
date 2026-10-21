@@ -25,7 +25,7 @@ You need [Python 3.11 or newer](https://www.python.org/downloads/) and
 
 ```
 cd xrpl-escrow
-npm install
+npm ci
 npm run setup
 cd ..\xrpl-escrow-py
 python -m venv .venv

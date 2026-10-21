@@ -130,7 +130,10 @@ class EscrowKit:
 
         A 503 means the oracle could not run the checks right now (busy, or its checker
         restarted) and gave no verdict, so this asks again a few times, with a fresh
-        signature each time.
+        signature each time: 4 attempts over about 6 s. A busy oracle can stay busy for
+        longer than that (Gpno N21). If this still raises a 503, the work stays delivered;
+        call ``request_verification`` again, until shortly before the job's deadline
+        (``cancelAfter``).
         """
         url = f"{self.oracle_url}/verify/{urllib.parse.quote(job_id, safe='')}"
         for attempt in range(1, attempts + 1):

@@ -12,7 +12,7 @@
 ## What the tester does
 
 1. **Set up (about 15 minutes).** Follow `QUICKSTART.md` steps 1 to 3: install,
-   `npm install`, `npm run setup`, start the three services.
+   `npm ci`, `npm run setup`, start the three services.
    *Note the time it took and anything that went wrong.*
 2. **Run the example (about 5 minutes).** Step 4a (TypeScript) or 4b (Python).
    Open one of the printed explorer links.

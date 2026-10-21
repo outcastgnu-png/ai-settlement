@@ -88,7 +88,7 @@ finished.
 | `could not reach any testnet server` | Check your network; behind a proxy set `HTTPS_PROXY` and `NODE_USE_ENV_PROXY=1`. |
 | `ORACLE_VERDICT_SEED is missing from .env` | Run `npm run setup` in `xrpl-escrow`. |
 | `no oracle at http://127.0.0.1:8802` | Start the services (step 3), or run the Python demo with `--start-services`. |
-| The faucet is slow or refuses | Wait a minute and rerun `npm run setup`; it only funds wallets below 30 XRP. |
+| The faucet is slow or refuses | Wait a minute and rerun `npm run setup`; it only funds wallets below 60 XRP. |
 
 More detail: [`xrpl-escrow/README.md`](xrpl-escrow/README.md) and
 [`xrpl-escrow-py/README.md`](xrpl-escrow-py/README.md). What the kit does not

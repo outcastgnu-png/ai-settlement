@@ -11,6 +11,10 @@
 //                               A $ref may only point at a subschema, never into
 //                               enum, const or other data, and its target is
 //                               checked like the rest (Gpno finding N8)
+//   $id, $anchor, $dynamicRef,  change what a $ref resolves against, so the
+//   $dynamicAnchor, $recursive*, policy and Ajv could read the same ref
+//   a nested $schema             differently (Gpno finding N19). Refs are
+//                               plain "#/..." pointers from the root only.
 // Both the registry (when a job is created) and the oracle (before compiling)
 // apply this policy. The oracle also runs the validation in a worker with a
 // hard timeout, in case something gets past these static limits.
@@ -18,7 +22,10 @@ export const MAX_SCHEMA_BYTES = 16_384;
 export const MAX_SCHEMA_DEPTH = 32;
 export const MAX_REFS = 64; // $ref occurrences in the schema as written
 export const MAX_EXPANDED_NODES = 4_096; // objects and arrays after every $ref is inlined
-export const BANNED_KEYWORDS = ["pattern", "patternProperties", "uniqueItems", "format", "$data"];
+export const BANNED_KEYWORDS = [
+  "pattern", "patternProperties", "uniqueItems", "format", "$data",
+  "$id", "id", "$anchor", "$dynamicRef", "$dynamicAnchor", "$recursiveRef", "$recursiveAnchor",
+];
 
 // Keywords whose values are maps of user-chosen names to subschemas, keywords
 // whose values are lists of subschemas, and keywords whose values are plain
@@ -116,6 +123,7 @@ export function schemaProblem(schema: unknown): string | null {
         continue;
       }
       if (BANNED_KEYWORDS.includes(key)) return `schema keyword "${key}" is not allowed`;
+      if (key === "$schema" && node !== schema) return `schema keyword "$schema" is only allowed at the root`;
       if (key === "$ref") {
         if (typeof value !== "string" || !value.startsWith("#")) return "only local $ref (#...) is allowed";
         const target = resolveSchemaPointer(schema, value);

@@ -78,7 +78,7 @@ You need [Node.js 22.12 or newer](https://nodejs.org/) (the current LTS works). 
 `xrpl-escrow` folder:
 
 ```
-npm install
+npm ci
 npm run setup
 ```
 
@@ -157,7 +157,7 @@ You need [Node.js 22.12 or newer](https://nodejs.org/) (the current LTS works). 
 
 ```
 cd xrpl-escrow
-npm install
+npm ci
 npm run demo
 ```
 
@@ -190,7 +190,7 @@ and the watcher keeps marking jobs `funded` and `paid` after its WebSocket is cu
 
 npm 11 runs a package's install script only if `package.json` allows it.
 `allowScripts` here denies both scripts the kit's dependencies have, so
-`npm install` prints no warning: `better-sqlite3` ships prebuilt binaries for
+`npm ci` prints no warning: `better-sqlite3` ships prebuilt binaries for
 Windows, macOS and Linux (its script would only compile from source, which
 needs build tools), and `esbuild` uses its platform package without running its
 postinstall check. npm 10 ignores the setting.

@@ -103,6 +103,21 @@ describe("oracle checks", () => {
     expect(Date.now() - started).toBeLessThan(500);
   });
 
+  it("json-schema refuses $id, $anchor and other keywords that change what a $ref means (Gpno N19)", () => {
+    // Gpno's shape: a $id under a property re-bases "#/$defs/..." for Ajv, while the policy
+    // resolves it from the root, so the two would check different schemas.
+    const inner = { $id: "http://example.com/inner", $defs: { s0: { type: "string" } }, $ref: "#/$defs/s0" };
+    expect(schemaProblem({ $defs: { s0: { type: "string" } }, properties: { v: inner } })).toMatch(/"\$id" is not allowed/);
+    for (const key of ["$id", "id", "$anchor", "$dynamicRef", "$dynamicAnchor", "$recursiveRef", "$recursiveAnchor"]) {
+      expect(schemaProblem({ properties: { v: { [key]: key.endsWith("Ref") ? "#" : "x", type: "string" } } }), key).toMatch(/is not allowed/);
+    }
+    // also when only a $ref reaches it, and a nested $schema
+    expect(schemaProblem({ $defs: { d: { $anchor: "a" } }, $ref: "#/$defs/d" })).toMatch(/"\$anchor" is not allowed/);
+    expect(schemaProblem({ properties: { v: { $schema: "http://json-schema.org/draft-07/schema#" } } })).toMatch(/only allowed at the root/);
+    // a root $schema, and properties that are merely named like these keywords, are fine
+    expect(schemaProblem({ $schema: "http://json-schema.org/draft-07/schema#", type: "object", properties: { $id: { type: "string" }, id: { type: "integer" } } })).toBeNull();
+  });
+
   it("json-schema stops a validation that runs past the timeout and keeps working afterwards", async () => {
     const started = Date.now();
     expect(await busySchemaCheck(5_000, 300)).toMatchObject({ pass: false, detail: expect.stringContaining("longer than 300 ms") });
@@ -114,7 +129,11 @@ describe("oracle checks", () => {
     // A worker that takes 1.5 s to pick the request up, against a 500 ms limit: only the
     // job's own validation counts, so it passes. (A cold worker loads tsx and Ajv first,
     // which takes about this long on a slow machine.)
+    const slowStart = Date.now();
     expect(await busySchemaCheck(0, 500, false, 1_500)).toMatchObject({ pass: true });
+    // the slow start really happened, so the pass above is the new clock's doing, not a fast
+    // machine's (Gpno N20: without this the test passed on the old code too)
+    expect(Date.now() - slowStart).toBeGreaterThanOrEqual(1_500);
     // and a real cold start, right after a timeout killed the worker
     expect((await busySchemaCheck(2_000, 500)).pass).toBe(false);
     expect((await jsonSchema({ schema: { type: "object" } }, ctx("{}"), 1_000)).pass).toBe(true);
