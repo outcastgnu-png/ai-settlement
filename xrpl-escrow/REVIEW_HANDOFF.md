@@ -4,9 +4,13 @@
 **Start with:** `docs/reviews/REVIEW.md`, which covers how to run everything and what to check.
 **Verdict:** written to `docs/reviews/VERDICT.md` as **PASS**, **PASS WITH FINDINGS** or **FAIL**.
 
-> **Update 2026-10-20:** Gpno returned PASS WITH FINDINGS on `deb71ea`. The fixes and the status
-> of each finding are in [`docs/reviews/FINDINGS_RESPONSE.md`](docs/reviews/FINDINGS_RESPONSE.md).
-> The counts and gaps below describe the current working tree, after the fixes.
+> **Update 2026-10-21:** Gpno returned PASS WITH FINDINGS on `deb71ea`
+> ([`docs/reviews/VERDICT-2026-10-20-deb71ea.md`](docs/reviews/VERDICT-2026-10-20-deb71ea.md)).
+> The fixes for findings 3 to 7 are committed as `af9a4db`, with Christopher's approval. Their
+> status is in [`docs/reviews/FINDINGS_RESPONSE.md`](docs/reviews/FINDINGS_RESPONSE.md).
+> Christopher asked Gpno for a **second review of `af9a4db`**: brief in the "Second review" section
+> of `docs/reviews/REVIEW.md`, verdict to `docs/reviews/VERDICT.md`. The Windows check is run
+> separately by Claude Code. The counts and gaps below describe `af9a4db`.
 
 ## Project facts
 

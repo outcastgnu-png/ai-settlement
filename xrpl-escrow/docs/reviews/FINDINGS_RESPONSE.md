@@ -1,6 +1,6 @@
 # Response to Gpno's verdict (PASS WITH FINDINGS)
 
-Verdict: [`VERDICT.md`](VERDICT.md), for commit `deb71ea`. The fixes below were committed on
+Verdict: [`VERDICT-2026-10-20-deb71ea.md`](VERDICT-2026-10-20-deb71ea.md), for commit `deb71ea`. The fixes below were committed on
 `main` on top of `deb71ea` with Christopher's approval ("Yes proceed", 2026-10-21 05:07 UTC).
 
 | # | Finding | Status | What changed |
@@ -76,7 +76,7 @@ The Phase 1 code, `npm run demo` and its 18 checks are unchanged.
 
 ## Still open
 
-- The NOT DEMONSTRATED items in `VERDICT.md`: the Windows run, the README quickstart,
+- The NOT DEMONSTRATED items in `VERDICT-2026-10-20-deb71ea.md`: the Windows run, the README quickstart,
   `expired_unclaimed` on testnet, and watcher reconnect.
 - Running checks in a worker with a timeout (finding 5), and TLS for any non-localhost deployment
   (finding 6).

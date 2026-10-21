@@ -1,0 +1,1942 @@
+diff --git a/.gitignore b/.gitignore
+index 0502a4e..a67f547 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -2,4 +2,3 @@ node_modules/
+ .env
+ .env.*
+ data/
+-xrpl-escrow/src/oracle/verdicts.jsonl
+diff --git a/README.md b/README.md
+index affd713..9ea28d5 100644
+--- a/README.md
++++ b/README.md
+@@ -4,7 +4,7 @@ Verified-delivery escrow for AI agent jobs on the XRP Ledger (testnet only).
+ 
+ | Folder | What's in it |
+ |---|---|
+-| `edr/` | Engineering decision records. EDR-012 governs Phase 2. Add EDR-011 (Phase 1) here. |
++| `edr/` | Engineering decision records. EDR-011 governs Phase 1 and EDR-012 governs Phase 2. |
+ | `research/` | The market writeup behind the project |
+ | `xrpl-escrow/` | The code. Start with `xrpl-escrow/README.md`. Rules: `CLAUDE.md` (Phase 1), `CLAUDE_PHASE2.md` |
+ | `xrpl-escrow/docs/reviews/` | Review brief (`REVIEW.md`), Phase 2 diff, and the reviewer's verdict (`VERDICT.md`). Reviewer: Gpno |
+diff --git a/docs/ESCROW-001_EARNED_STATUS.md b/docs/ESCROW-001_EARNED_STATUS.md
+new file mode 100644
+index 0000000..78ed15d
+--- /dev/null
++++ b/docs/ESCROW-001_EARNED_STATUS.md
+@@ -0,0 +1,47 @@
++# ESCROW-001: earned status under PersonalAi's rules
++
++Assessed 2026-10-21 against `PersonalAi\Agents.md` §9 (Earned-State Discipline), the earned-tier
++ranking in `PersonalAi\earned-strengths-canvas\PROVENANCE.md`, and `PersonalAi\edr\EDR-010`.
++PersonalAi was only read. No file there was changed.
++
++## What PersonalAi says about where EDRs go
++
++- EDR-010, decision 7: "Decision records live in `edr/` only. A Proposed EDR records a decision.
++  Only an Accepted EDR, earned by evidence and owner approval, is architectural truth."
++- `Agents.md` §1: tier 3 governance is "EDRs in `edr/` whose Status is Accepted".
++- PersonalAi's `edr\` runs EDR-001 to EDR-010 (no 004 or 009). EDR-011 and EDR-012 continue that
++  numbering, but neither file is in `PersonalAi\edr\`. Nothing in PersonalAi mentions ESCROW-001,
++  escrow or ai-settlement.
++- `edr\README.md` says the EDRs there record decisions for the XRP Intelligence Core.
++
++So in PersonalAi's terms, EDR-011 and EDR-012 are not tier 3 governance for PersonalAi. They are
++Accepted only where they sit, in `ai-settlement\edr\`.
++
++## Earned tier (PROVENANCE.md ranking)
++
++| Item | Tier | Evidence |
++|---|---|---|
++| Phase 1 and Phase 2 code at `deb71ea` | 1, committed with tests and evidence, **in the cloud copy only** | commits `ed122ab`, `deb71ea`; Phase 1 18/18; Phase 2 47/47 and 46/46 tests on testnet |
++| Fixes for Gpno findings 3 to 7, EDR-011 file, ACCEPTANCES.md | 3, working tree only (held) | 52/52 unit, 49/49 demo, 54/54 tests on testnet; not committed, not re-reviewed |
++| Anything at `C:\dev\ai-settlement\` | not verified | this session can't see `C:\dev\` |
++
++A commit proves preservation, not truth or ratification.
++
++## Earned (§9 vocabulary)
++
++- **Proposed, then accepted:** EDR-011 and EDR-012, accepted by Christopher by name on
++  2026-10-20 17:04 UTC, reviewer Gpno. EDR-011 was written down afterwards from
++  `xrpl-escrow\CLAUDE.md`.
++- **Evaluated:** Gpno reviewed `deb71ea`: PASS WITH FINDINGS (2 governance blockers, 5 fixes).
++- **Supported (internal):** testnet runs with explorer links, Linux only.
++
++## Unearned
++
++- Gpno's evaluation of the fixes. Their only evidence is the implementer's own runs.
++- Commit approval for the fixes and EDR-011.
++- Preservation on Christopher's PC (`C:\dev\ai-settlement\` not confirmed).
++- NOT DEMONSTRATED: Windows run, README quickstart, `expired_unclaimed` on testnet, watcher
++  reconnect.
++- Worker timeout for schema checks; TLS for anything beyond localhost.
++- Recommended, promoted, published, externally replicated, authorized for outreach: none.
++- Mainnet, real funds, hosted service: out of scope and not authorized.
+diff --git a/edr/ACCEPTANCES.md b/edr/ACCEPTANCES.md
+new file mode 100644
+index 0000000..a84c9ec
+--- /dev/null
++++ b/edr/ACCEPTANCES.md
+@@ -0,0 +1,14 @@
++# EDR acceptances
++
++| EDR | Status | Accepted by | When (UTC) | Statement | Reviewer |
++|---|---|---|---|---|---|
++| EDR-011, ESCROW-001 Phase 1 testnet demo | Accepted | Christopher (owner) | 2026-10-20 17:04 | "I accept EDR-011 and EDR-012, reviewer Gpno" | Gpno |
++| EDR-012, ESCROW-001 Phase 2 oracle and registry | Accepted | Christopher (owner) | 2026-10-20 17:04 | Same statement. He had also chosen "Accept and build" on a decision card at 07:31 | Gpno |
++
++Notes:
++- No EDR-011 document existed before 2026-10-20. At Christopher's request (17:10 UTC) it was
++  written down from `xrpl-escrow/CLAUDE.md` as `edr/EDR-011_ESCROW_PHASE1_TESTNET_DEMO.md`,
++  with Status Accepted under the statement above.
++- Gpno replaced Codex as the single final reviewer for both phases at 08:14 UTC. Gpno's verdict
++  is in `xrpl-escrow/docs/reviews/VERDICT.md`.
++- Christopher's statements were made in the project chat for ai_settlement_model.
+diff --git a/edr/EDR-011_ESCROW_PHASE1_TESTNET_DEMO.md b/edr/EDR-011_ESCROW_PHASE1_TESTNET_DEMO.md
+new file mode 100644
+index 0000000..ae89896
+--- /dev/null
++++ b/edr/EDR-011_ESCROW_PHASE1_TESTNET_DEMO.md
+@@ -0,0 +1,86 @@
++# EDR-011: ESCROW-001 Phase 1: Verified-Delivery Escrow Testnet Demo
++
++## Status
++
++Accepted
++
++Accepted by Christopher (owner) by name on 2026-10-20 at 17:04 UTC: "I accept EDR-011 and
++EDR-012, reviewer Gpno". See `edr/ACCEPTANCES.md`.
++
++This record was written down after the fact, on 2026-10-20 at Christopher's request. Phase 1 was
++built from his project instructions, saved as `xrpl-escrow/CLAUDE.md`, and no separate EDR-011
++document existed before. This file restates those instructions as a decision record and adds
++nothing to them. Where the two differ, `xrpl-escrow/CLAUDE.md` governs.
++
++## Date
++
++2026-10-20 (America/Chicago)
++
++## Deciders
++
++Christopher (owner). Implementer: Claude (builds end to end). Reviewer: Gpno (one final review
++for Phase 1 and Phase 2; replaced Codex on 2026-10-20). Written down by: Claude, from
++`xrpl-escrow/CLAUDE.md`.
++
++## Investigation
++
++ESCROW-001, phase 1.
++
++## Context
++
++The product is a job escrow for AI agents on the XRP Ledger that pays only after the work is
++verified (`research/ai_settlement_model.md`). Before building services around it, the core
++mechanism has to be shown to work on a real ledger: a native XRPL escrow locked behind a
++crypto-condition whose secret only a verifier holds.
++
++## Decision
++
++Build a TypeScript demo, **testnet only**, in `xrpl-escrow/`:
++
++1. A client locks XRP in a native XRPL escrow (`EscrowCreate`) with Destination = provider, the
++   price in drops, a PREIMAGE-SHA-256 `Condition`, and `CancelAfter` about 120 s ahead (Ripple
++   epoch = unix − 946684800).
++2. A 32-byte secret is generated per job. Only the oracle holds it. The registry stores the
++   condition, never the secret.
++3. The provider delivers. The oracle hashes the deliverable and compares it with the SHA-256 in
++   the job spec.
++4. On a pass, the oracle returns the fulfillment and the provider submits `EscrowFinish`.
++5. On a fail, the client submits `EscrowCancel` after `CancelAfter` and is refunded.
++
++Layout: `src/config.ts`, `wallets.ts`, `condition.ts`, `escrow.ts`, `oracle.ts` (in-process
++stub), `registry.ts` (in-memory stub), `demo.ts`, `test/condition.test.ts`, `test/flow.test.ts`.
++
++Stack: Node, TypeScript strict, `xrpl` (xrpl.js), a crypto-condition encoder, `dotenv`, `vitest`,
++`tsx`. It must work on Windows: npm scripts only, no bash-only scripts.
++
++## Boundaries
++
++- Testnet only. Connect to `wss://s.altnet.rippletest.net:51233` (fallback
++  `wss://testnet.xrpl-labs.com`) and assert `network_id === 1` on connect, or abort.
++- Fund wallets only from the testnet faucet. Never load mainnet seeds.
++- Seeds stay in a gitignored `.env`. Never log seeds or the secret.
++- Trust results from validated ledgers only.
++- No commit, merge or push without Christopher's approval.
++- Out of scope: RLUSD, the AI judge, disputes and multisig, the x402 bridge, mainnet, and a
++  hosted API.
++
++## Acceptance evidence
++
++- `npm run demo` passes these scenarios, printing testnet explorer links and balances before and
++  after:
++  1. happy path: the finish succeeds and the provider gains the price;
++  2. bad delivery: the oracle refuses, the escrow is cancelled after the deadline, and the client
++     is refunded minus fees;
++  3. wrong secret: the finish fails with `tecCRYPTOCONDITION_ERROR` and the escrow stays open.
++- Finishing after `CancelAfter` fails, and cancelling before it fails.
++- `npm test` passes, including known crypto-condition test vectors.
++- The README explains the flow in plain words and how to run it on Windows.
++
++Result on 2026-10-20: 18/18 demo checks and 8/8 tests on testnet
++(`xrpl-escrow/runs/2026-10-20-testnet.txt`). Windows was not run (NOT DEMONSTRATED).
++
++## Consequences
++
++The escrow mechanism is proven on testnet, so Phase 2 (EDR-012) can turn the in-process oracle
++and in-memory registry into local services. The per-phase branch `escrow/001-testnet-demo` was
++never created; Christopher waived per-phase branches on 2026-10-20 at 16:41 UTC ("Keep history").
+diff --git a/edr/EDR-012_ESCROW_PHASE2_ORACLE_REGISTRY.md b/edr/EDR-012_ESCROW_PHASE2_ORACLE_REGISTRY.md
+index 013f403..45ae657 100644
+--- a/edr/EDR-012_ESCROW_PHASE2_ORACLE_REGISTRY.md
++++ b/edr/EDR-012_ESCROW_PHASE2_ORACLE_REGISTRY.md
+@@ -2,10 +2,15 @@
+ 
+ ## Status
+ 
+-Proposed
++Accepted
+ 
+-This record is Proposed. It does not govern until the owner accepts it by name.
+-It depends on EDR-011 being Accepted, with the Phase 1 Codex review verdict recorded.
++Accepted by Christopher (owner) by name on 2026-10-20 at 17:04 UTC: "I accept EDR-011 and
++EDR-012, reviewer Gpno". See `edr/ACCEPTANCES.md`.
++
++Originally: "This record is Proposed. It does not govern until the owner accepts it by name.
++It depends on EDR-011 being Accepted, with the Phase 1 Codex review verdict recorded."
++EDR-011 was accepted in the same statement. The Phase 1 and Phase 2 review verdict is Gpno's,
++recorded in `xrpl-escrow/docs/reviews/VERDICT.md`.
+ 
+ ## Date
+ 
+@@ -13,8 +18,8 @@ It depends on EDR-011 being Accepted, with the Phase 1 Codex review verdict reco
+ 
+ ## Deciders
+ 
+-Christopher (owner). Implementer: Claude (builds end to end). Reviewer: Codex
+-(one final review). Drafted by: Grok Bot.
++Christopher (owner). Implementer: Claude (builds end to end). Reviewer: Gpno
++(one final review for Phase 1 and Phase 2; replaced Codex on 2026-10-20). Drafted by: Grok Bot.
+ 
+ ## Investigation
+ 
+diff --git a/xrpl-escrow/.gitignore b/xrpl-escrow/.gitignore
+index 6fb83fe..54ea3dc 100644
+--- a/xrpl-escrow/.gitignore
++++ b/xrpl-escrow/.gitignore
+@@ -1,4 +1,4 @@
+ node_modules/
+ .env
+ data/
+-src/oracle/verdicts.jsonl
++node_modules
+diff --git a/xrpl-escrow/.npmrc b/xrpl-escrow/.npmrc
+new file mode 100644
+index 0000000..b6f27f1
+--- /dev/null
++++ b/xrpl-escrow/.npmrc
+@@ -0,0 +1 @@
++engine-strict=true
+diff --git a/xrpl-escrow/README.md b/xrpl-escrow/README.md
+index 7b3c356..3953714 100644
+--- a/xrpl-escrow/README.md
++++ b/xrpl-escrow/README.md
+@@ -46,20 +46,29 @@ the ledger. Everything still runs on the testnet and listens on `127.0.0.1` only
+ | Service | Address | What it does |
+ |---|---|---|
+ | Job registry | `http://127.0.0.1:8801` | Stores each job's spec, price, parties, condition, escrow sequence, status and timestamps in SQLite (`data/jobs.db`). It never stores the secret. |
+-| Verification oracle | `http://127.0.0.1:8802` | Holds each job's secret, encrypted with AES-256-GCM under `ORACLE_VAULT_KEY` from `.env` (`data/oracle-vault.json`). Runs the job's checks (`sha256-match`, `json-schema`, `max-latency`), signs the verdict with the oracle wallet's key, and returns the fulfillment only on a pass and only to the job's provider. Appends every verdict to `src/oracle/verdicts.jsonl`. |
++| Verification oracle | `http://127.0.0.1:8802` | Holds each job's secret, encrypted with AES-256-GCM under `ORACLE_VAULT_KEY` from `.env` (`data/oracle-vault.json`). Before verifying, it confirms on the ledger that the job's escrow exists with the agreed amount, provider, condition and deadline. Runs the job's checks (`sha256-match`, `json-schema`, `max-latency`), signs the verdict with its own ed25519 verdict key (`ORACLE_VERDICT_SEED`), and returns the fulfillment only on a pass and only to the job's provider. Appends every verdict to `data/verdicts.jsonl`. |
+ | Ledger watcher | (no port) | Subscribes to the client and provider accounts over WebSocket. A validated `EscrowCreate` marks the job `funded`, `EscrowFinish` marks it `paid`, `EscrowCancel` marks it `refunded`. It flags escrows within 30 s of `CancelAfter`, and marks a passed job nobody claimed in time `expired_unclaimed`. |
+ 
+ Job states: `draft -> funded -> delivered -> verified_pass | verified_fail -> paid | refunded | expired_unclaimed`.
+ Only the watcher sets `funded`, `paid` and `refunded`, and only from validated ledger transactions.
++The registry enforces this: its two internal write endpoints need a bearer
++token from `.env`, `WATCHER_SERVICE_TOKEN` for ledger events and
++`ORACLE_SERVICE_TOKEN` for conditions and verdicts.
+ 
+ The oracle never runs, evaluates or follows anything inside a deliverable or
+ a job spec. It only hashes the deliverable, parses it as JSON, or validates it
+-against the job's schema. The provider proves who it is by signing each
+-request with its wallet key.
++against the job's schema. JSON Schemas in job specs may not use the
++regex keywords `pattern` and `patternProperties`, or `uniqueItems`, `format` or
++`$data`, and are capped at 16 KB, because those keywords can make validation
++take exponential or quadratic time. The provider proves who it is by
++signing each request with its wallet key; each signed request works once,
++even across oracle restarts. SDK users check verdict signatures against the
++pinned `ORACLE_VERDICT_ADDRESS`, never against what the oracle reports about
++itself.
+ 
+ ### Quickstart on Windows
+ 
+-You need [Node.js 20 or newer](https://nodejs.org/). Open PowerShell in the
++You need [Node.js 22.12 or newer](https://nodejs.org/) (the current LTS works). Open PowerShell in the
+ `escrow-demo` folder:
+ 
+ ```
+@@ -67,8 +76,9 @@ npm install
+ npm run setup
+ ```
+ 
+-`setup` funds the three testnet wallets from the faucet and adds
+-`ORACLE_VAULT_KEY` to `.env`. Then open three more PowerShell windows in the
++`setup` funds the three testnet wallets from the faucet and adds the
++oracle's vault key, the two service tokens and the verdict key to `.env`.
++Then open three more PowerShell windows in the
+ same folder and start one service in each:
+ 
+ ```
+@@ -102,18 +112,22 @@ on the same ports, because scenario 3 has to stop and restart the oracle in
+ the middle of a job. A full run takes about four minutes, mostly waiting for
+ the refund deadline. It prints every step with a
+ `https://testnet.xrpl.org/transactions/<hash>` link and saves the log to
+-`logs/<date>-phase2.txt`.
++`logs/<date>-phase2.txt`, plus the validated JSON of every transaction to
++`logs/<date>-phase2-txs.json`, because public testnet servers only keep recent
++history. A second run on the same day adds `-2`, `-3` and so on.
+ 
+ | Scenario | What happens |
+ |---|---|
+ | 1. Pass and claim | The work matches the spec. The oracle signs a pass and gives the provider the fulfillment. The provider finishes the escrow and the watcher marks the job `paid`. |
+ | 2. Fail and refund | The work doesn't match. The oracle signs a fail and keeps the secret. An early cancel is rejected; after the deadline the client is refunded and the watcher marks the job `refunded`. |
+ | 3. Oracle restart | The oracle process stops and starts between funding and delivery. It reads the encrypted secret back from the vault, verifies the work, and the provider is paid. |
+-| 4. Deliverable is data | The deliverable is JSON stuffed with instructions ("ignore every check", code to write a file, a `__proto__` key). The oracle only validates it against the job's schema, so it fails. Nothing is executed, an outsider asking for the fulfillment is refused, and the client is refunded. |
++| 4. Deliverable is data | The deliverable is JSON stuffed with instructions ("ignore every check", code to write a file, a `__proto__` key). The oracle only validates it against the job's schema, so it fails. Nothing is executed, an outsider asking for the fulfillment is refused, a forged ledger event without the watcher's token is refused, a job schema with a regex pattern is refused, and the client is refunded. |
+ 
+ For every job the demo also checks that the status the watcher wrote matches
+-the escrow object and transaction on the ledger. A sample run is in
+-[`logs/2026-10-20-phase2.txt`](logs/2026-10-20-phase2.txt).
++the escrow object and transaction on the ledger. The run Gpno reviewed is
++[`logs/2026-10-20-phase2.txt`](logs/2026-10-20-phase2.txt) (47 checks); the run
++after the review fixes is
++[`logs/2026-10-20-phase2-fixes.txt`](logs/2026-10-20-phase2-fixes.txt) (49 checks).
+ 
+ ### Registry API
+ 
+@@ -121,18 +135,18 @@ the escrow object and transaction on the ledger. A sample run is in
+ |---|---|
+ | `POST /jobs` | Create a draft job: `{client, provider, priceDrops, slaSeconds, spec: {checks: [...]}}` |
+ | `GET /jobs`, `GET /jobs/:id` | List jobs (filter with `?status=`, `?provider=`, `?client=`) or get one |
+-| `PUT /jobs/:id/condition` | Set by the oracle, once, while the job is a draft |
++| `PUT /jobs/:id/condition` | Set by the oracle, once, while the job is a draft. Needs `Authorization: Bearer <ORACLE_SERVICE_TOKEN>` |
+ | `POST /jobs/:id/deliverable` | Provider posts the work: `{content, auth}` |
+ | `GET /jobs/:id/deliverable` | The stored deliverable and its SHA-256 |
+-| `POST /jobs/:id/events`, `GET /jobs/:id/events` | Status changes from the watcher or the oracle, and the history |
++| `POST /jobs/:id/events`, `GET /jobs/:id/events` | Status changes from the watcher (`WATCHER_SERVICE_TOKEN`) or the oracle (`ORACLE_SERVICE_TOKEN`), and the history |
+ | `GET /providers/:address/reputation` | Reputation stub: passed, failed, paid, refunded and expired counts |
+ 
+-Oracle: `GET /health` (address and public key), `POST /jobs/:id/condition`,
++Oracle: `GET /health` (verdict signer address and public key), `POST /jobs/:id/condition`,
+ `POST /verify/:id` with `{auth}` signed by the provider.
+ 
+ ## Phase 1: run the escrow demo (Windows, macOS or Linux)
+ 
+-You need [Node.js 20 or newer](https://nodejs.org/). In a terminal
++You need [Node.js 22.12 or newer](https://nodejs.org/) (the current LTS works). In a terminal
+ (PowerShell or Command Prompt on Windows):
+ 
+ ```
+@@ -167,7 +181,8 @@ npm run typecheck
+ - Testnet only. On connect the code reads `network_id` from the server and
+   aborts unless it is `1` (testnet).
+ - Wallets are funded only by the testnet faucet. No mainnet seeds are loaded.
+-- Seeds, the vault key and the secret are never printed or logged.
++- Seeds, the vault key, the service tokens, the verdict key and the secret are
++  never printed or logged.
+ - Phase 2 services bind to 127.0.0.1 only.
+ - Results are read from validated ledgers only.
+ 
+@@ -184,8 +199,9 @@ npm run typecheck
+ | `src/demo.ts` | Runs the scenarios and prints the report |
+ | `test/condition.test.ts` | Known test vectors, cross-checked against `five-bells-condition` |
+ | `test/flow.test.ts` | All Phase 1 scenarios against the live testnet |
+-| `src/local-config.ts` | Phase 2 ports, file paths, `.env` reading, vault key creation |
+-| `src/http.ts`, `src/auth.ts` | JSON over `node:http` on 127.0.0.1; signed requests and signed verdicts |
++| `src/local-config.ts` | Phase 2 ports, file paths, `.env` reading, creation of local secrets |
++| `src/schema-policy.ts` | Which JSON Schemas a job spec may contain |
++| `src/http.ts`, `src/auth.ts` | JSON over `node:http` on 127.0.0.1; signed requests, replay guard, service tokens, signed verdicts |
+ | `src/registry/` | `db.ts` (SQLite job store, transitions, reputation) and `server.ts` (HTTP API on 8801) |
+ | `src/oracle/` | `server.ts` (HTTP on 8802), `vault.ts` (AES-256-GCM secrets), `checks/` (`sha256-match`, `json-schema`, `max-latency`) |
+ | `src/watcher.ts` | Ledger subscription that drives job status from validated transactions |
+diff --git a/xrpl-escrow/REVIEW_HANDOFF.md b/xrpl-escrow/REVIEW_HANDOFF.md
+index d534419..4147e95 100644
+--- a/xrpl-escrow/REVIEW_HANDOFF.md
++++ b/xrpl-escrow/REVIEW_HANDOFF.md
+@@ -2,8 +2,11 @@
+ 
+ **Reviewer:** Gpno, the single final reviewer for both phases (EDR-011 and EDR-012).
+ **Start with:** `docs/reviews/REVIEW.md`, which covers how to run everything and what to check.
+-**Verdict:** write it to `docs/reviews/VERDICT.md` as **PASS**, **PASS WITH FINDINGS** or **FAIL**.
+-The template and format are in that file.
++**Verdict:** written to `docs/reviews/VERDICT.md` as **PASS**, **PASS WITH FINDINGS** or **FAIL**.
++
++> **Update 2026-10-20:** Gpno returned PASS WITH FINDINGS on `deb71ea`. The fixes and the status
++> of each finding are in [`docs/reviews/FINDINGS_RESPONSE.md`](docs/reviews/FINDINGS_RESPONSE.md).
++> The counts and gaps below describe the current working tree, after the fixes.
+ 
+ ## Project facts
+ 
+@@ -11,11 +14,15 @@ The template and format are in that file.
+   `PersonalAi`. The code is in `xrpl-escrow\` and the decision records are in `edr\`.
+ - **Network:** XRP Ledger testnet only. Every connection checks `network_id === 1` and aborts
+   otherwise. Wallets are funded only by the testnet faucet.
+-- **Approvals:** Christopher accepted EDR-012 on 2026-10-20 at 07:31 UTC. EDR-011, the Phase 1
+-  record, is not in this repo; add it to `edr\` if you have it.
+-- **Reviewer names in the governance docs:** The copies of EDR-012 and `CLAUDE_PHASE2.md` still
+-  name Codex as reviewer, because they are kept as Christopher uploaded them. Christopher has
+-  since changed the reviewer to Gpno for both phases.
++- **Approvals:** Christopher accepted EDR-012 on 2026-10-20 at 07:31 UTC, on a decision card in
++  the project chat. EDR-011, the Phase 1 record, was written down from `CLAUDE.md` afterwards
++  (`edr\EDR-011_ESCROW_PHASE1_TESTNET_DEMO.md`). Christopher accepted EDR-011 and EDR-012 by name, with Gpno as reviewer, at 17:04 UTC
++  (`edr/ACCEPTANCES.md`).
++- **Git history:** Christopher asked for `git init` and the baseline commit at 08:14 UTC. At
++  16:41 UTC he chose to keep `main` as it is and waived the per-phase branches (Gpno finding 2).
++- **Reviewer names in the governance docs:** EDR-012 now names Gpno as reviewer.
++  `CLAUDE_PHASE2.md` still says Codex, because it is kept as Christopher uploaded it. Gpno is the
++  reviewer for both phases.
+ - **Build environment:** Linux cloud container, Node 22.22.0, npm 10.9.4. Testnet traffic went
+   through `wss://testnet.xrpl-labs.com`. The primary `s.altnet` server on port 51233 was blocked by
+   the sandbox proxy, and the code falls back automatically.
+@@ -62,19 +69,19 @@ the files as they stood before Phase 2 began. In git, both phases are in the bas
+ 
+ ## Test commands and expected results
+ 
+-Run these from `xrpl-escrow\` in PowerShell, with Node 20 or newer.
++Run these from `xrpl-escrow\` in PowerShell, with Node 22.12 or newer.
+ 
+ | Command | Expected | Result on 2026-10-20 |
+ |---|---|---|
+ | `npm ci` | Installs cleanly | OK |
+ | `npm run typecheck` | 0 errors | 0 errors |
+-| `npm run test:unit` | 44/44, no network | 44/44 |
+-| `npm run setup` | 3 funded testnet wallets and `ORACLE_VAULT_KEY` written to `.env` | OK |
++| `npm run test:unit` | 52/52, no network | 52/52 (44/44 at `deb71ea`) |
++| `npm run setup` | 3 funded testnet wallets, plus the vault key, the two service tokens and the verdict key in `.env` | OK |
+ | `npm run demo` (Phase 1) | **18/18** checks | 18/18 (`runs/2026-10-20-testnet.txt`) |
+-| `npm run demo:phase2` (Phase 2) | **47/47** checks, log saved to `logs/<date>-phase2.txt` | 47/47 (`logs/2026-10-20-phase2.txt`) |
+-| `npm test` | **46/46** tests, about 6 minutes, both testnet flows | 46/46 in 327.6 s |
++| `npm run demo:phase2` (Phase 2) | **49/49** checks, log saved to `logs/<date>-phase2.txt` | 49/49 (`logs/2026-10-20-phase2-fixes.txt`); 47/47 at `deb71ea` (`logs/2026-10-20-phase2.txt`) |
++| `npm test` | **54/54** tests, about 6 minutes, both testnet flows | 54/54 in 364.9 s (46/46 at `deb71ea`) |
+ 
+-The 46 tests are: 7 condition test vectors, 9 registry, 15 oracle, 6 watcher, 7 SDK, and one testnet
++The 54 tests are: 7 condition test vectors, 11 registry, 20 oracle, 6 watcher, 8 SDK, and one testnet
+ flow for each phase. Behind a proxy, also set `HTTPS_PROXY` and `NODE_USE_ENV_PROXY=1`.
+ 
+ ### How the run results map to the acceptance evidence
+@@ -102,27 +109,28 @@ flow for each phase. Behind a proxy, also set `HTTPS_PROXY` and `NODE_USE_ENV_PR
+ 
+ ## Known gaps
+ 
+-1. **Registry writes from localhost are unauthenticated.** `PUT /jobs/:id/condition` and
+-   `POST /jobs/:id/events` accept any caller on 127.0.0.1, so any local process could change a
+-   job's status. That alone can't move money, because only the oracle's fulfillment unlocks an
+-   escrow and the ledger statuses come from the chain. A service token or signed oracle and
+-   watcher events is needed before anything leaves localhost.
+-2. **Ajv schema compile and ReDoS risk.** Ajv compiles the client's JSON Schema from the job spec
+-   into code. A hostile `pattern` could cause catastrophic regex backtracking. Deliverables are only
+-   passed through `JSON.parse`. Before outside developers submit specs, restrict the allowed schema
+-   keywords or use a safe regex engine.
++Both known gaps from `deb71ea` are fixed. Details are in `docs/reviews/FINDINGS_RESPONSE.md`.
++
++1. **Registry writes from localhost** now need `ORACLE_SERVICE_TOKEN` or `WATCHER_SERVICE_TOKEN`.
++   The oracle also confirms on the ledger that the job's escrow exists with the agreed terms before
++   it verifies anything.
++2. **Ajv and ReDoS:** job schemas may not use `pattern`, `patternProperties`, `uniqueItems`,
++   `format` or `$data`. Schemas are capped at 16 KB and 32 levels of nesting, and the
++   compiled-schema cache is bounded. Checks still run in the oracle's own process, with no worker
++   timeout.
+ 
+ Other notes:
+-- Replay protection for signed requests is kept in memory with a 2-minute window, so it resets
+-  when the oracle restarts.
+-- Verdicts are signed with the oracle's testnet wallet key.
+-- `max-latency` uses the registry's clock, not ledger close time.
++- Request replay protection is saved in `data/oracle-replay.json`, so it survives restarts.
++- Verdicts are signed with a separate ed25519 key. SDK users pin its address
++  (`ORACLE_VERDICT_ADDRESS`).
++- `max-latency` measures from the close time of the ledger that validated the EscrowCreate.
++- The fulfillment still travels over plain HTTP on 127.0.0.1.
+ - Deliverables are UTF-8 text up to 1 MB.
+-- `src/oracle/verdicts.jsonl` sits under `src/` because `CLAUDE_PHASE2.md` puts it there. It is
+-  gitignored.
++- The verdict log is `data/verdicts.jsonl`, not the `src/oracle/` path in `CLAUDE_PHASE2.md`.
+ - `demo:phase2` starts its own copies of the services, so stop any you started by hand first.
+ 
+ ## Secrets
+ 
+-`.env` (seeds and `ORACLE_VAULT_KEY`), `data/` (the database and vault) and `node_modules/` are
++`.env` (seeds, `ORACLE_VAULT_KEY`, the service tokens and the verdict key), `data/` (the database,
++vault, replay file and verdict log) and `node_modules/` are
+ gitignored and are not in the repo or the zip. Run `npm run setup` to create fresh testnet wallets.
+diff --git a/xrpl-escrow/docs/reviews/FINDINGS_RESPONSE.md b/xrpl-escrow/docs/reviews/FINDINGS_RESPONSE.md
+new file mode 100644
+index 0000000..bb348c0
+--- /dev/null
++++ b/xrpl-escrow/docs/reviews/FINDINGS_RESPONSE.md
+@@ -0,0 +1,82 @@
++# Response to Gpno's verdict (PASS WITH FINDINGS)
++
++Verdict: [`VERDICT.md`](VERDICT.md), for commit `deb71ea`. The fixes below were committed on
++`main` on top of `deb71ea` with Christopher's approval ("Yes proceed", 2026-10-21 05:07 UTC).
++
++| # | Finding | Status | What changed |
++|---|---|---|---|
++| 1 | EDR-011 missing; EDRs not accepted by name; EDR-012 names Codex | **Resolved** | On 2026-10-20 at 17:04 UTC Christopher wrote: "I accept EDR-011 and EDR-012, reviewer Gpno". This is recorded in `edr/ACCEPTANCES.md`, and EDR-012 now shows Status Accepted with Gpno as reviewer. EDR-011 had never been written down; at his request it is now `edr/EDR-011_ESCROW_PHASE1_TESTNET_DEMO.md`, restating `xrpl-escrow/CLAUDE.md`, Status Accepted |
++| 2 | Phase branches missing; commit approval not on record | **Resolved by Christopher** | On 2026-10-20 at 16:41 UTC Christopher chose "Keep history": `main` stays as it is and the branch requirement is waived. His 08:14 UTC message asked for `git init` and the baseline commit, which is the approval for `ed122ab` and `deb71ea` |
++| 3 | Node 20 documented, but `npm ci` needs Node 22.12 or newer | Fixed | `engines.node` is `>=22.12` in `package.json` and the lockfile. `.npmrc` sets `engine-strict=true`, so older Node versions fail at install with a clear message. README, REVIEW.md and REVIEW_HANDOFF.md say Node 22.12 or newer |
++| 4 | Forged `ledger` events accepted by the registry | Fixed | See "Finding 4" below |
++| 5 | ReDoS through Ajv; unbounded cache | Fixed (worker timeout not added) | See "Finding 5" below |
++| 6 | Minor items | Fixed, except plain HTTP | See "Finding 6" below |
++| 7 | Run-log transaction hashes no longer retrievable from public servers | Fixed for future runs | `demo:phase2` now saves every transaction's validated JSON to `logs/<date>-phase2-txs.json` and never overwrites an earlier log |
++
++## Finding 4: authenticated registry writes, and an escrow check on the ledger
++
++- `npm run setup` adds two random 32-byte tokens to `.env`: `ORACLE_SERVICE_TOKEN` and
++  `WATCHER_SERVICE_TOKEN`.
++- `PUT /jobs/:id/condition` and `POST /jobs/:id/events` with `source: "oracle"` need
++  `Authorization: Bearer <ORACLE_SERVICE_TOKEN>`. Events with `source: "ledger"` need the
++  watcher's token. Tokens are compared in constant time (`src/auth.ts` `checkBearer`). A missing
++  or wrong token gets 401, and the oracle's token can't post ledger events.
++- Before it verifies anything, the oracle reads the escrow from the latest validated ledger and
++  checks that it exists, pays the job's provider, holds the job's price, uses the job's condition
++  and has the job's `CancelAfter` (`src/oracle/server.ts` `ledgerEscrowCheck`). If any of these
++  fails, it returns 409 with no verdict and no fulfillment, and the job's status doesn't change.
++  This holds even if something gets past the token check.
++- Evidence:
++  - `test/registry.test.ts` "accepts internal writes only with the right service token".
++  - `test/oracle.test.ts` "releases nothing when the escrow is not on the ledger as agreed".
++  - On testnet, the demo check "a forged ledger event without the watcher's token is refused"
++    returned 401, and every pass in the run went through the real escrow check.
++
++## Finding 5: limits on JSON Schemas
++
++- `src/schema-policy.ts` refuses these schema keywords: `pattern` and `patternProperties` (both
++  run the schema's own regex), `uniqueItems` (compares array items pairwise), `format` (no format
++  plugins are loaded) and `$data`. It also refuses any `$ref` that isn't local, any schema over
++  16 KB, and nesting deeper than 32 levels. Property names such as `pattern` inside `properties`
++  are still allowed.
++- The registry applies the policy when a job is created (400), and the oracle applies it again
++  before compiling. The compiled-validator cache holds at most 256 entries, and each schema is
++  removed from Ajv's own registry after compiling.
++- Evidence:
++  - The Gpno case, `pattern: "^(a+)+$"` checked against 40 a's followed by `!`, is now refused
++    in under 100 ms (`test/oracle.test.ts`).
++  - `test/registry.test.ts` "refuses job schemas that could make validation slow".
++  - On testnet, the demo check "a job schema with a regex pattern is refused" returned 400.
++- **Not done:** running checks in a worker thread with a timeout. With regex keywords and
++  `uniqueItems` banned, and schemas and deliverables size-capped, I know of no remaining
++  super-linear Ajv keyword. A worker timeout would still be good defense in depth before Phase 3,
++  and it is listed as a gap.
++
++## Finding 6: minor items
++
++| Item | Change |
++|---|---|
++| Replay set lost on restart | `ReplayGuard` in `src/auth.ts` saves used signatures to `data/oracle-replay.json`. Test: "remembers used signatures across a restart" |
++| Verdict key is the wallet seed | Verdicts are signed with a separate ed25519 key, `ORACLE_VERDICT_SEED`, which is not a funded account. Its public address, `ORACLE_VERDICT_ADDRESS`, is in `.env` |
++| `verifyVerdict` address optional, taken from `/health` | `verifyVerdict(verdict, oracleAddress)` now requires the address. The SDK takes it from `oracleAddress` or `ORACLE_VERDICT_ADDRESS` and never from `/health`. Test: "does not trust a verdict from an oracle address other than the pinned one" |
++| `max-latency` uses a forgeable `fundedAt` | The watcher reports `fundedAt` as the close time of the ledger that validated the EscrowCreate, and only the watcher's token can set it |
++| `verdicts.jsonl` under `src/` | It is now `data/verdicts.jsonl`, gitignored with the rest of `data/`. This departs from the path in `CLAUDE_PHASE2.md` |
++| Fulfillment over plain HTTP | **Not changed.** The services bind to 127.0.0.1 only. TLS is needed before anything leaves localhost, which already requires a new EDR |
++
++## Results after the fixes (2026-10-20, Linux, Node 22.22.0)
++
++| Command | Result |
++|---|---|
++| `npm run typecheck` | 0 errors |
++| `npm run test:unit` | **52/52** (7 condition, 11 registry, 20 oracle, 6 watcher, 8 SDK) |
++| `npm run demo:phase2` | **49/49** checks: the 47 checks from the reviewed run plus the 2 new security checks. Log: `logs/2026-10-20-phase2-fixes.txt`; transactions: `logs/2026-10-20-phase2-fixes-txs.json` (9 of 9 validated) |
++| `npm test` | **54/54** in 364.9 s, including both testnet flows |
++
++The Phase 1 code, `npm run demo` and its 18 checks are unchanged.
++
++## Still open
++
++- The NOT DEMONSTRATED items in `VERDICT.md`: the Windows run, the README quickstart,
++  `expired_unclaimed` on testnet, and watcher reconnect.
++- Running checks in a worker with a timeout (finding 5), and TLS for any non-localhost deployment
++  (finding 6).
+diff --git a/xrpl-escrow/docs/reviews/REVIEW.md b/xrpl-escrow/docs/reviews/REVIEW.md
+index 5ede26e..2c6ef27 100644
+--- a/xrpl-escrow/docs/reviews/REVIEW.md
++++ b/xrpl-escrow/docs/reviews/REVIEW.md
+@@ -8,14 +8,15 @@ Don't change any file except `docs/reviews/VERDICT.md`.
+ | Document | Path from the repo root `C:\dev\ai-settlement\` |
+ |---|---|
+ | Phase 1 rules (testnet only, the `network_id` guard, seeds, validated ledgers) | `xrpl-escrow\CLAUDE.md` |
+-| EDR-011, the Phase 1 decision | `edr\` (not in the repo yet) |
++| EDR-011, the Phase 1 decision, written down from `CLAUDE.md` and accepted by name on 2026-10-20 | `edr\EDR-011_ESCROW_PHASE1_TESTNET_DEMO.md` |
+ | Phase 2 build instructions | `xrpl-escrow\CLAUDE_PHASE2.md` |
+-| EDR-012, the Phase 2 decision, accepted on 2026-10-20 | `edr\EDR-012_ESCROW_PHASE2_ORACLE_REGISTRY.md` |
++| EDR-012, the Phase 2 decision, accepted by name on 2026-10-20 | `edr\EDR-012_ESCROW_PHASE2_ORACLE_REGISTRY.md` |
+ | Implementer's handoff: scope, expected results, NOT DEMONSTRATED, known gaps | `xrpl-escrow\REVIEW_HANDOFF.md` |
+ | Run logs with testnet explorer links | `xrpl-escrow\runs\2026-10-20-testnet.txt` (Phase 1) and `xrpl-escrow\logs\2026-10-20-phase2.txt` (Phase 2) |
+ 
+-The EDR-012 and `CLAUDE_PHASE2.md` copies still say Codex. Christopher has since made Gpno the
+-reviewer for both phases.
++`CLAUDE_PHASE2.md` still says Codex. Christopher has since made Gpno the reviewer for both
++phases, and EDR-012 records this. Christopher accepted both EDRs by name on 2026-10-20 (see
++`edr/ACCEPTANCES.md`).
+ 
+ ## What to review
+ 
+@@ -30,16 +31,16 @@ Suggested order:
+ 
+ ## How to run it
+ 
+-Run these in PowerShell from `xrpl-escrow\`, with Node 20 or newer:
++Run these in PowerShell from `xrpl-escrow\`, with Node 22.12 or newer:
+ 
+ ```
+ npm ci
+ npm run typecheck        # expect 0 errors
+-npm run test:unit        # expect 44/44, no network
++npm run test:unit        # expect 52/52, no network
+ npm run setup            # funds 3 testnet wallets from the faucet and writes .env (testnet only)
+ npm run demo             # Phase 1: expect 18/18 checks
+-npm run demo:phase2      # Phase 2: expect 47/47 checks; the log goes to logs\<date>-phase2.txt
+-npm test                 # expect 46/46, including both testnet flows (about 6 minutes)
++npm run demo:phase2      # Phase 2: expect 49/49 checks; the log goes to logs\<date>-phase2.txt
++npm test                 # expect 54/54, including both testnet flows (about 6 minutes)
+ ```
+ 
+ Windows has never been run, so your Windows results are new evidence. Record them either way.
+@@ -77,8 +78,9 @@ Windows has never been run, so your Windows results are new evidence. Record the
+ 10. **Windows compatibility.** npm scripts only, and the spawn in `src/services.ts`.
+ 11. **Tests.** Do they prove the acceptance evidence in both EDRs?
+ 
+-The known gaps (unauthenticated localhost registry writes, and ReDoS risk when Ajv compiles a
+-schema) and the NOT DEMONSTRATED items are listed in `REVIEW_HANDOFF.md`. Repeat one only if you
++The first review's verdict is in `VERDICT.md`, and the response to each finding is in
++`FINDINGS_RESPONSE.md`. The remaining gaps and the NOT DEMONSTRATED items are listed in
++`REVIEW_HANDOFF.md`. Repeat one only if you
+ rate it differently or it should block Phase 3.
+ 
+ ## Verdict
+diff --git a/xrpl-escrow/docs/reviews/VERDICT.md b/xrpl-escrow/docs/reviews/VERDICT.md
+index 6f47479..b4b1d1a 100644
+--- a/xrpl-escrow/docs/reviews/VERDICT.md
++++ b/xrpl-escrow/docs/reviews/VERDICT.md
+@@ -1,13 +1,15 @@
+ # Verdict: ESCROW-001 Phase 1 and Phase 2
+ 
+ **Reviewer:** Gpno
+-**Date:**
+-**Commit reviewed:**
+-**Verdict:** PASS / PASS WITH FINDINGS / FAIL (keep one)
++**Date:** 2026-10-20
++**Commit reviewed:** deb71ea351fd40cfa61e6485e522d567df6d3327 (main; baseline ed122ab)
++**Verdict:** PASS WITH FINDINGS
++
++**Contingency:** This verdict is PASS WITH FINDINGS only if Christopher fixes or explicitly waives findings 1 and 2. Otherwise the verdict is **FAIL**, because `docs/reviews/REVIEW.md` defines FAIL as "a hard rule or an EDR requirement is not met," and findings 1 and 2 are unmet EDR requirements.
+ 
+ ## Summary
+ 
+-One paragraph explaining why you gave this verdict.
++The code meets every hard rule. It runs on testnet only: every connection goes through `connectTestnet()`/`assertTestnet` (network_id 1), and there is no mainnet URL anywhere. All services bind to 127.0.0.1 only. The registry never stores the secret, and the vault uses AES-256-GCM with a random IV, the auth tag and the job id as associated data. The fulfillment is released only on a pass, and only to a fresh, valid signature from the job's provider. Deliverables are only hashed or `JSON.parse`d, never executed. Typecheck is clean and 44/44 unit tests pass on Node 22. Governance has gaps: neither EDR has been accepted by name, EDR-011 is missing, and the required branches don't exist. The documented Node 20 support is broken. Two known gaps were reproduced and must be fixed before Phase 3: forged "ledger" events in the registry and ReDoS through Ajv.
+ 
+ ## Findings
+ 
+@@ -15,26 +17,34 @@ List the most severe first. Remove this section if the verdict is PASS.
+ 
+ | # | Severity (blocker / major / minor / nit) | File:line | Problem and a concrete failure scenario | Suggested fix | Blocks Phase 3? |
+ |---|---|---|---|---|---|
+-| 1 | | | | | |
++| 1 | blocker (governance) | `edr/EDR-012_ESCROW_PHASE2_ORACLE_REGISTRY.md` (Status); `edr/` | EDR-012 still reads "Proposed" and says it "does not govern until the owner accepts it by name." It depends on EDR-011 being Accepted with a Phase 1 verdict, but EDR-011 isn't in the repo (REVIEW.md: "not in the repo yet"). EDR-012 also still names Codex as reviewer. The build ran under records that don't govern. | Christopher adds EDR-011 to `edr/`, accepts EDR-011 and EDR-012 by name, and records Gpno as reviewer (or waives this explicitly). | Yes |
++| 2 | blocker (governance) | git history (`main` only: `ed122ab`, `deb71ea`) | EDR-011 and CLAUDE_PHASE2.md require branches `escrow/001-testnet-demo` and `escrow/002-oracle-registry`. Only `main` exists, and both phases arrive as one baseline commit, so the Phase 1→2 diff was rebuilt after the fact. The repo is `C:\dev\ai-settlement\`, separate from PersonalAi. Claude committed, and no explicit approval for that is on record (CLAUDE.md: "Do not commit… without Christopher's explicit approval"). | Christopher confirms the separate repo is intended and that the commits were approved, or recreates the branches (or waives this explicitly). | Yes |
++| 3 | major | `xrpl-escrow/package.json` (`engines`); `README.md`; `docs/reviews/REVIEW.md` | The docs say "Node 20 or newer." On Node 20.19.2, `npm ci` fails: better-sqlite3@13 needs node >=22, vitest@5 needs ^22.12, and the native build fails. A Windows user following the quickstart on Node 20 can't install. | Set `engines.node` to `>=22.12` and update README and REVIEW.md. | Yes |
++| 4 | major | `xrpl-escrow/src/registry/server.ts` (`applyEvent`, `POST /jobs/:id/events`) | Any local process can post `{source:"ledger"}`. Reproduced: a forged `funded` was accepted (offerSequence 999999, createTx "FAKE") with no escrow on the ledger, then a forged `refunded` closed the job and reputation counted it. On a really funded job, a forged `refunded` makes it terminal. The watcher then ignores it, and `/deliverable` rejects new work, so the provider can't get a verdict and the client is refunded at CancelAfter. | Authenticate watcher and oracle events (shared service token or signed events), and have the oracle confirm the escrow on the ledger before releasing the fulfillment. | Yes |
++| 5 | major | `xrpl-escrow/src/oracle/checks/json-schema.ts` (`new Ajv({ strict: true })`, `compiled` Map) | Client-supplied schemas are compiled with the native JS RegExp. Reproduced with pattern `^(a+)+$`: 55 / 83 / 672 ms at lengths 20 / 24 / 27, roughly doubling per character. Checks run synchronously in the single oracle process, so one hostile job freezes verification for every job and can push other providers past CancelAfter. The compiled-schema cache is unbounded. | Use `code: { regExp: re2 }` or ban `pattern`/`patternProperties`, cap schema size, bound the cache, and run checks in a worker with a timeout. | Yes |
++| 6 | minor | `xrpl-escrow/src/auth.ts`; `src/oracle/server.ts`; `src/oracle/checks/max-latency.ts`; `src/sdk/index.ts` (`verifyVerdict`); `src/local-config.ts` (`VERDICT_LOG`) | Replay protection is an in-memory signature set, lost on restart. The verdict signing key is the oracle's wallet seed. The fulfillment travels over plain HTTP. `max-latency` uses the registry's `fundedAt`, which finding 4 can forge. `verifyVerdict`'s `oracleAddress` is optional, and the SDK takes it from the unauthenticated `/health`. `verdicts.jsonl` is under `src/`. | Persist replay state; use a separate verdict key; pin the oracle address in config; use ledger close time for latency; move the log to `data/` or `logs/`. | Partly (the auth and latency items) |
++| 7 | nit | `xrpl-escrow/runs/2026-10-20-testnet.txt`, `logs/2026-10-20-phase2.txt` | The public testnet servers keep only recent history, so neither phase's tx hashes can be looked up now. The Phase 2 hashes were confirmed validated earlier on 2026-10-20 (9/9, results as logged). The Phase 1 accounts exist and show activity. The logs are now the only full record. | Save the tx JSON (or explorer snapshots) alongside the run logs in future runs. | No |
+ 
+ ## What I ran
+ 
+ | Command | Expected | Result |
+ |---|---|---|
+-| `npm run typecheck` | 0 errors | |
+-| `npm run test:unit` | 44/44 | |
+-| `npm run demo` | 18/18 | |
+-| `npm run demo:phase2` | 47/47 | |
+-| `npm test` | 46/46 | |
++| `npm run typecheck` | 0 errors | 0 errors (Node 22.23.3) |
++| `npm run test:unit` | 44/44 | 44/44 passed (5 files, 2.7 s) |
++| `npm run demo` | 18/18 | Not run; log reviewed (18/18 in `runs/2026-10-20-testnet.txt`) |
++| `npm run demo:phase2` | 47/47 | Not run; log reviewed (47/47; 9/9 tx hashes confirmed validated on testnet earlier on 2026-10-20) |
++| `npm test` | 46/46 | 44/44 unit tests only; the 2 testnet flow tests were not run |
++
++`npm ci` on Node 20.19.2 failed (finding 3). On Node 22.23.3 it passed, and `npm audit` found 0 vulnerabilities. Separate scripts in a scratch copy reproduced findings 4 and 5.
+ 
+-Operating system and Node version:
++Operating system and Node version: Linux (shared review box), Node 22.23.3, npm from that Node 22 install (Node 20.19.2 / npm 11.21.0 failed `npm ci`).
+ 
+-Anything you could not run, and why:
++Anything you could not run, and why: `npm run setup`, `npm run demo`, `npm run demo:phase2` and the two testnet flow tests in `npm test` were not run, by instruction (no `.env` secrets, no new testnet transactions). Windows was not available to the reviewer.
+ 
+ ## NOT DEMONSTRATED items
+ 
+ For each item, say whether you confirmed it, it is still open, or it is not needed:
+-- Windows run:
+-- README quickstart:
+-- `expired_unclaimed` on testnet:
+-- Watcher reconnect:
++- Windows run: Still open. Not run. All 50 tracked files are LF, there is no `.gitattributes`, and the `src/services.ts` spawn uses no shell, so no blocker is visible. Node >=22.12 is required (finding 3).
++- README quickstart: Still open. Not driven by hand. It fails as written on Node 20 (finding 3).
++- `expired_unclaimed` on testnet: Still open. Covered by unit tests only; the logic in `src/watcher.ts` `eventsForLedger` reads correctly.
++- Watcher reconnect: Still open. The resubscribe-on-`connected` code is present in `src/watcher.ts` but has never been exercised.
+diff --git a/xrpl-escrow/package.json b/xrpl-escrow/package.json
+index 121b2ef..ddbc4c5 100644
+--- a/xrpl-escrow/package.json
++++ b/xrpl-escrow/package.json
+@@ -33,6 +33,6 @@
+   "type": "module",
+   "private": true,
+   "engines": {
+-    "node": ">=20"
++    "node": ">=22.12"
+   }
+ }
+diff --git a/xrpl-escrow/src/auth.ts b/xrpl-escrow/src/auth.ts
+index eb94c4f..03d6232 100644
+--- a/xrpl-escrow/src/auth.ts
++++ b/xrpl-escrow/src/auth.ts
+@@ -3,7 +3,10 @@
+ // A provider proves who it is by signing "<action>|<jobId>|<timestamp>|<payloadHash>"
+ // with its wallet key; the server checks that the public key derives to the
+ // job's provider address. The oracle signs its verdicts the same way.
+-import { createHash } from "node:crypto";
++import { createHash, timingSafeEqual } from "node:crypto";
++import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
++import type { IncomingHttpHeaders } from "node:http";
++import { dirname } from "node:path";
+ import { deriveAddress, sign, verify } from "ripple-keypairs";
+ import type { Wallet } from "xrpl";
+ import { HttpError } from "./http.js";
+@@ -31,9 +34,39 @@ export function signRequest(wallet: Wallet, action: string, jobId: string, paylo
+   };
+ }
+ 
++/**
++ * Remembers request signatures for longer than the freshness window, so a
++ * signed request can be used once. With a file path it survives restarts.
++ */
++export class ReplayGuard {
++  readonly #used = new Map<string, number>(); // signature -> request timestamp (ms)
++
++  constructor(readonly path?: string) {
++    if (path && existsSync(path)) {
++      const saved = JSON.parse(readFileSync(path, "utf8")) as Record<string, number>;
++      for (const [sig, ts] of Object.entries(saved)) this.#used.set(sig, ts);
++    }
++  }
++
++  /** Records the signature; false if it was already used. */
++  use(signature: string, timestamp: number): boolean {
++    const cutoff = Date.now() - 2 * MAX_SKEW_MS;
++    for (const [sig, ts] of this.#used) if (ts < cutoff) this.#used.delete(sig);
++    if (this.#used.has(signature)) return false;
++    this.#used.set(signature, timestamp);
++    if (this.path) {
++      mkdirSync(dirname(this.path), { recursive: true });
++      const tmp = `${this.path}.tmp`;
++      writeFileSync(tmp, JSON.stringify(Object.fromEntries(this.#used)));
++      renameSync(tmp, this.path);
++    }
++    return true;
++  }
++}
++
+ /** Throws 401/403 unless `auth` is a fresh, valid signature by `expectedAddress`. */
+ export function checkRequest(
+-  auth: unknown, action: string, jobId: string, payloadHash: string, expectedAddress: string, seen?: Set<string>,
++  auth: unknown, action: string, jobId: string, payloadHash: string, expectedAddress: string, replay?: ReplayGuard,
+ ): void {
+   const a = auth as Partial<RequestAuth> | undefined;
+   if (!a || typeof a.publicKey !== "string" || typeof a.signature !== "string" || typeof a.timestamp !== "number") {
+@@ -48,9 +81,17 @@ export function checkRequest(
+   }
+   if (!valid) throw new HttpError(401, "bad signature");
+   if (deriveAddress(a.publicKey) !== expectedAddress) throw new HttpError(403, "only the job's provider may do this");
+-  if (seen) {
+-    if (seen.has(a.signature)) throw new HttpError(401, "auth already used");
+-    seen.add(a.signature);
++  if (replay && !replay.use(a.signature, a.timestamp)) throw new HttpError(401, "auth already used");
++}
++
++const digest = (text: string) => createHash("sha256").update(text).digest();
++
++/** Throws 401 unless the request carries `Authorization: Bearer <expected>`. Compared in constant time. */
++export function checkBearer(headers: IncomingHttpHeaders, expected: string, who: string): void {
++  const header = headers.authorization ?? "";
++  const given = header.startsWith("Bearer ") ? header.slice(7) : "";
++  if (!given || !timingSafeEqual(digest(given), digest(expected))) {
++    throw new HttpError(401, `only the ${who} may do this`);
+   }
+ }
+ 
+diff --git a/xrpl-escrow/src/demo-phase2.ts b/xrpl-escrow/src/demo-phase2.ts
+index 6150457..5672798 100644
+--- a/xrpl-escrow/src/demo-phase2.ts
++++ b/xrpl-escrow/src/demo-phase2.ts
+@@ -19,7 +19,7 @@ import { sha256Hex } from "./auth.js";
+ import { EXPLORER_TX, connectTestnet } from "./config.js";
+ import { cancelEscrow, getEscrow, type TxResult } from "./escrow.js";
+ import { HttpError, callJson } from "./http.js";
+-import { DATA_DIR, ENV_FILE, ORACLE_PORT, REGISTRY_PORT, VERDICT_LOG, ensureVaultKey } from "./local-config.js";
++import { DATA_DIR, ENV_FILE, ORACLE_PORT, REGISTRY_PORT, ensureLocalSecrets } from "./local-config.js";
+ import type { Check } from "./demo.js";
+ import { EscrowKit, escrowRef, type Job, type JobSpec } from "./sdk/index.js";
+ import { startService, type Service } from "./services.js";
+@@ -44,12 +44,13 @@ export async function runPhase2(client: Client, wallets: Wallets, opts: Phase2Op
+   const oraclePort = opts.oraclePort ?? ORACLE_PORT;
+   const dataDir = resolve(opts.dataDir ?? DATA_DIR);
+   const jobsDb = resolve(dataDir, "jobs.db");
+-  const verdictLog = resolve(opts.verdictLog ?? VERDICT_LOG);
++  const verdictLog = resolve(opts.verdictLog ?? resolve(dataDir, "verdicts.jsonl"));
+   const registryUrl = `http://127.0.0.1:${registryPort}`;
+   const oracleUrl = `http://127.0.0.1:${oraclePort}`;
+   const serviceEnv = {
+     REGISTRY_PORT: String(registryPort), ORACLE_PORT: String(oraclePort), REGISTRY_URL: registryUrl,
+     JOBS_DB: jobsDb, VAULT_FILE: resolve(dataDir, "oracle-vault.json"), VERDICT_LOG: verdictLog,
++    REPLAY_FILE: resolve(dataDir, "oracle-replay.json"),
+     ENV_FILE: resolve(opts.envFile ?? ENV_FILE),
+   };
+   const priceXrp = 10;
+@@ -176,6 +177,14 @@ export async function runPhase2(client: Client, wallets: Wallets, opts: Phase2Op
+       outsider = err instanceof HttpError ? `${err.status} ${err.message}` : String(err);
+     }
+     check("a non-provider asking the oracle is refused", outsider.startsWith("403"), outsider);
++    const refusal = (p: Promise<unknown>) => p.then(() => "accepted", (e) => (e instanceof HttpError ? `${e.status} ${e.message}` : String(e)));
++    const forged = await refusal(callJson("POST", `${registryUrl}/jobs/${job4.id}/events`, { source: "ledger", status: "refunded", txHash: "FAKE" }));
++    check("a forged ledger event without the watcher's token is refused", forged.startsWith("401"), forged);
++    const redos = await refusal(kit.createJob({
++      client: payer.address, provider: provider.address, priceDrops, slaSeconds: 120,
++      spec: { checks: [{ type: "json-schema", schema: { type: "string", pattern: "^(a+)+$" } }] },
++    }));
++    check("a job schema with a regex pattern is refused", redos.startsWith("400"), redos);
+     const logLine = readFileSync(verdictLog, "utf8").trim().split("\n").reverse().find((l) => l.includes(job4.id)) ?? "";
+     check("verdict log records the evidence hash, not the content", logLine.includes(sha256Hex(injected)) && !logLine.includes("SYSTEM OVERRIDE"));
+ 
+@@ -240,13 +249,17 @@ async function main() {
+     console.log(line);
+   };
+   const stamp = new Date().toISOString();
++  // logs/<date>-phase2.txt, or <date>-phase2-2.txt and so on when today's name is taken.
++  let base = `${stamp.slice(0, 10)}-phase2`;
++  for (let n = 2; existsSync(resolve("logs", `${base}.txt`)); n++) base = `${stamp.slice(0, 10)}-phase2-${n}`;
++  const txFile = resolve("logs", `${base}-txs.json`);
+   log(`npm run demo:phase2 — XRP Ledger testnet, ${stamp}`);
+   const client = await connectTestnet();
+   let failed: Check[] = [];
+   try {
+     log(`Connected to ${client.url} (testnet, network_id 1). Loading or funding wallets from the faucet...`);
+     const wallets = await loadOrFundWallets(client);
+-    ensureVaultKey();
++    ensureLocalSecrets();
+     for (const [role, w] of Object.entries(wallets)) {
+       log(`  ${role.padEnd(8)} ${w.address}  ${(await xrpBalance(client, w.address)).toFixed(6)} XRP`);
+     }
+@@ -259,11 +272,23 @@ async function main() {
+     log(`\nRun aborted: ${err instanceof Error ? err.stack ?? err.message : String(err)}`);
+     process.exitCode = 1;
+   } finally {
+-    await client.disconnect();
++    // Public testnet servers keep little history, so save each transaction as validated now.
+     mkdirSync("logs", { recursive: true });
+-    const file = resolve("logs", `${stamp.slice(0, 10)}-phase2.txt`);
++    const hashes = [...new Set(lines.join("\n").match(/(?<=\/transactions\/)[0-9A-F]{64}/g) ?? [])];
++    const txs: unknown[] = [];
++    for (const hash of hashes) {
++      try {
++        txs.push((await client.request({ command: "tx", transaction: hash })).result);
++      } catch (err) {
++        txs.push({ hash, error: err instanceof Error ? err.message : String(err) });
++      }
++    }
++    writeFileSync(txFile, `${JSON.stringify(txs, null, 1)}\n`);
++    await client.disconnect();
++    const file = resolve("logs", `${base}.txt`);
+     writeFileSync(file, `${lines.join("\n")}\n`);
+     console.log(`\nRun log saved to ${file}`);
++    console.log(`Transaction JSON saved to ${txFile}`);
+   }
+ }
+ 
+diff --git a/xrpl-escrow/src/http.ts b/xrpl-escrow/src/http.ts
+index 297977a..5e7cf51 100644
+--- a/xrpl-escrow/src/http.ts
++++ b/xrpl-escrow/src/http.ts
+@@ -1,6 +1,6 @@
+ // Minimal JSON-over-HTTP helpers on node:http, shared by the registry and the
+ // oracle. Servers only ever bind to 127.0.0.1.
+-import { Agent, createServer, request, type IncomingMessage, type Server } from "node:http";
++import { Agent, createServer, request, type IncomingHttpHeaders, type IncomingMessage, type Server } from "node:http";
+ import type { AddressInfo } from "node:net";
+ import { LOCALHOST } from "./local-config.js";
+ 
+@@ -15,7 +15,7 @@ export class HttpError extends Error {
+ export interface Route {
+   method: "GET" | "POST" | "PUT";
+   path: string; // e.g. "/jobs/:id"
+-  handler: (params: Record<string, string>, body: unknown, query: URLSearchParams) => unknown | Promise<unknown>;
++  handler: (params: Record<string, string>, body: unknown, query: URLSearchParams, headers: IncomingHttpHeaders) => unknown | Promise<unknown>;
+ }
+ 
+ function match(pattern: string, path: string): Record<string, string> | null {
+@@ -58,7 +58,7 @@ export function jsonServer(routes: Route[]): Server {
+         if (route.method !== req.method) continue;
+         const params = match(route.path, url.pathname);
+         if (!params) continue;
+-        const result = await route.handler(params, await readJson(req), url.searchParams);
++        const result = await route.handler(params, await readJson(req), url.searchParams, req.headers);
+         return send(200, result ?? {});
+       }
+       send(404, { error: "not found" });
+@@ -81,14 +81,17 @@ export function listenLocal(server: Server, port: number): Promise<number> {
+ // A private agent so localhost calls never go through an HTTP proxy configured in the environment.
+ const directAgent = new Agent();
+ 
+-/** Call a local JSON service. Throws HttpError on a non-2xx response. */
+-export function callJson<T>(method: string, url: string, body?: unknown): Promise<T> {
++/** Call a local JSON service. Throws HttpError on a non-2xx response. `token` is sent as a bearer token. */
++export function callJson<T>(method: string, url: string, body?: unknown, token?: string): Promise<T> {
+   const payload = body === undefined ? undefined : Buffer.from(JSON.stringify(body));
+   return new Promise((resolveCall, reject) => {
+     const req = request(url, {
+       method,
+       agent: directAgent,
+-      headers: payload ? { "content-type": "application/json", "content-length": payload.length } : {},
++      headers: {
++        ...(payload ? { "content-type": "application/json", "content-length": payload.length } : {}),
++        ...(token ? { authorization: `Bearer ${token}` } : {}),
++      },
+     }, async (res) => {
+       const chunks: Buffer[] = [];
+       for await (const chunk of res) chunks.push(chunk as Buffer);
+diff --git a/xrpl-escrow/src/local-config.ts b/xrpl-escrow/src/local-config.ts
+index 3548743..1fa5b8d 100644
+--- a/xrpl-escrow/src/local-config.ts
++++ b/xrpl-escrow/src/local-config.ts
+@@ -4,6 +4,7 @@ import { randomBytes } from "node:crypto";
+ import { existsSync, readFileSync, writeFileSync } from "node:fs";
+ import { resolve } from "node:path";
+ import { parse } from "dotenv";
++import { Wallet, type ECDSA } from "xrpl";
+ 
+ export const LOCALHOST = "127.0.0.1";
+ 
+@@ -17,7 +18,8 @@ export const REGISTRY_URL = env("REGISTRY_URL", `http://${LOCALHOST}:${REGISTRY_
+ export const ORACLE_URL = env("ORACLE_URL", `http://${LOCALHOST}:${ORACLE_PORT}`);
+ export const JOBS_DB = env("JOBS_DB", resolve(DATA_DIR, "jobs.db"));
+ export const VAULT_FILE = env("VAULT_FILE", resolve(DATA_DIR, "oracle-vault.json"));
+-export const VERDICT_LOG = env("VERDICT_LOG", resolve("src", "oracle", "verdicts.jsonl"));
++export const VERDICT_LOG = env("VERDICT_LOG", resolve(DATA_DIR, "verdicts.jsonl"));
++export const REPLAY_FILE = env("REPLAY_FILE", resolve(DATA_DIR, "oracle-replay.json"));
+ 
+ /** Values from .env, with process.env taking precedence. */
+ export function readEnvFile(path = ENV_FILE): Record<string, string> {
+@@ -30,10 +32,34 @@ export function readEnvFile(path = ENV_FILE): Record<string, string> {
+   return merged;
+ }
+ 
+-/** Add ORACLE_VAULT_KEY (32 random bytes, hex) to .env if it is missing. Never prints it. */
+-export function ensureVaultKey(path = ENV_FILE): void {
++/**
++ * Local secrets the services need, created in .env if missing and never printed:
++ *   ORACLE_VAULT_KEY        AES-256-GCM key for the oracle's secret vault
++ *   ORACLE_SERVICE_TOKEN    lets the oracle set conditions and verdict statuses in the registry
++ *   WATCHER_SERVICE_TOKEN   lets the watcher post ledger events to the registry
++ *   ORACLE_VERDICT_SEED     ed25519 key the oracle signs verdicts with (not a funded wallet)
++ *   ORACLE_VERDICT_ADDRESS  public: the address SDK users pin to check verdict signatures
++ */
++export function ensureLocalSecrets(path = ENV_FILE): void {
+   const current = existsSync(path) ? readFileSync(path, "utf8") : "";
+-  if (/^ORACLE_VAULT_KEY=/m.test(current) || process.env.ORACLE_VAULT_KEY) return;
++  const has = (key: string) => new RegExp(`^${key}=`, "m").test(current) || process.env[key] !== undefined;
++  const add: string[] = [];
++  const hex32 = () => randomBytes(32).toString("hex");
++  if (!has("ORACLE_VAULT_KEY")) add.push(`ORACLE_VAULT_KEY=${hex32()}`);
++  if (!has("ORACLE_SERVICE_TOKEN")) add.push(`ORACLE_SERVICE_TOKEN=${hex32()}`);
++  if (!has("WATCHER_SERVICE_TOKEN")) add.push(`WATCHER_SERVICE_TOKEN=${hex32()}`);
++  if (!has("ORACLE_VERDICT_SEED")) {
++    const verdictKey = Wallet.generate("ed25519" as ECDSA);
++    add.push(`ORACLE_VERDICT_SEED=${verdictKey.seed}`, `ORACLE_VERDICT_ADDRESS=${verdictKey.address}`);
++  }
++  if (add.length === 0) return;
+   const sep = current === "" || current.endsWith("\n") ? "" : "\n";
+-  writeFileSync(path, `${current}${sep}ORACLE_VAULT_KEY=${randomBytes(32).toString("hex")}\n`, { mode: 0o600 });
++  writeFileSync(path, `${current}${sep}${add.join("\n")}\n`, { mode: 0o600 });
++}
++
++/** Read a required value from .env, with a hint to run setup when it is missing. */
++export function requireEnv(env: Record<string, string>, key: string): string {
++  const value = env[key];
++  if (!value) throw new Error(`${key} is missing from .env; run npm run setup`);
++  return value;
+ }
+diff --git a/xrpl-escrow/src/oracle/checks/json-schema.ts b/xrpl-escrow/src/oracle/checks/json-schema.ts
+index 99245d8..da71f15 100644
+--- a/xrpl-escrow/src/oracle/checks/json-schema.ts
++++ b/xrpl-escrow/src/oracle/checks/json-schema.ts
+@@ -1,9 +1,13 @@
+ // Passes when the deliverable parses as JSON and validates against the job's
+-// JSON Schema. JSON.parse only builds plain data; nothing in it is run.
++// JSON Schema. JSON.parse only builds plain data; nothing in it is run. The
++// schema must pass the schema policy first (no regex keywords, size and depth
++// limits), and compiled validators are kept in a bounded cache.
+ import { Ajv, type ValidateFunction } from "ajv";
++import { schemaProblem } from "../../schema-policy.js";
+ import type { CheckContext, CheckResult } from "./types.js";
+ 
+ const ajv = new Ajv({ strict: true, allErrors: false });
++const MAX_CACHED = 256;
+ const compiled = new Map<string, ValidateFunction>();
+ 
+ function validator(schema: Record<string, unknown>): ValidateFunction {
+@@ -11,13 +15,20 @@ function validator(schema: Record<string, unknown>): ValidateFunction {
+   let validate = compiled.get(key);
+   if (!validate) {
+     validate = ajv.compile(schema);
++    ajv.removeSchema(schema); // keep Ajv's own registry from growing with every job
++    if (compiled.size >= MAX_CACHED) compiled.delete(compiled.keys().next().value!);
+     compiled.set(key, validate);
+   }
+   return validate;
+ }
+ 
++/** Number of compiled validators held, for tests. */
++export const cachedValidators = () => compiled.size;
++
+ export function jsonSchema(spec: { schema: Record<string, unknown> }, ctx: CheckContext): CheckResult {
+   const fail = (detail: string): CheckResult => ({ type: "json-schema", pass: false, detail });
++  const problem = schemaProblem(spec.schema);
++  if (problem) return fail(`job schema refused: ${problem}`);
+   let data: unknown;
+   try {
+     data = JSON.parse(ctx.content);
+diff --git a/xrpl-escrow/src/oracle/checks/max-latency.ts b/xrpl-escrow/src/oracle/checks/max-latency.ts
+index ba0ecf1..677acbb 100644
+--- a/xrpl-escrow/src/oracle/checks/max-latency.ts
++++ b/xrpl-escrow/src/oracle/checks/max-latency.ts
+@@ -1,5 +1,7 @@
+-// Passes when the work was delivered within maxMs of the escrow being funded,
+-// using the registry's own timestamps.
++// Passes when the work was delivered within maxMs of the escrow being funded.
++// fundedAt is the close time of the ledger that validated the EscrowCreate, as
++// reported by the authenticated watcher; deliveredAt is when the registry
++// stored the work.
+ import type { CheckContext, CheckResult } from "./types.js";
+ 
+ export function maxLatency(spec: { maxMs: number }, ctx: CheckContext): CheckResult {
+diff --git a/xrpl-escrow/src/oracle/server.ts b/xrpl-escrow/src/oracle/server.ts
+index f6491cc..5af832f 100644
+--- a/xrpl-escrow/src/oracle/server.ts
++++ b/xrpl-escrow/src/oracle/server.ts
+@@ -1,22 +1,27 @@
+ // Verification oracle HTTP service on 127.0.0.1:8802.
+ //
+-//   GET  /health                   oracle address and public key, for checking verdict signatures
++//   GET  /health                   the verdict signer's address and public key
+ //   POST /jobs/:jobId/condition    make the job's secret, seal it in the vault, set the condition in the registry
+ //   POST /verify/:jobId            {auth} signed by the job's provider; runs the job's checks
+ //
+ // The oracle is the only process that holds secrets. It reads the job spec and
+ // deliverable from the registry and only hashes, parses or validates them; it
+-// never executes or follows anything inside them. A verify call returns a
+-// verdict signed with the oracle wallet's key, and the fulfillment only on a
+-// pass and only to the job's provider. Every verdict is appended to a JSONL log.
++// never executes or follows anything inside them. Before it verifies anything
++// it confirms on the ledger that the job's escrow exists with the agreed
++// amount, provider, condition and deadline, so a forged registry status can't
++// get a fulfillment released. A verify call returns a verdict signed with the
++// oracle's ed25519 verdict key, and the fulfillment only on a pass and only to
++// the job's provider. Every verdict is appended to a JSONL log.
+ import { appendFileSync, mkdirSync } from "node:fs";
+ import { dirname } from "node:path";
+ import { pathToFileURL } from "node:url";
+-import { Wallet } from "xrpl";
+-import { checkRequest, sha256Hex, signPayload } from "../auth.js";
++import { Wallet, type Client } from "xrpl";
++import { ReplayGuard, checkRequest, sha256Hex, signPayload } from "../auth.js";
+ import { makeSecret, toCondition, toFulfillment } from "../condition.js";
++import { connectTestnet } from "../config.js";
++import { getEscrow } from "../escrow.js";
+ import { HttpError, callJson, jsonServer, listenLocal, type Route } from "../http.js";
+-import { ORACLE_PORT, REGISTRY_URL, VAULT_FILE, VERDICT_LOG, readEnvFile } from "../local-config.js";
++import { ORACLE_PORT, REGISTRY_URL, REPLAY_FILE, VAULT_FILE, VERDICT_LOG, readEnvFile, requireEnv } from "../local-config.js";
+ import type { Deliverable, Job } from "../registry/db.js";
+ import { runChecks, type CheckResult } from "./checks/index.js";
+ import { SecretVault, parseVaultKey } from "./vault.js";
+@@ -28,7 +33,7 @@ export interface VerdictBody {
+   evidenceHash: string; // sha256 of the deliverable the checks ran on
+   condition: string;
+   provider: string;
+-  oracle: string; // oracle XRPL address
++  oracle: string; // address of the verdict signing key
+   publicKey: string;
+   issuedAt: number;
+ }
+@@ -37,17 +42,39 @@ export interface SignedVerdict extends VerdictBody {
+   signature: string;
+ }
+ 
++/** Returns null when the job's escrow is on the ledger as agreed, otherwise what is wrong. */
++export type EscrowCheck = (job: Job) => Promise<string | null>;
++
+ export interface OracleOptions {
+-  wallet: Wallet;
++  verdictKey: Wallet; // signs verdicts; a key of its own, not a funded wallet
+   vault: SecretVault;
++  serviceToken: string; // ORACLE_SERVICE_TOKEN, for writes to the registry
++  escrowCheck: EscrowCheck;
++  replay?: ReplayGuard;
+   registryUrl?: string;
+   verdictLog?: string;
+ }
+ 
++/** Compare the escrow object in the latest validated ledger with the job. */
++export function ledgerEscrowCheck(client: Client): EscrowCheck {
++  return async (job) => {
++    if (job.offerSequence === null || job.cancelAfter === null || job.condition === null) return "job has no escrow recorded";
++    const escrow = await getEscrow(client, {
++      owner: job.client, offerSequence: job.offerSequence, condition: job.condition, cancelAfter: job.cancelAfter,
++    });
++    if (!escrow) return "no open escrow on the ledger for this job";
++    if (escrow.Destination !== job.provider) return "escrow destination is not the job's provider";
++    if (escrow.Amount !== job.priceDrops) return "escrow amount is not the job's price";
++    if (escrow.Condition !== job.condition) return "escrow condition is not the job's condition";
++    if (escrow.CancelAfter !== job.cancelAfter) return "escrow deadline is not the job's deadline";
++    return null;
++  };
++}
++
+ export function oracleRoutes(opts: OracleOptions): Route[] {
+   const registry = opts.registryUrl ?? REGISTRY_URL;
+   const verdictLog = opts.verdictLog ?? VERDICT_LOG;
+-  const usedAuth = new Set<string>();
++  const replay = opts.replay ?? new ReplayGuard();
+   const getJob = async (id: string) => {
+     try {
+       return await callJson<Job>("GET", `${registry}/jobs/${encodeURIComponent(id)}`);
+@@ -60,7 +87,7 @@ export function oracleRoutes(opts: OracleOptions): Route[] {
+   return [
+     {
+       method: "GET", path: "/health",
+-      handler: () => ({ ok: true, service: "oracle", oracle: opts.wallet.address, publicKey: opts.wallet.publicKey }),
++      handler: () => ({ ok: true, service: "oracle", oracle: opts.verdictKey.address, publicKey: opts.verdictKey.publicKey }),
+     },
+ 
+     {
+@@ -74,7 +101,7 @@ export function oracleRoutes(opts: OracleOptions): Route[] {
+           opts.vault.put(jobId, secret);
+         }
+         const condition = toCondition(secret);
+-        await callJson("PUT", `${registry}/jobs/${encodeURIComponent(jobId)}/condition`, { condition });
++        await callJson("PUT", `${registry}/jobs/${encodeURIComponent(jobId)}/condition`, { condition }, opts.serviceToken);
+         return { jobId, condition };
+       },
+     },
+@@ -83,7 +110,7 @@ export function oracleRoutes(opts: OracleOptions): Route[] {
+       method: "POST", path: "/verify/:jobId",
+       handler: async ({ jobId }, body) => {
+         const job = await getJob(jobId);
+-        checkRequest((body as { auth?: unknown } | undefined)?.auth, "verify", jobId, "", job.provider, usedAuth);
++        checkRequest((body as { auth?: unknown } | undefined)?.auth, "verify", jobId, "", job.provider, replay);
+         if (!["delivered", "verified_pass", "verified_fail"].includes(job.status)) {
+           throw new HttpError(409, `job is ${job.status}; nothing to verify`);
+         }
+@@ -91,15 +118,17 @@ export function oracleRoutes(opts: OracleOptions): Route[] {
+         if (!secret || !job.condition || toCondition(secret) !== job.condition) {
+           throw new HttpError(409, "this oracle does not hold the secret for the job's condition");
+         }
++        const escrowProblem = await opts.escrowCheck(job);
++        if (escrowProblem) throw new HttpError(409, `escrow check failed: ${escrowProblem}`);
+         const deliverable = await callJson<Deliverable>("GET", `${registry}/jobs/${encodeURIComponent(jobId)}/deliverable`);
+ 
+         const { pass, results } = runChecks(job.spec.checks, { job, content: deliverable.content, deliveredAt: deliverable.deliveredAt });
+         const unsigned: VerdictBody = {
+           jobId, verdict: pass ? "pass" : "fail", checks: results, evidenceHash: sha256Hex(deliverable.content),
+-          condition: job.condition, provider: job.provider, oracle: opts.wallet.address, publicKey: opts.wallet.publicKey,
+-          issuedAt: Date.now(),
++          condition: job.condition, provider: job.provider, oracle: opts.verdictKey.address,
++          publicKey: opts.verdictKey.publicKey, issuedAt: Date.now(),
+         };
+-        const verdict: SignedVerdict = { ...unsigned, signature: signPayload(unsigned, opts.wallet) };
++        const verdict: SignedVerdict = { ...unsigned, signature: signPayload(unsigned, opts.verdictKey) };
+ 
+         mkdirSync(dirname(verdictLog), { recursive: true });
+         appendFileSync(verdictLog, `${JSON.stringify(verdict)}\n`);
+@@ -107,7 +136,7 @@ export function oracleRoutes(opts: OracleOptions): Route[] {
+           await callJson("POST", `${registry}/jobs/${encodeURIComponent(jobId)}/events`, {
+             source: "oracle", status: pass ? "verified_pass" : "verified_fail",
+             detail: results.map((r) => `${r.type}: ${r.pass ? "pass" : "fail"}`).join(", "),
+-          });
++          }, opts.serviceToken);
+         }
+         return pass ? { verdict, fulfillment: toFulfillment(secret) } : { verdict };
+       },
+@@ -117,24 +146,31 @@ export function oracleRoutes(opts: OracleOptions): Route[] {
+ 
+ export async function startOracle(opts: Partial<OracleOptions> & { port?: number } = {}) {
+   const env = readEnvFile();
+-  const wallet = opts.wallet ?? (env.ORACLE_SEED ? Wallet.fromSeed(env.ORACLE_SEED) : null);
+-  if (!wallet) throw new Error("ORACLE_SEED is missing from .env; run the demo once to create testnet wallets");
++  const verdictKey = opts.verdictKey ?? Wallet.fromSeed(requireEnv(env, "ORACLE_VERDICT_SEED"));
+   const vault = opts.vault ?? new SecretVault(VAULT_FILE, parseVaultKey(env.ORACLE_VAULT_KEY));
+-  const server = jsonServer(oracleRoutes({ ...opts, wallet, vault }));
++  const serviceToken = opts.serviceToken ?? requireEnv(env, "ORACLE_SERVICE_TOKEN");
++  let ledger: Client | null = null;
++  let escrowCheck = opts.escrowCheck;
++  if (!escrowCheck) {
++    ledger = await connectTestnet();
++    escrowCheck = ledgerEscrowCheck(ledger);
++  }
++  const replay = opts.replay ?? new ReplayGuard(REPLAY_FILE);
++  const server = jsonServer(oracleRoutes({ ...opts, verdictKey, vault, serviceToken, escrowCheck, replay }));
+   const port = await listenLocal(server, opts.port ?? ORACLE_PORT);
+   return {
+     port,
+     url: `http://127.0.0.1:${port}`,
+-    address: wallet.address,
++    address: verdictKey.address,
+     close: () => new Promise<void>((done) => {
+-      server.close(() => done());
++      server.close(() => (ledger ? ledger.disconnect().then(() => done(), () => done()) : done()));
+       server.closeAllConnections();
+     }),
+   };
+ }
+ 
+ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+-  startOracle().then(({ url, address }) => console.log(`oracle ${address} listening on ${url}`), (err) => {
++  startOracle().then(({ url, address }) => console.log(`oracle (verdict key ${address}) listening on ${url}`), (err) => {
+     console.error(err instanceof Error ? err.message : err);
+     process.exitCode = 1;
+   });
+diff --git a/xrpl-escrow/src/registry/server.ts b/xrpl-escrow/src/registry/server.ts
+index 2547cf3..4c8eec1 100644
+--- a/xrpl-escrow/src/registry/server.ts
++++ b/xrpl-escrow/src/registry/server.ts
+@@ -4,19 +4,23 @@
+ //   POST /jobs                          create a draft job {client, provider, priceDrops, slaSeconds, spec}
+ //   GET  /jobs[?status=&provider=&client=]
+ //   GET  /jobs/:id
+-//   PUT  /jobs/:id/condition            set by the oracle once, while the job is a draft
++//   PUT  /jobs/:id/condition            set by the oracle once, while the job is a draft (oracle token)
+ //   POST /jobs/:id/deliverable          provider posts the work {content, auth}
+ //   GET  /jobs/:id/deliverable
+-//   POST /jobs/:id/events               status changes from the watcher (ledger) or the oracle
++//   POST /jobs/:id/events               status changes from the watcher (watcher token) or the oracle (oracle token)
+ //   GET  /jobs/:id/events
+ //   GET  /providers/:address/reputation
+ //
+ // Job specs and deliverables are stored as data and never interpreted here.
++// The two internal write endpoints need a bearer token from .env, so only the
++// oracle can set conditions and verdicts, and only the watcher can report what
++// happened on the ledger.
+ import { pathToFileURL } from "node:url";
+ import { isValidClassicAddress } from "xrpl";
+-import { checkRequest, sha256Hex } from "../auth.js";
++import { checkBearer, checkRequest, sha256Hex } from "../auth.js";
+ import { HttpError, jsonServer, listenLocal, type Route } from "../http.js";
+-import { JOBS_DB, REGISTRY_PORT } from "../local-config.js";
++import { JOBS_DB, REGISTRY_PORT, readEnvFile, requireEnv } from "../local-config.js";
++import { schemaProblem } from "../schema-policy.js";
+ import { JobStore, TERMINAL, canMove, type CheckSpec, type Job, type JobPatch, type JobStatus, type NewJob } from "./db.js";
+ 
+ const FORBIDDEN_KEYS = ["secret", "fulfillment", "preimage"];
+@@ -32,7 +36,7 @@ function containsForbiddenKey(value: unknown): boolean {
+ function validCheck(c: unknown): c is CheckSpec {
+   if (!isObject(c) || !CHECK_TYPES.includes(c.type as string)) return false;
+   if (c.type === "sha256-match") return typeof c.sha256 === "string" && /^[0-9a-fA-F]{64}$/.test(c.sha256);
+-  if (c.type === "json-schema") return isObject(c.schema);
++  if (c.type === "json-schema") return isObject(c.schema) && schemaProblem(c.schema) === null;
+   return typeof c.maxMs === "number" && c.maxMs > 0;
+ }
+ 
+@@ -47,6 +51,12 @@ export function parseNewJob(body: unknown): NewJob {
+   if (!Number.isInteger(slaSeconds) || (slaSeconds as number) < 30 || (slaSeconds as number) > 86_400) {
+     throw new HttpError(400, "slaSeconds must be an integer from 30 to 86400");
+   }
++  if (isObject(spec) && Array.isArray(spec.checks)) {
++    for (const c of spec.checks) {
++      const problem = isObject(c) && c.type === "json-schema" ? schemaProblem(c.schema) : null;
++      if (problem) throw new HttpError(400, `json-schema check refused: ${problem}`);
++    }
++  }
+   if (!isObject(spec) || !Array.isArray(spec.checks) || spec.checks.length === 0 || !spec.checks.every(validCheck)) {
+     throw new HttpError(400, `spec.checks must be a non-empty list of: ${CHECK_TYPES.join(", ")}`);
+   }
+@@ -57,7 +67,12 @@ export function parseNewJob(body: unknown): NewJob {
+ const LEDGER_STATUSES: JobStatus[] = ["funded", "paid", "refunded", "expired_unclaimed"];
+ const ORACLE_STATUSES: JobStatus[] = ["verified_pass", "verified_fail"];
+ 
+-export function registryRoutes(store: JobStore): Route[] {
++export interface ServiceTokens {
++  oracle: string;
++  watcher: string;
++}
++
++export function registryRoutes(store: JobStore, tokens: ServiceTokens): Route[] {
+   const mustGet = (id: string): Job => {
+     const job = store.get(id);
+     if (!job) throw new HttpError(404, `unknown job ${id}`);
+@@ -80,7 +95,8 @@ export function registryRoutes(store: JobStore): Route[] {
+ 
+     {
+       method: "PUT", path: "/jobs/:id/condition",
+-      handler: ({ id }, body) => {
++      handler: ({ id }, body, _q, headers) => {
++        checkBearer(headers, tokens.oracle, "oracle");
+         const job = mustGet(id);
+         const condition = isObject(body) ? body.condition : undefined;
+         if (typeof condition !== "string" || !/^A0258020[0-9A-F]{64}810120$/.test(condition)) {
+@@ -118,7 +134,16 @@ export function registryRoutes(store: JobStore): Route[] {
+       },
+     },
+ 
+-    { method: "POST", path: "/jobs/:id/events", handler: ({ id }, body) => applyEvent(store, mustGet(id), body) },
++    {
++      method: "POST", path: "/jobs/:id/events",
++      handler: ({ id }, body, _q, headers) => {
++        const source = isObject(body) ? body.source : undefined;
++        if (source === "ledger") checkBearer(headers, tokens.watcher, "watcher");
++        else if (source === "oracle") checkBearer(headers, tokens.oracle, "oracle");
++        else throw new HttpError(400, "source must be ledger or oracle");
++        return applyEvent(store, mustGet(id), body);
++      },
++    },
+ 
+     { method: "GET", path: "/jobs/:id/events", handler: ({ id }) => (mustGet(id), store.events(id)) },
+ 
+@@ -163,7 +188,8 @@ function applyEvent(store: JobStore, job: Job, body: unknown): Job {
+   }
+ 
+   const patch: JobPatch = { status };
+-  if (status === "funded") Object.assign(patch, { offerSequence: int("offerSequence"), cancelAfter: int("cancelAfter"), createTx: str("txHash"), fundedAt: now });
++  // fundedAt is the close time of the ledger that validated the EscrowCreate, when the watcher knows it.
++  if (status === "funded") Object.assign(patch, { offerSequence: int("offerSequence"), cancelAfter: int("cancelAfter"), createTx: str("txHash"), fundedAt: int("fundedAt") ?? now });
+   if (status === "paid") Object.assign(patch, { finishTx: str("txHash"), closedAt: now });
+   if (status === "refunded") Object.assign(patch, { cancelTx: str("txHash"), closedAt: now });
+   if (status === "verified_pass" || status === "verified_fail") Object.assign(patch, { verdict: status === "verified_pass" ? "pass" : "fail", verifiedAt: now });
+@@ -173,9 +199,11 @@ function applyEvent(store: JobStore, job: Job, body: unknown): Job {
+   return store.update(job.id, patch);
+ }
+ 
+-export async function startRegistry(opts: { dbPath?: string; port?: number } = {}) {
++export async function startRegistry(opts: { dbPath?: string; port?: number; tokens?: ServiceTokens } = {}) {
++  const env = opts.tokens ? {} : readEnvFile();
++  const tokens = opts.tokens ?? { oracle: requireEnv(env, "ORACLE_SERVICE_TOKEN"), watcher: requireEnv(env, "WATCHER_SERVICE_TOKEN") };
+   const store = new JobStore(opts.dbPath ?? JOBS_DB);
+-  const server = jsonServer(registryRoutes(store));
++  const server = jsonServer(registryRoutes(store, tokens));
+   const port = await listenLocal(server, opts.port ?? REGISTRY_PORT);
+   return {
+     port,
+diff --git a/xrpl-escrow/src/schema-policy.ts b/xrpl-escrow/src/schema-policy.ts
+new file mode 100644
+index 0000000..bc5420a
+--- /dev/null
++++ b/xrpl-escrow/src/schema-policy.ts
+@@ -0,0 +1,55 @@
++// Limits on the JSON Schemas a client may put in a job spec. Ajv compiles a
++// schema into JavaScript, and some keywords let a hostile schema make
++// validation take exponential or quadratic time:
++//   pattern, patternProperties  run the schema's own regular expressions (ReDoS)
++//   uniqueItems                 compares array items pairwise
++//   format                      needs format plugins this kit does not load
++// Both the registry (when a job is created) and the oracle (before compiling)
++// apply this policy.
++export const MAX_SCHEMA_BYTES = 16_384;
++export const MAX_SCHEMA_DEPTH = 32;
++export const BANNED_KEYWORDS = ["pattern", "patternProperties", "uniqueItems", "format", "$data"];
++
++// Keywords whose values are maps of user-chosen names to subschemas, and
++// keywords whose values are plain data, not schemas.
++const NAME_MAPS = ["properties", "$defs", "definitions", "dependentSchemas"];
++const DATA_VALUES = ["enum", "const", "default", "examples", "required", "dependentRequired", "title", "description"];
++
++/** Why `schema` is not allowed, or null if it is. */
++export function schemaProblem(schema: unknown): string | null {
++  let text: string;
++  try {
++    text = JSON.stringify(schema);
++  } catch {
++    return "schema is not plain JSON";
++  }
++  if (Buffer.byteLength(text, "utf8") > MAX_SCHEMA_BYTES) return `schema is larger than ${MAX_SCHEMA_BYTES} bytes`;
++
++  const walk = (node: unknown, depth: number): string | null => {
++    if (depth > MAX_SCHEMA_DEPTH) return `schema is nested deeper than ${MAX_SCHEMA_DEPTH} levels`;
++    if (Array.isArray(node)) {
++      for (const item of node) {
++        const problem = walk(item, depth + 1);
++        if (problem) return problem;
++      }
++      return null;
++    }
++    if (typeof node !== "object" || node === null) return null;
++    for (const [key, value] of Object.entries(node)) {
++      if (BANNED_KEYWORDS.includes(key)) return `schema keyword "${key}" is not allowed`;
++      if (key === "$ref" && typeof value === "string" && !value.startsWith("#")) return "only local $ref (#...) is allowed";
++      if (DATA_VALUES.includes(key)) continue;
++      if (NAME_MAPS.includes(key) && typeof value === "object" && value !== null) {
++        for (const sub of Object.values(value)) {
++          const problem = walk(sub, depth + 1);
++          if (problem) return problem;
++        }
++        continue;
++      }
++      const problem = walk(value, depth + 1);
++      if (problem) return problem;
++    }
++    return null;
++  };
++  return walk(schema, 0);
++}
+diff --git a/xrpl-escrow/src/sdk/index.ts b/xrpl-escrow/src/sdk/index.ts
+index 66847ac..3bda097 100644
+--- a/xrpl-escrow/src/sdk/index.ts
++++ b/xrpl-escrow/src/sdk/index.ts
+@@ -12,7 +12,7 @@ import type { Client, Wallet } from "xrpl";
+ import { signRequest, sha256Hex, verifyPayload } from "../auth.js";
+ import { cancelEscrow, createEscrow, finishEscrow, sleep, waitPastCancelAfter, type EscrowRef, type TxResult } from "../escrow.js";
+ import { callJson } from "../http.js";
+-import { ORACLE_URL, REGISTRY_URL } from "../local-config.js";
++import { ORACLE_URL, REGISTRY_URL, readEnvFile } from "../local-config.js";
+ import type { Job, JobEvent, JobSpec, JobStatus } from "../registry/db.js";
+ import type { SignedVerdict, VerdictBody } from "../oracle/server.js";
+ 
+@@ -23,6 +23,12 @@ export interface KitOptions {
+   xrpl?: Client; // needed for fundJob, claim and refund
+   registryUrl?: string;
+   oracleUrl?: string;
++  /**
++   * The oracle's verdict signing address. Verdicts are only trusted when signed by
++   * this address. Defaults to ORACLE_VERDICT_ADDRESS from .env; never taken from
++   * the oracle's own /health answer.
++   */
++  oracleAddress?: string;
+   /** How long to wait for the watcher to reflect a validated transaction. */
+   statusTimeoutMs?: number;
+ }
+@@ -42,10 +48,10 @@ export interface DeliverResult {
+   fulfillment: string | null;
+ }
+ 
+-/** Check a verdict's signature, and that it came from `oracleAddress` when given. */
+-export function verifyVerdict(verdict: SignedVerdict, oracleAddress?: string): boolean {
++/** Check a verdict's signature, and that it came from the pinned `oracleAddress`. */
++export function verifyVerdict(verdict: SignedVerdict, oracleAddress: string): boolean {
+   const { signature, ...unsigned } = verdict;
+-  if (oracleAddress && verdict.oracle !== oracleAddress) return false;
++  if (!oracleAddress || verdict.oracle !== oracleAddress) return false;
+   return verifyPayload(unsigned as VerdictBody, signature, verdict.publicKey, verdict.oracle);
+ }
+ 
+@@ -60,6 +66,7 @@ export class EscrowKit {
+   readonly registryUrl: string;
+   readonly oracleUrl: string;
+   readonly #xrpl?: Client;
++  readonly oracleAddress: string | null;
+   readonly #timeout: number;
+ 
+   constructor(opts: KitOptions = {}) {
+@@ -67,6 +74,7 @@ export class EscrowKit {
+     this.oracleUrl = opts.oracleUrl ?? ORACLE_URL;
+     this.#xrpl = opts.xrpl;
+     this.#timeout = opts.statusTimeoutMs ?? 60_000;
++    this.oracleAddress = opts.oracleAddress ?? readEnvFile().ORACLE_VERDICT_ADDRESS ?? null;
+   }
+ 
+   #ledger(): Client {
+@@ -130,11 +138,11 @@ export class EscrowKit {
+       content, auth: signRequest(providerWallet, "deliver", jobId, sha256Hex(content)),
+     });
+     const { verdict, fulfillment } = await this.requestVerification(jobId, providerWallet);
+-    const { oracle } = await this.oracleInfo();
+     return {
+       job: await this.getJob(jobId),
+       verdict,
+-      verdictSignatureValid: verifyVerdict(verdict, oracle) && verdict.evidenceHash === sha256Hex(content),
++      verdictSignatureValid: this.oracleAddress !== null && verifyVerdict(verdict, this.oracleAddress)
++        && verdict.evidenceHash === sha256Hex(content),
+       fulfillment: fulfillment ?? null,
+     };
+   }
+diff --git a/xrpl-escrow/src/setup.ts b/xrpl-escrow/src/setup.ts
+index b9f96c4..4a8c136 100644
+--- a/xrpl-escrow/src/setup.ts
++++ b/xrpl-escrow/src/setup.ts
+@@ -1,17 +1,18 @@
+ // One-time setup: fund the three testnet wallets from the faucet and create
+-// ORACLE_VAULT_KEY, all saved in .env. Run before starting the services by hand.
++// the oracle's vault key, the service tokens and the verdict key, all saved
++// in .env. Run before starting the services by hand.
+ import { connectTestnet } from "./config.js";
+-import { ensureVaultKey } from "./local-config.js";
++import { ensureLocalSecrets } from "./local-config.js";
+ import { loadOrFundWallets, xrpBalance } from "./wallets.js";
+ 
+ const client = await connectTestnet();
+ try {
+   const wallets = await loadOrFundWallets(client);
+-  ensureVaultKey();
++  ensureLocalSecrets();
+   for (const [role, w] of Object.entries(wallets)) {
+     console.log(`  ${role.padEnd(8)} ${w.address}  ${(await xrpBalance(client, w.address)).toFixed(6)} XRP`);
+   }
+-  console.log("Wallet seeds and ORACLE_VAULT_KEY are in .env (testnet only, gitignored).");
++  console.log("Wallet seeds, the vault key, service tokens and the verdict key are in .env (testnet only, gitignored).");
+ } finally {
+   await client.disconnect();
+ }
+diff --git a/xrpl-escrow/src/watcher.ts b/xrpl-escrow/src/watcher.ts
+index e8556b5..3766490 100644
+--- a/xrpl-escrow/src/watcher.ts
++++ b/xrpl-escrow/src/watcher.ts
+@@ -9,11 +9,12 @@
+ // On every validated ledger it also flags escrows within WARN_SECONDS of
+ // CancelAfter, and marks passed-but-unclaimed jobs expired_unclaimed once a
+ // ledger closes after CancelAfter. Only validated, tesSUCCESS transactions count.
++// Its writes to the registry carry WATCHER_SERVICE_TOKEN from .env.
+ import { pathToFileURL } from "node:url";
+ import type { Client, TransactionStream } from "xrpl";
+-import { connectTestnet } from "./config.js";
++import { RIPPLE_EPOCH_OFFSET, connectTestnet } from "./config.js";
+ import { callJson } from "./http.js";
+-import { REGISTRY_URL } from "./local-config.js";
++import { REGISTRY_URL, readEnvFile, requireEnv } from "./local-config.js";
+ import { TERMINAL, type Job } from "./registry/db.js";
+ 
+ export const WARN_SECONDS = 30;
+@@ -23,6 +24,7 @@ export interface LedgerTx {
+   validated: boolean;
+   result: string;
+   tx: Record<string, unknown>;
++  closeTimeMs: number | null; // close time of the ledger that validated it
+ }
+ 
+ export interface RegistryEvent {
+@@ -36,7 +38,9 @@ export function toLedgerTx(msg: Record<string, unknown>): LedgerTx | null {
+   const meta = msg.meta as { TransactionResult?: string } | string | undefined;
+   const hash = (msg.hash ?? tx?.hash) as string | undefined;
+   if (!tx || !hash || typeof meta !== "object") return null;
+-  return { hash, validated: msg.validated === true, result: meta.TransactionResult ?? "", tx };
++  const iso = typeof msg.close_time_iso === "string" ? Date.parse(msg.close_time_iso) : NaN;
++  const closeTimeMs = Number.isFinite(iso) ? iso : typeof tx.date === "number" ? (tx.date + RIPPLE_EPOCH_OFFSET) * 1000 : null;
++  return { hash, validated: msg.validated === true, result: meta.TransactionResult ?? "", tx, closeTimeMs };
+ }
+ 
+ /** The registry event a validated escrow transaction implies, if it belongs to a known job. */
+@@ -52,7 +56,7 @@ export function eventForTx(t: LedgerTx, jobs: Job[]): RegistryEvent | null {
+         jobId: job.id,
+         body: {
+           source: "ledger", status: "funded", offerSequence: tx.Sequence, cancelAfter: tx.CancelAfter, txHash: t.hash,
+-          detail: `EscrowCreate ${t.hash}`,
++          fundedAt: t.closeTimeMs ?? undefined, detail: `EscrowCreate ${t.hash}`,
+         },
+       };
+     }
+@@ -84,6 +88,7 @@ export function eventsForLedger(closeTime: number, jobs: Job[], warnSeconds = WA
+ }
+ 
+ export interface WatcherOptions {
++  serviceToken: string; // WATCHER_SERVICE_TOKEN
+   registryUrl?: string;
+   pollMs?: number;
+   log?: (line: string) => void;
+@@ -91,14 +96,16 @@ export interface WatcherOptions {
+ 
+ export class LedgerWatcher {
+   readonly #registry: string;
++  readonly #token: string;
+   readonly #log: (line: string) => void;
+   readonly #accounts = new Set<string>();
+   #queue: Promise<void> = Promise.resolve();
+   #timer: NodeJS.Timeout | null = null;
+   #pollMs: number;
+ 
+-  constructor(private readonly client: Client, opts: WatcherOptions = {}) {
++  constructor(private readonly client: Client, opts: WatcherOptions) {
+     this.#registry = opts.registryUrl ?? REGISTRY_URL;
++    this.#token = opts.serviceToken;
+     this.#pollMs = opts.pollMs ?? 1000;
+     this.#log = opts.log ?? ((line) => console.log(`[watcher] ${line}`));
+   }
+@@ -171,7 +178,7 @@ export class LedgerWatcher {
+ 
+   async #send({ jobId, body }: RegistryEvent) {
+     try {
+-      const job = await callJson<Job>("POST", `${this.#registry}/jobs/${jobId}/events`, body);
++      const job = await callJson<Job>("POST", `${this.#registry}/jobs/${jobId}/events`, body, this.#token);
+       this.#log(`job ${jobId}: ${body.status ? `status ${job.status}` : "flagged"} (${body.detail})`);
+     } catch (err) {
+       this.#log(`job ${jobId}: registry refused ${String(body.status ?? "flag")}: ${err instanceof Error ? err.message : String(err)}`);
+@@ -180,8 +187,9 @@ export class LedgerWatcher {
+ }
+ 
+ async function main() {
++  const serviceToken = requireEnv(readEnvFile(), "WATCHER_SERVICE_TOKEN");
+   const client = await connectTestnet();
+-  const watcher = new LedgerWatcher(client);
++  const watcher = new LedgerWatcher(client, { serviceToken });
+   await watcher.start();
+   console.log(`[watcher] connected to ${client.url} (testnet), watching jobs in ${REGISTRY_URL}`);
+   const shutdown = async () => {
+diff --git a/xrpl-escrow/test/helpers.ts b/xrpl-escrow/test/helpers.ts
+index 5254952..3111351 100644
+--- a/xrpl-escrow/test/helpers.ts
++++ b/xrpl-escrow/test/helpers.ts
+@@ -3,28 +3,39 @@ import { randomBytes } from "node:crypto";
+ import { mkdtempSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+-import { Wallet } from "xrpl";
++import { Wallet, type ECDSA } from "xrpl";
++import { ReplayGuard } from "../src/auth.js";
+ import { callJson } from "../src/http.js";
+-import { startOracle } from "../src/oracle/server.js";
++import { startOracle, type EscrowCheck } from "../src/oracle/server.js";
+ import { SecretVault } from "../src/oracle/vault.js";
+ import { startRegistry } from "../src/registry/server.js";
+ import type { Job } from "../src/registry/db.js";
+ 
+ export const tempDir = () => mkdtempSync(join(tmpdir(), "escrow-test-"));
+ 
++export const TOKENS = { oracle: randomBytes(32).toString("hex"), watcher: randomBytes(32).toString("hex") };
++
+ export async function startLocal() {
+   const dir = tempDir();
+-  const registry = await startRegistry({ dbPath: join(dir, "jobs.db"), port: 0 });
+-  const oracleWallet = Wallet.generate();
++  const registry = await startRegistry({ dbPath: join(dir, "jobs.db"), port: 0, tokens: TOKENS });
++  const verdictKey = Wallet.generate("ed25519" as ECDSA);
+   const vaultKey = randomBytes(32);
+   const vaultFile = join(dir, "vault.json");
+   const verdictLog = join(dir, "verdicts.jsonl");
++  const replayFile = join(dir, "replay.json");
++  // Stands in for the ledger: by default every escrow "exists"; tests can make it fail.
++  const ledger = { problem: null as string | null, checked: [] as string[] };
++  const escrowCheck: EscrowCheck = async (job) => {
++    ledger.checked.push(job.id);
++    return ledger.problem;
++  };
+   const launchOracle = () => startOracle({
+-    port: 0, wallet: oracleWallet, vault: new SecretVault(vaultFile, vaultKey), registryUrl: registry.url, verdictLog,
++    port: 0, verdictKey, vault: new SecretVault(vaultFile, vaultKey), registryUrl: registry.url, verdictLog,
++    serviceToken: TOKENS.oracle, escrowCheck, replay: new ReplayGuard(replayFile),
+   });
+   let oracle = await launchOracle();
+   return {
+-    dir, registry, oracleWallet, vaultFile, vaultKey, verdictLog,
++    dir, registry, verdictKey, vaultFile, vaultKey, verdictLog, ledger,
+     get oracle() {
+       return oracle;
+     },
+@@ -44,4 +55,4 @@ export async function startLocal() {
+ export const markFunded = (registryUrl: string, jobId: string, offerSequence = 7) =>
+   callJson<Job>("POST", `${registryUrl}/jobs/${jobId}/events`, {
+     source: "ledger", status: "funded", offerSequence, cancelAfter: 900_000_000, txHash: "AB".repeat(32),
+-  });
++  }, TOKENS.watcher);
+diff --git a/xrpl-escrow/test/oracle.test.ts b/xrpl-escrow/test/oracle.test.ts
+index 5a06860..e9952d3 100644
+--- a/xrpl-escrow/test/oracle.test.ts
++++ b/xrpl-escrow/test/oracle.test.ts
+@@ -8,7 +8,7 @@ import { Wallet } from "xrpl";
+ import { sha256Hex, signRequest } from "../src/auth.js";
+ import { HttpError, callJson } from "../src/http.js";
+ import { runChecks } from "../src/oracle/checks/index.js";
+-import { jsonSchema } from "../src/oracle/checks/json-schema.js";
++import { cachedValidators, jsonSchema } from "../src/oracle/checks/json-schema.js";
+ import { maxLatency } from "../src/oracle/checks/max-latency.js";
+ import { sha256Match } from "../src/oracle/checks/sha256-match.js";
+ import { SecretVault, parseVaultKey } from "../src/oracle/vault.js";
+@@ -34,6 +34,21 @@ describe("oracle checks", () => {
+     expect(jsonSchema({ schema: { type: "nonsense" } }, ctx("{}"))).toMatchObject({ pass: false, detail: expect.stringContaining("schema is invalid") });
+   });
+ 
++  it("json-schema refuses regex keywords instead of running them", () => {
++    const evil = { type: "string", pattern: "^(a+)+$" };
++    const started = Date.now();
++    expect(jsonSchema({ schema: evil }, ctx(JSON.stringify("a".repeat(40) + "!")))).toMatchObject({
++      pass: false, detail: expect.stringContaining('"pattern" is not allowed'),
++    });
++    expect(Date.now() - started).toBeLessThan(100);
++    expect(jsonSchema({ schema: { type: "object", patternProperties: { "(x+)+y": {} } } }, ctx("{}")).pass).toBe(false);
++  });
++
++  it("json-schema keeps a bounded cache of compiled schemas", () => {
++    for (let i = 0; i < 300; i++) jsonSchema({ schema: { type: "object", maxProperties: i } }, ctx("{}"));
++    expect(cachedValidators()).toBeLessThanOrEqual(256);
++  });
++
+   it("json-schema leaves __proto__ in a deliverable as plain data", () => {
+     const schema = { type: "object" };
+     expect(jsonSchema({ schema }, ctx('{"__proto__":{"polluted":true},"constructor":{"prototype":{"polluted":true}}}')).pass).toBe(true);
+@@ -118,9 +133,9 @@ describe("oracle service", () => {
+   it("on a pass, gives the provider a signed verdict and a fulfillment that opens the condition", async () => {
+     const { id, condition } = await deliveredJob("good", [{ type: "sha256-match", sha256: sha256Hex("good") }]);
+     const { verdict, fulfillment } = await verify(id);
+-    expect(verdict).toMatchObject({ verdict: "pass", evidenceHash: sha256Hex("good"), condition, oracle: local.oracleWallet.address });
+-    expect(verifyVerdict(verdict, local.oracleWallet.address)).toBe(true);
+-    expect(verifyVerdict({ ...verdict, verdict: "fail" }, local.oracleWallet.address)).toBe(false);
++    expect(verdict).toMatchObject({ verdict: "pass", evidenceHash: sha256Hex("good"), condition, oracle: local.verdictKey.address });
++    expect(verifyVerdict(verdict, local.verdictKey.address)).toBe(true);
++    expect(verifyVerdict({ ...verdict, verdict: "fail" }, local.verdictKey.address)).toBe(false);
+     expect(verifyVerdict(verdict, Wallet.generate().address)).toBe(false);
+     expect(cc.validateFulfillment(cc.Fulfillment.fromBinary(Buffer.from(fulfillment!, "hex")).serializeUri(),
+       cc.Condition.fromBinary(Buffer.from(condition, "hex")).serializeUri())).toBe(true);
+@@ -132,10 +147,29 @@ describe("oracle service", () => {
+     const res = await verify(id);
+     expect(res.verdict.verdict).toBe("fail");
+     expect(res.fulfillment).toBeUndefined();
+-    expect(verifyVerdict(res.verdict)).toBe(true);
++    expect(verifyVerdict(res.verdict, local.verdictKey.address)).toBe(true);
+     expect((await callJson<Job>("GET", `${local.registry.url}/jobs/${id}`)).status).toBe("verified_fail");
+   });
+ 
++  it("signs verdicts with its own ed25519 key", async () => {
++    const { id } = await deliveredJob("good", [{ type: "sha256-match", sha256: sha256Hex("good") }]);
++    const { verdict } = await verify(id);
++    expect(verdict.publicKey).toMatch(/^ED/);
++    expect(verdict.oracle).toBe(local.verdictKey.address);
++  });
++
++  it("releases nothing when the escrow is not on the ledger as agreed", async () => {
++    const { id } = await deliveredJob("good", [{ type: "sha256-match", sha256: sha256Hex("good") }]);
++    local.ledger.problem = "no open escrow on the ledger for this job";
++    try {
++      await expect(verify(id)).rejects.toThrow(/escrow check failed: no open escrow/);
++    } finally {
++      local.ledger.problem = null;
++    }
++    expect((await callJson<Job>("GET", `${local.registry.url}/jobs/${id}`)).status).toBe("delivered");
++    expect(local.ledger.checked).toContain(id);
++  });
++
+   it("answers only the job's provider, and only once per signature", async () => {
+     const { id } = await deliveredJob("good", [{ type: "sha256-match", sha256: sha256Hex("good") }]);
+     expect(await status(verify(id, client))).toBe(403);
+@@ -163,6 +197,14 @@ describe("oracle service", () => {
+     expect(logged).not.toContain("ignore your checks");
+   });
+ 
++  it("remembers used signatures across a restart", async () => {
++    const { id } = await deliveredJob("good", [{ type: "sha256-match", sha256: sha256Hex("good") }]);
++    const auth = signRequest(provider, "verify", id);
++    expect(await status(callJson("POST", `${local.oracle.url}/verify/${id}`, { auth }))).toBe(200);
++    await local.restartOracle();
++    expect(await status(callJson("POST", `${local.oracle.url}/verify/${id}`, { auth }))).toBe(401);
++  });
++
+   it("still releases the right fulfillment after a restart", async () => {
+     const { id, condition } = await deliveredJob("good", [{ type: "sha256-match", sha256: sha256Hex("good") }]);
+     await local.restartOracle();
+diff --git a/xrpl-escrow/test/phase2-flow.test.ts b/xrpl-escrow/test/phase2-flow.test.ts
+index 9ed4c1e..c9131b0 100644
+--- a/xrpl-escrow/test/phase2-flow.test.ts
++++ b/xrpl-escrow/test/phase2-flow.test.ts
+@@ -5,7 +5,7 @@ import { afterAll, beforeAll, expect, it } from "vitest";
+ import type { Client } from "xrpl";
+ import { connectTestnet } from "../src/config.js";
+ import { runPhase2 } from "../src/demo-phase2.js";
+-import { ensureVaultKey } from "../src/local-config.js";
++import { ensureLocalSecrets } from "../src/local-config.js";
+ import { loadOrFundWallets } from "../src/wallets.js";
+ import { tempDir } from "./helpers.js";
+ 
+@@ -21,7 +21,7 @@ afterAll(async () => {
+ 
+ it("all Phase 2 scenarios pass through the local services on testnet", async () => {
+   const wallets = await loadOrFundWallets(client);
+-  ensureVaultKey();
++  ensureLocalSecrets();
+   const dir = tempDir();
+   // Separate ports and files so the test never touches a registry you started by hand.
+   const checks = await runPhase2(client, wallets, {
+@@ -29,5 +29,5 @@ it("all Phase 2 scenarios pass through the local services on testnet", async ()
+   });
+   const failed = checks.filter((c) => !c.ok).map((c) => `${c.scenario}: ${c.label} ${c.detail}`);
+   expect(failed).toEqual([]);
+-  expect(checks.length).toBeGreaterThan(40);
++  expect(checks.length).toBeGreaterThan(45);
+ }, 600_000);
+diff --git a/xrpl-escrow/test/registry.test.ts b/xrpl-escrow/test/registry.test.ts
+index 27092a2..f126ca0 100644
+--- a/xrpl-escrow/test/registry.test.ts
++++ b/xrpl-escrow/test/registry.test.ts
+@@ -7,6 +7,7 @@ import { sha256Hex, signRequest } from "../src/auth.js";
+ import { HttpError, callJson } from "../src/http.js";
+ import type { Job, JobEvent } from "../src/registry/db.js";
+ import { startRegistry } from "../src/registry/server.js";
++import { TOKENS } from "./helpers.js";
+ 
+ const client = Wallet.generate();
+ const provider = Wallet.generate();
+@@ -18,14 +19,16 @@ const newJob = (extra: Record<string, unknown> = {}) => ({
+ 
+ let registry: Awaited<ReturnType<typeof startRegistry>>;
+ let url: string;
+-const call = <T = Job>(method: string, path: string, body?: unknown) => callJson<T>(method, `${url}${path}`, body);
++const call = <T = Job>(method: string, path: string, body?: unknown, token?: string) => callJson<T>(method, `${url}${path}`, body, token);
+ const status = (p: Promise<unknown>) => p.then(() => 200, (e: HttpError) => e.status);
+-const event = (id: string, body: Record<string, unknown>) => call("POST", `/jobs/${id}/events`, body);
++const event = (id: string, body: Record<string, unknown>) =>
++  call("POST", `/jobs/${id}/events`, body, body.source === "oracle" ? TOKENS.oracle : TOKENS.watcher);
++const setCondition = (id: string, condition: string, token = TOKENS.oracle) => call("PUT", `/jobs/${id}/condition`, { condition }, token);
+ const deliver = (id: string, wallet: Wallet, content: string) =>
+   call("POST", `/jobs/${id}/deliverable`, { content, auth: signRequest(wallet, "deliver", id, sha256Hex(content)) });
+ 
+ beforeAll(async () => {
+-  registry = await startRegistry({ dbPath: join(mkdtempSync(join(tmpdir(), "registry-")), "jobs.db"), port: 0 });
++  registry = await startRegistry({ dbPath: join(mkdtempSync(join(tmpdir(), "registry-")), "jobs.db"), port: 0, tokens: TOKENS });
+   url = registry.url;
+ });
+ afterAll(() => registry.close());
+@@ -63,10 +66,32 @@ describe("job registry API", () => {
+ 
+   it("accepts the condition once, only while draft", async () => {
+     const job = await call("POST", "/jobs", newJob());
+-    expect(await status(call("PUT", `/jobs/${job.id}/condition`, { condition: "abc" }))).toBe(400);
+-    expect((await call("PUT", `/jobs/${job.id}/condition`, { condition: CONDITION })).condition).toBe(CONDITION);
+-    expect(await status(call("PUT", `/jobs/${job.id}/condition`, { condition: CONDITION }))).toBe(200); // idempotent
+-    expect(await status(call("PUT", `/jobs/${job.id}/condition`, { condition: CONDITION.replace("6668", "7778") }))).toBe(409);
++    expect(await status(setCondition(job.id, "abc"))).toBe(400);
++    expect((await setCondition(job.id, CONDITION)).condition).toBe(CONDITION);
++    expect(await status(setCondition(job.id, CONDITION))).toBe(200); // idempotent
++    expect(await status(setCondition(job.id, CONDITION.replace("6668", "7778")))).toBe(409);
++  });
++
++  it("accepts internal writes only with the right service token", async () => {
++    const job = await call("POST", "/jobs", newJob());
++    expect(await status(setCondition(job.id, CONDITION, ""))).toBe(401);
++    expect(await status(setCondition(job.id, CONDITION, TOKENS.watcher))).toBe(401);
++    const funded = { source: "ledger", status: "funded", offerSequence: 1, cancelAfter: 800_000_000, txHash: "FAKE" };
++    expect(await status(call("POST", `/jobs/${job.id}/events`, funded))).toBe(401);
++    expect(await status(call("POST", `/jobs/${job.id}/events`, funded, TOKENS.oracle))).toBe(401);
++    expect(await status(call("POST", `/jobs/${job.id}/events`, { source: "oracle", status: "verified_pass" }, TOKENS.watcher))).toBe(401);
++    expect(await status(call("POST", `/jobs/${job.id}/events`, { source: "someone", status: "paid" }, TOKENS.watcher))).toBe(400);
++    expect((await call("GET", `/jobs/${job.id}`)).status).toBe("draft");
++    expect((await event(job.id, { ...funded, fundedAt: 1_700_000_000_000 })).fundedAt).toBe(1_700_000_000_000);
++  });
++
++  it("refuses job schemas that could make validation slow", async () => {
++    const schemaJob = (schema: unknown) => call("POST", "/jobs", newJob({ spec: { checks: [{ type: "json-schema", schema }] } }));
++    expect(await status(schemaJob({ type: "string", pattern: "^(a+)+$" }))).toBe(400);
++    expect(await status(schemaJob({ type: "object", patternProperties: { "^x": {} } }))).toBe(400);
++    expect(await status(schemaJob({ type: "array", uniqueItems: true }))).toBe(400);
++    expect(await status(schemaJob({ type: "object", properties: { pattern: { type: "string" } } }))).toBe(200);
++    expect(await status(schemaJob({ type: "object", description: "x".repeat(20_000) }))).toBe(400);
+   });
+ 
+   it("walks a job through draft -> funded -> delivered -> verified_pass -> paid", async () => {
+diff --git a/xrpl-escrow/test/sdk.test.ts b/xrpl-escrow/test/sdk.test.ts
+index f6dde2d..5b313a0 100644
+--- a/xrpl-escrow/test/sdk.test.ts
++++ b/xrpl-escrow/test/sdk.test.ts
+@@ -13,7 +13,9 @@ describe("EscrowKit (registry + oracle, no ledger)", () => {
+   let kit: EscrowKit;
+   beforeAll(async () => {
+     local = await startLocal();
+-    kit = new EscrowKit({ registryUrl: local.registry.url, oracleUrl: local.oracle.url, statusTimeoutMs: 300 });
++    kit = new EscrowKit({
++      registryUrl: local.registry.url, oracleUrl: local.oracle.url, oracleAddress: local.verdictKey.address, statusTimeoutMs: 300,
++    });
+   });
+   afterAll(() => local.close());
+ 
+@@ -49,7 +51,18 @@ describe("EscrowKit (registry + oracle, no ledger)", () => {
+     const res = await kit.deliver(job.id, provider, "something else");
+     expect(res).toMatchObject({ fulfillment: null, verdictSignatureValid: true });
+     expect(res.job.status).toBe("verified_fail");
+-    expect(verifyVerdict(res.verdict, local.oracleWallet.address)).toBe(true);
++    expect(verifyVerdict(res.verdict, local.verdictKey.address)).toBe(true);
++  });
++
++  it("does not trust a verdict from an oracle address other than the pinned one", async () => {
++    const other = new EscrowKit({
++      registryUrl: local.registry.url, oracleUrl: local.oracle.url, oracleAddress: Wallet.generate().address,
++    });
++    const job = await newJob();
++    await markFunded(local.registry.url, job.id, 10);
++    const res = await other.deliver(job.id, provider, "the work");
++    expect(res.verdict.verdict).toBe("pass");
++    expect(res.verdictSignatureValid).toBe(false);
+   });
+ 
+   it("deliver is refused for a non-provider and before funding", async () => {
+@@ -66,7 +79,7 @@ describe("EscrowKit (registry + oracle, no ledger)", () => {
+ 
+   it("reports provider reputation", async () => {
+     const rep = await kit.reputation(provider.address);
+-    expect(rep).toMatchObject({ provider: provider.address, passed: 1, failed: 1 });
++    expect(rep).toMatchObject({ provider: provider.address, passed: 2, failed: 1 });
+     expect(rep.total).toBeGreaterThanOrEqual(5);
+   });
+ });
+diff --git a/xrpl-escrow/test/watcher.test.ts b/xrpl-escrow/test/watcher.test.ts
+index 8cc19ac..6d520c6 100644
+--- a/xrpl-escrow/test/watcher.test.ts
++++ b/xrpl-escrow/test/watcher.test.ts
+@@ -5,7 +5,7 @@ import { callJson } from "../src/http.js";
+ import type { Job } from "../src/registry/db.js";
+ import { startRegistry } from "../src/registry/server.js";
+ import { LedgerWatcher, eventForTx, eventsForLedger, toLedgerTx } from "../src/watcher.js";
+-import { tempDir } from "./helpers.js";
++import { TOKENS, tempDir } from "./helpers.js";
+ import { join } from "node:path";
+ 
+ const CLIENT = Wallet.generate().address;
+@@ -20,7 +20,7 @@ const job = (over: Partial<Job> = {}): Job => ({
+ });
+ 
+ const createMsg = (over: Record<string, unknown> = {}, result = "tesSUCCESS", validated = true) => ({
+-  type: "transaction", validated, hash: "H_CREATE", meta: { TransactionResult: result },
++  type: "transaction", validated, hash: "H_CREATE", meta: { TransactionResult: result }, close_time_iso: "2026-10-20T07:40:00Z",
+   tx_json: { TransactionType: "EscrowCreate", Account: CLIENT, Destination: PROVIDER, Amount: "10000000",
+     Condition: COND, CancelAfter: 800_000_120, Sequence: 55, ...over },
+ });
+@@ -35,11 +35,12 @@ describe("watcher event mapping", () => {
+     const v1 = { validated: true, meta: { TransactionResult: "tesSUCCESS" }, transaction: { hash: "H1", TransactionType: "Payment" } };
+     expect(toLedgerTx(v1)?.hash).toBe("H1");
+     expect(toLedgerTx({ validated: true, meta: "BLOB", tx_json: {}, hash: "x" })).toBeNull();
++    expect(toLedgerTx({ ...v1, transaction: { ...v1.transaction, date: 0 } })?.closeTimeMs).toBe(946_684_800_000); // Ripple epoch
+   });
+ 
+   it("maps a matching validated EscrowCreate to funded", () => {
+     const e = eventForTx(toLedgerTx(createMsg())!, [job()]);
+-    expect(e).toEqual({ jobId: "j1", body: expect.objectContaining({ source: "ledger", status: "funded", offerSequence: 55, cancelAfter: 800_000_120, txHash: "H_CREATE" }) });
++    expect(e).toEqual({ jobId: "j1", body: expect.objectContaining({ source: "ledger", status: "funded", offerSequence: 55, cancelAfter: 800_000_120, txHash: "H_CREATE", fundedAt: Date.parse("2026-10-20T07:40:00Z") }) });
+   });
+ 
+   it("ignores unvalidated, failed, or non-matching creates", () => {
+@@ -82,7 +83,7 @@ class FakeLedger extends EventEmitter {
+ describe("LedgerWatcher against a registry", () => {
+   let registry: Awaited<ReturnType<typeof startRegistry>>;
+   beforeAll(async () => {
+-    registry = await startRegistry({ dbPath: join(tempDir(), "jobs.db"), port: 0 });
++    registry = await startRegistry({ dbPath: join(tempDir(), "jobs.db"), port: 0, tokens: TOKENS });
+   });
+   afterAll(() => registry.close());
+ 
+@@ -92,15 +93,15 @@ describe("LedgerWatcher against a registry", () => {
+       client: CLIENT, provider: PROVIDER, priceDrops: "10000000", slaSeconds: 120,
+       spec: { checks: [{ type: "max-latency", maxMs: 1000 }] },
+     });
+-    await callJson("PUT", `${reg}/jobs/${created.id}/condition`, { condition: COND });
++    await callJson("PUT", `${reg}/jobs/${created.id}/condition`, { condition: COND }, TOKENS.oracle);
+     const ledger = new FakeLedger();
+     ledger.history[CLIENT] = [createMsg()]; // the create happened before the watcher was listening
+-    const watcher = new LedgerWatcher(ledger as unknown as Client, { registryUrl: reg, pollMs: 50, log: () => {} });
++    const watcher = new LedgerWatcher(ledger as unknown as Client, { serviceToken: TOKENS.watcher, registryUrl: reg, pollMs: 50, log: () => {} });
+     await watcher.start();
+     await watcher.idle();
+     watcher.stop();
+     expect(ledger.subscribed).toEqual(expect.arrayContaining([CLIENT, PROVIDER]));
+-    expect(await callJson<Job>("GET", `${reg}/jobs/${created.id}`)).toMatchObject({ status: "funded", offerSequence: 55, createTx: "H_CREATE" });
++    expect(await callJson<Job>("GET", `${reg}/jobs/${created.id}`)).toMatchObject({ status: "funded", offerSequence: 55, createTx: "H_CREATE", fundedAt: Date.parse("2026-10-20T07:40:00Z") });
+ 
+     ledger.emit("ledgerClosed", { ledger_time: 800_000_100 });
+     await watcher.idle();
