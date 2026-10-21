@@ -115,3 +115,16 @@ How I reviewed instead: I took my Phase 3 tree, which is `a0f6e1b` plus the unco
 
 1. Close N24, the integrity check above.
 2. Recommended, not blocking: ban `$id`/`$anchor`/`$dynamic*` (N19), make the start-up test fail on revert (N20), and correct the retry wording in the threat model and the SDK docs (N21).
+
+## Addendum (2026-10-21, 18:10 CT): N24 and N22 closed
+
+Integrity output Christopher supplied (run 2026-10-21T22:49:50Z):
+- `git rev-parse HEAD` returns `8dab15e62db38f3cfec97d3588525a1de8f1fd95`, and `git status --porcelain` is empty, so the tree is clean.
+- `8dab15e` is authored by Christopher Terrell <outcastgnu@gmail.com> and changes only `edr/ACCEPTANCES.md` (+5/-1).
+- `git diff a0f6e1b 8dab15e` is IDENTICAL to `phase3-fixes.diff` (sha256 edf95690…fdef), the diff this review's reconstructed tree was built from.
+
+**N24: closed.** The reviewed changes are exactly the committed ones.
+
+**N22: closed.** `7b2d357` differs from the tree tested on Windows only in the Windows logs, the N10 row of FINDINGS_RESPONSE.md and the ACCEPTANCES signature line. No source or test file differs, so the Windows results apply to the committed code.
+
+The verdict is now unconditional: **PASS WITH FINDINGS** (N19, N20, N21 and N23 open, none blocking public release).

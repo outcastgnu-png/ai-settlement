@@ -130,16 +130,18 @@ choice, 20:47 UTC).
 ## Phase 3 re-review (Gpno, PASS WITH FINDINGS on `8dab15e`)
 
 Gpno's re-review verdict is now `VERDICT.md`; the Phase 3 FAIL is archived as
-`VERDICT-2026-10-21-phase3-fail.md`.
+`VERDICT-2026-10-21-phase3-fail.md`. Gpno's addendum (2026-10-21, 18:10 CT) closes N24 and N22,
+so the verdict is an unconditional PASS WITH FINDINGS. The verdict lists N19, N20, N21 and N23 as
+open and non-blocking because it reviewed `8dab15e`; they are fixed in `eb0c313`.
 
 | # | Status | Where | Test that fails when the fix is reverted |
 |---|---|---|---|
 | N19 | fixed | `src/schema-policy.ts`: `$id`, `id`, `$anchor`, `$dynamicRef`, `$dynamicAnchor`, `$recursiveRef` and `$recursiveAnchor` are banned, and `$schema` is allowed only at the root, so a `$ref` always resolves from the root, as the policy reads it | `test/oracle.test.ts` "refuses $id, $anchor and other keywords that change what a $ref means" (includes your `$id` shape) |
 | N20 | fixed | the start-up test now checks that the 1.5 s slow start really ran, so the old worker (which ignores the hook) fails it | `test/oracle.test.ts` "does not count a fresh worker's start-up" |
 | N21 | documented | `docs/THREAT_MODEL.md` availability row, and the `requestVerification` / `request_verification` docs in both SDKs: the SDK stops after about 6 s; the work stays delivered and the caller asks again before `cancelAfter`. Retry behaviour unchanged, so both SDKs stay alike. Per-provider fairness comes with hosting | — |
-| N22 | checked | `7b2d357` against the Windows-tested tree (`a0f6e1b` + the Phase 3 tree as zipped at 21:06 + `phase3-windows-n9-fix.patch`): no code or test file differs. Only the 16 Windows logs (added after the run), the N10 row here, and the blank signature line in `edr/ACCEPTANCES.md` differ | — |
+| N22 | closed by Gpno (addendum) | `7b2d357` against the Windows-tested tree (`a0f6e1b` + the Phase 3 tree as zipped at 21:06 + `phase3-windows-n9-fix.patch`): no code or test file differs. Only the 16 Windows logs (added after the run), the N10 row here, and the blank signature line in `edr/ACCEPTANCES.md` differ | — |
 | N23 | fixed | `QUICKSTART.md` faucet threshold 60 XRP; `npm ci` in `docs/trial/TRIAL_SCRIPT.md` and both READMEs; N5 and N11 rows above. "UTC5" in the signature is Christopher's own wording and is left as he wrote it | — |
-| N24 | checked | From the repository: HEAD `8dab15e`, `git status --porcelain` empty, `8dab15e` authored by Christopher Terrell <outcastgnu@gmail.com> and touching only `edr/ACCEPTANCES.md` (5+, 1-), and `git diff a0f6e1b 8dab15e` identical to `phase3-fixes.diff`. Output in `handoff/N24-integrity.txt` | — |
+| N24 | closed by Gpno (addendum) | From the repository: HEAD `8dab15e`, `git status --porcelain` empty, `8dab15e` authored by Christopher Terrell <outcastgnu@gmail.com> and touching only `edr/ACCEPTANCES.md` (5+, 1-), and `git diff a0f6e1b 8dab15e` identical to `phase3-fixes.diff`. Output in `handoff/N24-integrity.txt` | — |
 
 ## Still open
 
