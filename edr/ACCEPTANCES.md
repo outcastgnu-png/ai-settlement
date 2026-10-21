@@ -23,7 +23,11 @@ Christopher answered, in order: "approve, yes, restore, yes, keep the numbers".
 Everything above was written by the implementer from Christopher's messages. Christopher confirms
 it by filling in and committing this line himself:
 
-Signed: ______________________ (Christopher Terrell), date: ____________
+Signed: "I Christopher Terrell give my acceptance on 10/21/2026 15:45 UTC5"
+
+Christopher gave this wording in the project chat on 2026-10-21 at 20:47 UTC and asked for it to
+be written here. It is copied exactly as he wrote it. He approved the commit that adds it on
+2026-10-21 at 21:35 UTC ("Approve both").
 
 Notes:
 - No EDR-011 document existed before 2026-10-20. At Christopher's request (17:10 UTC) it was
