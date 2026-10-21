@@ -60,7 +60,9 @@ a job spec. It only hashes the deliverable, parses it as JSON, or validates it
 against the job's schema. JSON Schemas in job specs may not use the
 regex keywords `pattern` and `patternProperties`, or `uniqueItems`, `format` or
 `$data`, and are capped at 16 KB, because those keywords can make validation
-take exponential or quadratic time. The provider proves who it is by
+take exponential or quadratic time. `$ref` must be local, may not be recursive,
+and the schema may not grow past 4096 nodes once every `$ref` is inlined. The
+schema check itself runs in a worker thread and is stopped after 2 seconds. The provider proves who it is by
 signing each request with its wallet key; each signed request works once,
 even across oracle restarts. SDK users check verdict signatures against the
 pinned `ORACLE_VERDICT_ADDRESS`, never against what the oracle reports about
@@ -69,7 +71,7 @@ itself.
 ### Quickstart on Windows
 
 You need [Node.js 22.12 or newer](https://nodejs.org/) (the current LTS works). Open PowerShell in the
-`escrow-demo` folder:
+`xrpl-escrow` folder:
 
 ```
 npm install
@@ -150,7 +152,7 @@ You need [Node.js 22.12 or newer](https://nodejs.org/) (the current LTS works). 
 (PowerShell or Command Prompt on Windows):
 
 ```
-cd escrow-demo
+cd xrpl-escrow
 npm install
 npm run demo
 ```

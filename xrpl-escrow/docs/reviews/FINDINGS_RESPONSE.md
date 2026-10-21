@@ -47,10 +47,8 @@ Verdict: [`VERDICT-2026-10-20-deb71ea.md`](VERDICT-2026-10-20-deb71ea.md), for c
     in under 100 ms (`test/oracle.test.ts`).
   - `test/registry.test.ts` "refuses job schemas that could make validation slow".
   - On testnet, the demo check "a job schema with a regex pattern is refused" returned 400.
-- **Not done:** running checks in a worker thread with a timeout. With regex keywords and
-  `uniqueItems` banned, and schemas and deliverables size-capped, I know of no remaining
-  super-linear Ajv keyword. A worker timeout would still be good defense in depth before Phase 3,
-  and it is listed as a gap.
+- **Second review:** Gpno found a schema that passes this policy and is still exponential (N1,
+  nested `anyOf` over local `$ref`s). See "Second review" below for the fix.
 
 ## Finding 6: minor items
 
@@ -74,9 +72,40 @@ Verdict: [`VERDICT-2026-10-20-deb71ea.md`](VERDICT-2026-10-20-deb71ea.md), for c
 
 The Phase 1 code, `npm run demo` and its 18 checks are unchanged.
 
+## Second review (2026-10-21, `VERDICT.md`, on `af9a4db`): PASS WITH FINDINGS
+
+Verdict: findings 3, 4, 6 and 7 fixed, 5 partly. Two new blocking findings, N1 and N2, one nit,
+N6, and four process items for Christopher (N3, N4, N5, N7). Christopher approved the commit of the
+changes below on 2026-10-21 at 05:40 UTC ("yes"), after `7317e48` (the Windows run) was brought
+into this copy of the repo.
+
+| # | Finding | Status | What changed |
+|---|---|---|---|
+| N1 | Exponential validation from nested `anyOf` over local `$ref`s, allowed by the policy | Fixed | Two layers. (1) `src/schema-policy.ts` now resolves every local `$ref`: a `$ref` that points nowhere, a recursive `$ref`, more than 64 `$ref`s, or a schema that exceeds 4096 nodes once every `$ref` is inlined is refused. Gpno's bomb at N=22 is refused in milliseconds, and the registry returns 400 for it. Ordinary reuse of a definition is still allowed. (2) The JSON Schema check now runs in a worker thread (`src/oracle/checks/json-schema-worker.ts`) with a hard timeout, 2 s by default (`src/oracle/checks/json-schema.ts`). On timeout the worker is killed, the check fails with "took longer than 2000 ms and was stopped", and a fresh worker serves the next request. `runChecks` is now async and the oracle awaits it. |
+| N2 | Replay guard keyed on the raw signature string; a re-cased signature replays | Fixed | `ReplayGuard` is keyed on `replayKey()` = sha256 of the upper-cased public key and the exact message that was signed (`action|jobId|timestamp|payloadHash`), not on the signature (`src/auth.ts`). Any encoding of the same signature maps to the same key. The persisted file format is unchanged. |
+| N3 | Which EDR-011 text Christopher accepted | Resolved | Christopher chose "restore" (2026-10-21 05:40 UTC). The four clauses are back in `edr/EDR-011_ESCROW_PHASE1_TESTNET_DEMO.md`, each marked "(restored 2026-10-21)" |
+| N4 | `e54e6d8` committed without explicit approval | Resolved | Approved after the fact by Christopher (2026-10-21 05:40 UTC). From now on every commit gets its own explicit approval |
+| N5 | All approvals written by the implementer | **Awaiting Christopher** | He said yes to signing `edr/ACCEPTANCES.md` himself; a signature line is there for him |
+| N6 | Duplicate `node_modules` line; old verdict-log path no longer ignored | Fixed | `xrpl-escrow/.gitignore` lists `node_modules` once, without the trailing slash, so it also matches the symlinked `node_modules` in the cloud build copy (the reason for the second line), and ignores the old `src/oracle/verdicts.jsonl` path again |
+| N7 | EDR numbers continue PersonalAi's series | Resolved | Christopher chose to keep the numbers |
+
+Also fixed: the README's Windows quickstart said `escrow-demo`; the folder is `xrpl-escrow` (found
+by the Windows run).
+
+Evidence:
+- `test/oracle.test.ts` "refuses $ref chains that blow up when expanded, and recursive $ref"
+  (N1 policy), "stops a validation that runs past the timeout and keeps working afterwards" (N1
+  worker; a test-only request holds the worker for 5 s against a 300 ms timeout), and the
+  re-cased-signature cases in "answers only the job's provider, and only once per signature" (N2).
+  `test/registry.test.ts` "refuses job schemas that could make validation slow" now includes the
+  N=22 bomb and a recursive `$ref`.
+- Results (Linux, Node 22.22.0): `typecheck` 0 errors; `test:unit` **54/54**; `demo:phase2`
+  **49/49** on testnet (`logs/2026-10-21-phase2-fixes2.txt`, transactions in
+  `logs/2026-10-21-phase2-fixes2-txs.json`). `npm test` in full not yet re-run.
+
 ## Still open
 
-- The NOT DEMONSTRATED items in `VERDICT-2026-10-20-deb71ea.md`: the Windows run, the README quickstart,
-  `expired_unclaimed` on testnet, and watcher reconnect.
-- Running checks in a worker with a timeout (finding 5), and TLS for any non-localhost deployment
-  (finding 6).
+- N5: Christopher's signature in `edr/ACCEPTANCES.md`.
+- The NOT DEMONSTRATED items from the first review were all run on Christopher's Windows PC on
+  2026-10-21 at `e54e6d8` and passed (commit `7317e48`). Not re-run after the N1/N2 fixes.
+- TLS for any non-localhost deployment (finding 6).

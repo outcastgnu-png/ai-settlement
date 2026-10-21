@@ -23,7 +23,7 @@ import { getEscrow } from "../escrow.js";
 import { HttpError, callJson, jsonServer, listenLocal, type Route } from "../http.js";
 import { ORACLE_PORT, REGISTRY_URL, REPLAY_FILE, VAULT_FILE, VERDICT_LOG, readEnvFile, requireEnv } from "../local-config.js";
 import type { Deliverable, Job } from "../registry/db.js";
-import { runChecks, type CheckResult } from "./checks/index.js";
+import { runChecks, stopSchemaWorker, type CheckResult } from "./checks/index.js";
 import { SecretVault, parseVaultKey } from "./vault.js";
 
 export interface VerdictBody {
@@ -122,7 +122,7 @@ export function oracleRoutes(opts: OracleOptions): Route[] {
         if (escrowProblem) throw new HttpError(409, `escrow check failed: ${escrowProblem}`);
         const deliverable = await callJson<Deliverable>("GET", `${registry}/jobs/${encodeURIComponent(jobId)}/deliverable`);
 
-        const { pass, results } = runChecks(job.spec.checks, { job, content: deliverable.content, deliveredAt: deliverable.deliveredAt });
+        const { pass, results } = await runChecks(job.spec.checks, { job, content: deliverable.content, deliveredAt: deliverable.deliveredAt });
         const unsigned: VerdictBody = {
           jobId, verdict: pass ? "pass" : "fail", checks: results, evidenceHash: sha256Hex(deliverable.content),
           condition: job.condition, provider: job.provider, oracle: opts.verdictKey.address,
@@ -163,7 +163,10 @@ export async function startOracle(opts: Partial<OracleOptions> & { port?: number
     url: `http://127.0.0.1:${port}`,
     address: verdictKey.address,
     close: () => new Promise<void>((done) => {
-      server.close(() => (ledger ? ledger.disconnect().then(() => done(), () => done()) : done()));
+      server.close(() => {
+        const rest = Promise.all([stopSchemaWorker(), ledger ? ledger.disconnect() : Promise.resolve()]);
+        rest.then(() => done(), () => done());
+      });
       server.closeAllConnections();
     }),
   };

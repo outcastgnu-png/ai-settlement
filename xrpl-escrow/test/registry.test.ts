@@ -92,6 +92,10 @@ describe("job registry API", () => {
     expect(await status(schemaJob({ type: "array", uniqueItems: true }))).toBe(400);
     expect(await status(schemaJob({ type: "object", properties: { pattern: { type: "string" } } }))).toBe(200);
     expect(await status(schemaJob({ type: "object", description: "x".repeat(20_000) }))).toBe(400);
+    const defs: Record<string, unknown> = { s0: { type: "string" } };
+    for (let k = 1; k <= 22; k++) defs[`s${k}`] = { anyOf: [{ $ref: `#/$defs/s${k - 1}` }, { $ref: `#/$defs/s${k - 1}` }] };
+    expect(await status(schemaJob({ $defs: defs, $ref: "#/$defs/s22" }))).toBe(400); // Gpno N1
+    expect(await status(schemaJob({ $defs: { a: { items: { $ref: "#/$defs/a" } } }, $ref: "#/$defs/a" }))).toBe(400);
   });
 
   it("walks a job through draft -> funded -> delivered -> verified_pass -> paid", async () => {

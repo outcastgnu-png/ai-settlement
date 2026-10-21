@@ -7,8 +7,9 @@ import cc from "five-bells-condition";
 import { Wallet } from "xrpl";
 import { sha256Hex, signRequest } from "../src/auth.js";
 import { HttpError, callJson } from "../src/http.js";
-import { runChecks } from "../src/oracle/checks/index.js";
-import { cachedValidators, jsonSchema } from "../src/oracle/checks/json-schema.js";
+import { runChecks, stopSchemaWorker } from "../src/oracle/checks/index.js";
+import { busySchemaCheck, cachedValidators, jsonSchema } from "../src/oracle/checks/json-schema.js";
+import { schemaProblem } from "../src/schema-policy.js";
 import { maxLatency } from "../src/oracle/checks/max-latency.js";
 import { sha256Match } from "../src/oracle/checks/sha256-match.js";
 import { SecretVault, parseVaultKey } from "../src/oracle/vault.js";
@@ -20,38 +21,72 @@ import { markFunded, startLocal, tempDir } from "./helpers.js";
 const job = (over: Partial<Job> = {}) => ({ fundedAt: 1_000, ...over }) as Job;
 const ctx = (content: string, deliveredAt = 2_000, j = job()) => ({ job: j, content, deliveredAt });
 
+/** Gpno's N1 case: nested anyOf over local $refs, no regex, exponential to validate. */
+const refBomb = (n: number) => {
+  const defs: Record<string, unknown> = { s0: { type: "string" } };
+  for (let k = 1; k <= n; k++) defs[`s${k}`] = { anyOf: [{ $ref: `#/$defs/s${k - 1}` }, { $ref: `#/$defs/s${k - 1}` }] };
+  return { $defs: defs, $ref: `#/$defs/s${n}` };
+};
+
 describe("oracle checks", () => {
+  afterAll(() => stopSchemaWorker());
+
   it("sha256-match compares the deliverable's hash with the spec", () => {
     expect(sha256Match({ sha256: sha256Hex("abc").toUpperCase() }, ctx("abc")).pass).toBe(true);
     expect(sha256Match({ sha256: sha256Hex("abc") }, ctx("abd")).pass).toBe(false);
   });
 
-  it("json-schema parses and validates without running anything", () => {
+  it("json-schema parses and validates without running anything", async () => {
     const schema = { type: "object", required: ["ok"], properties: { ok: { const: true } } };
-    expect(jsonSchema({ schema }, ctx('{"ok":true}')).pass).toBe(true);
-    expect(jsonSchema({ schema }, ctx('{"ok":false}'))).toMatchObject({ pass: false, detail: expect.stringContaining("/ok") });
-    expect(jsonSchema({ schema }, ctx("not json"))).toMatchObject({ pass: false, detail: "deliverable is not valid JSON" });
-    expect(jsonSchema({ schema: { type: "nonsense" } }, ctx("{}"))).toMatchObject({ pass: false, detail: expect.stringContaining("schema is invalid") });
+    expect((await jsonSchema({ schema }, ctx('{"ok":true}'))).pass).toBe(true);
+    expect(await jsonSchema({ schema }, ctx('{"ok":false}'))).toMatchObject({ pass: false, detail: expect.stringContaining("/ok") });
+    expect(await jsonSchema({ schema }, ctx("not json"))).toMatchObject({ pass: false, detail: "deliverable is not valid JSON" });
+    expect(await jsonSchema({ schema: { type: "nonsense" } }, ctx("{}"))).toMatchObject({ pass: false, detail: expect.stringContaining("schema is invalid") });
   });
 
-  it("json-schema refuses regex keywords instead of running them", () => {
+  it("json-schema refuses regex keywords instead of running them", async () => {
     const evil = { type: "string", pattern: "^(a+)+$" };
     const started = Date.now();
-    expect(jsonSchema({ schema: evil }, ctx(JSON.stringify("a".repeat(40) + "!")))).toMatchObject({
+    expect(await jsonSchema({ schema: evil }, ctx(JSON.stringify("a".repeat(40) + "!")))).toMatchObject({
       pass: false, detail: expect.stringContaining('"pattern" is not allowed'),
     });
     expect(Date.now() - started).toBeLessThan(100);
-    expect(jsonSchema({ schema: { type: "object", patternProperties: { "(x+)+y": {} } } }, ctx("{}")).pass).toBe(false);
+    expect((await jsonSchema({ schema: { type: "object", patternProperties: { "(x+)+y": {} } } }, ctx("{}"))).pass).toBe(false);
   });
 
-  it("json-schema keeps a bounded cache of compiled schemas", () => {
-    for (let i = 0; i < 300; i++) jsonSchema({ schema: { type: "object", maxProperties: i } }, ctx("{}"));
+  it("json-schema refuses $ref chains that blow up when expanded, and recursive $ref", async () => {
+    expect(schemaProblem(refBomb(4))).toBeNull(); // 31 nodes expanded: fine
+    const started = Date.now();
+    for (const n of [12, 22]) expect(schemaProblem(refBomb(n))).toMatch(/expands to more than/);
+    expect(schemaProblem(refBomb(40))).toMatch(/more than 64 \$ref/); // the ref count trips first
+    expect(Date.now() - started).toBeLessThan(200);
+    expect(await jsonSchema({ schema: refBomb(22) }, ctx("1"))).toMatchObject({ pass: false, detail: expect.stringContaining("expands to more than") });
+    expect(schemaProblem({ $defs: { a: { items: { $ref: "#/$defs/a" } } }, $ref: "#/$defs/a" })).toMatch(/recursive \$ref/);
+    expect(schemaProblem({ $ref: "#" })).toMatch(/recursive \$ref/);
+    expect(schemaProblem({ $ref: "#/$defs/missing" })).toMatch(/points nowhere/);
+    const manyRefs = { $defs: { s: { type: "string" } }, type: "array", items: { anyOf: Array.from({ length: 65 }, () => ({ $ref: "#/$defs/s" })) } };
+    expect(schemaProblem(manyRefs)).toMatch(/more than 64 \$ref/);
+    // ordinary reuse of a definition is still allowed
+    const reuse = { $defs: { s: { type: "string" } }, type: "object", properties: { a: { $ref: "#/$defs/s" }, b: { $ref: "#/$defs/s" } } };
+    expect((await jsonSchema({ schema: reuse }, ctx('{"a":"x","b":"y"}'))).pass).toBe(true);
+  });
+
+  it("json-schema stops a validation that runs past the timeout and keeps working afterwards", async () => {
+    const started = Date.now();
+    expect(await busySchemaCheck(5_000, 300)).toMatchObject({ pass: false, detail: expect.stringContaining("longer than 300 ms") });
+    expect(Date.now() - started).toBeLessThan(2_500);
+    expect((await jsonSchema({ schema: { type: "object" } }, ctx("{}"))).pass).toBe(true);
+  });
+
+  it("json-schema keeps a bounded cache of compiled schemas", async () => {
+    for (let i = 0; i < 300; i++) await jsonSchema({ schema: { type: "object", maxProperties: i } }, ctx("{}"));
     expect(cachedValidators()).toBeLessThanOrEqual(256);
+    expect(cachedValidators()).toBeGreaterThan(0);
   });
 
-  it("json-schema leaves __proto__ in a deliverable as plain data", () => {
+  it("json-schema leaves __proto__ in a deliverable as plain data", async () => {
     const schema = { type: "object" };
-    expect(jsonSchema({ schema }, ctx('{"__proto__":{"polluted":true},"constructor":{"prototype":{"polluted":true}}}')).pass).toBe(true);
+    expect((await jsonSchema({ schema }, ctx('{"__proto__":{"polluted":true},"constructor":{"prototype":{"polluted":true}}}'))).pass).toBe(true);
     expect(({} as Record<string, unknown>).polluted).toBeUndefined();
   });
 
@@ -61,11 +96,11 @@ describe("oracle checks", () => {
     expect(maxLatency({ maxMs: 1_000 }, ctx("x", 2_000, job({ fundedAt: null }))).pass).toBe(false);
   });
 
-  it("passes only when every check passes, and never with no checks", () => {
+  it("passes only when every check passes, and never with no checks", async () => {
     const good = { type: "sha256-match", sha256: sha256Hex("x") } as const;
-    expect(runChecks([good, { type: "max-latency", maxMs: 5_000 }], ctx("x")).pass).toBe(true);
-    expect(runChecks([good, { type: "max-latency", maxMs: 1 }], ctx("x")).pass).toBe(false);
-    expect(runChecks([], ctx("x")).pass).toBe(false);
+    expect((await runChecks([good, { type: "max-latency", maxMs: 5_000 }], ctx("x"))).pass).toBe(true);
+    expect((await runChecks([good, { type: "max-latency", maxMs: 1 }], ctx("x"))).pass).toBe(false);
+    expect((await runChecks([], ctx("x"))).pass).toBe(false);
   });
 });
 
@@ -177,6 +212,12 @@ describe("oracle service", () => {
     const auth = signRequest(provider, "verify", id);
     expect(await status(callJson("POST", `${local.oracle.url}/verify/${id}`, { auth }))).toBe(200);
     expect(await status(callJson("POST", `${local.oracle.url}/verify/${id}`, { auth }))).toBe(401);
+    // the same signature written differently is still the same request (Gpno N2)
+    const variants = [auth.signature.toLowerCase(), auth.signature.slice(0, 10).toLowerCase() + auth.signature.slice(10)];
+    for (const signature of variants) {
+      expect(await status(callJson("POST", `${local.oracle.url}/verify/${id}`, { auth: { ...auth, signature } }))).toBe(401);
+    }
+    expect(await status(callJson("POST", `${local.oracle.url}/verify/${id}`, { auth: { ...auth, publicKey: auth.publicKey.toLowerCase() } }))).toBe(401);
     expect(await status(callJson("POST", `${local.oracle.url}/verify/${id}`, {}))).toBe(401);
   });
 

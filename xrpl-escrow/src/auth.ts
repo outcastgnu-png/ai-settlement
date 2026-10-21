@@ -35,11 +35,14 @@ export function signRequest(wallet: Wallet, action: string, jobId: string, paylo
 }
 
 /**
- * Remembers request signatures for longer than the freshness window, so a
- * signed request can be used once. With a file path it survives restarts.
+ * Remembers signed requests for longer than the freshness window, so a signed
+ * request can be used once. The key is a hash of what was signed and by whom
+ * (`replayKey`), not the signature string: the same signature can be written
+ * in several ways (hex case, for one), and all of them verify (Gpno finding
+ * N2). With a file path it survives restarts.
  */
 export class ReplayGuard {
-  readonly #used = new Map<string, number>(); // signature -> request timestamp (ms)
+  readonly #used = new Map<string, number>(); // replay key -> request timestamp (ms)
 
   constructor(readonly path?: string) {
     if (path && existsSync(path)) {
@@ -48,12 +51,12 @@ export class ReplayGuard {
     }
   }
 
-  /** Records the signature; false if it was already used. */
-  use(signature: string, timestamp: number): boolean {
+  /** Records the request; false if it was already used. */
+  use(key: string, timestamp: number): boolean {
     const cutoff = Date.now() - 2 * MAX_SKEW_MS;
-    for (const [sig, ts] of this.#used) if (ts < cutoff) this.#used.delete(sig);
-    if (this.#used.has(signature)) return false;
-    this.#used.set(signature, timestamp);
+    for (const [k, ts] of this.#used) if (ts < cutoff) this.#used.delete(k);
+    if (this.#used.has(key)) return false;
+    this.#used.set(key, timestamp);
     if (this.path) {
       mkdirSync(dirname(this.path), { recursive: true });
       const tmp = `${this.path}.tmp`;
@@ -63,6 +66,10 @@ export class ReplayGuard {
     return true;
   }
 }
+
+/** What a signed request is remembered by: the signer and the exact message signed. */
+export const replayKey = (publicKey: string, action: string, jobId: string, timestamp: number, payloadHash: string) =>
+  sha256Hex(`${publicKey.toUpperCase()}|${requestMessage(action, jobId, timestamp, payloadHash)}`);
 
 /** Throws 401/403 unless `auth` is a fresh, valid signature by `expectedAddress`. */
 export function checkRequest(
@@ -81,7 +88,9 @@ export function checkRequest(
   }
   if (!valid) throw new HttpError(401, "bad signature");
   if (deriveAddress(a.publicKey) !== expectedAddress) throw new HttpError(403, "only the job's provider may do this");
-  if (replay && !replay.use(a.signature, a.timestamp)) throw new HttpError(401, "auth already used");
+  if (replay && !replay.use(replayKey(a.publicKey, action, jobId, a.timestamp, payloadHash), a.timestamp)) {
+    throw new HttpError(401, "auth already used");
+  }
 }
 
 const digest = (text: string) => createHash("sha256").update(text).digest();

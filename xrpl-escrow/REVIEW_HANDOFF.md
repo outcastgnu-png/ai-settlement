@@ -79,13 +79,13 @@ Run these from `xrpl-escrow\` in PowerShell, with Node 22.12 or newer.
 |---|---|---|
 | `npm ci` | Installs cleanly | OK |
 | `npm run typecheck` | 0 errors | 0 errors |
-| `npm run test:unit` | 52/52, no network | 52/52 (44/44 at `deb71ea`) |
+| `npm run test:unit` | 54/54, no network | 54/54 after the N1/N2 fixes (52/52 at `af9a4db`, 44/44 at `deb71ea`) |
 | `npm run setup` | 3 funded testnet wallets, plus the vault key, the two service tokens and the verdict key in `.env` | OK |
 | `npm run demo` (Phase 1) | **18/18** checks | 18/18 (`runs/2026-10-20-testnet.txt`) |
-| `npm run demo:phase2` (Phase 2) | **49/49** checks, log saved to `logs/<date>-phase2.txt` | 49/49 (`logs/2026-10-20-phase2-fixes.txt`); 47/47 at `deb71ea` (`logs/2026-10-20-phase2.txt`) |
-| `npm test` | **54/54** tests, about 6 minutes, both testnet flows | 54/54 in 364.9 s (46/46 at `deb71ea`) |
+| `npm run demo:phase2` (Phase 2) | **49/49** checks, log saved to `logs/<date>-phase2.txt` | 49/49 after the N1/N2 fixes (`logs/2026-10-21-phase2-fixes2.txt`); 49/49 at `af9a4db` (`logs/2026-10-20-phase2-fixes.txt`); 47/47 at `deb71ea` |
+| `npm test` | **56/56** tests, about 6 minutes, both testnet flows | 54/54 at `af9a4db` in 364.9 s; not yet re-run in full after the N1/N2 fixes |
 
-The 54 tests are: 7 condition test vectors, 11 registry, 20 oracle, 6 watcher, 8 SDK, and one testnet
+The 56 tests are: 7 condition test vectors, 11 registry, 22 oracle, 6 watcher, 8 SDK, and one testnet
 flow for each phase. Behind a proxy, also set `HTTPS_PROXY` and `NODE_USE_ENV_PROXY=1`.
 
 ### How the run results map to the acceptance evidence
@@ -102,14 +102,15 @@ flow for each phase. Behind a proxy, also set `HTTPS_PROXY` and `NODE_USE_ENV_PR
 
 ## NOT DEMONSTRATED
 
-- **Windows run.** Everything ran on Linux. The code uses npm scripts and `node --import tsx`, with
-  no shell scripts, and `better-sqlite3` ships Windows prebuilds, but it has not been run on
-  Windows.
-- **The README quickstart.** Each service started from its npm script and answered its health
-  check, but nobody drove a job by hand through services started that way.
-- **`expired_unclaimed` on testnet.** Only unit tests cover it (`watcher.test.ts`,
-  `registry.test.ts`).
-- **Watcher reconnect.** The resubscribe-on-reconnect path never ran during the testnet runs.
+All four items below were run on Christopher's Windows PC on 2026-10-21 at `e54e6d8`, in a
+separate Claude Code session, and passed (quickstart 4/4, `npm test` 54/54, `demo:phase2` 49/49,
+`expired_unclaimed` 4/4, watcher reconnect 6/6). The logs and the two scripts are in commit
+`7317e48`.
+
+- **Windows run.** Done on 2026-10-21 (see above). Not re-run after the N1/N2 fixes.
+- **The README quickstart.** Done on 2026-10-21.
+- **`expired_unclaimed` on testnet.** Done on 2026-10-21.
+- **Watcher reconnect.** Done on 2026-10-21.
 
 ## Known gaps
 
@@ -120,11 +121,15 @@ Both known gaps from `deb71ea` are fixed. Details are in `docs/reviews/FINDINGS_
    it verifies anything.
 2. **Ajv and ReDoS:** job schemas may not use `pattern`, `patternProperties`, `uniqueItems`,
    `format` or `$data`. Schemas are capped at 16 KB and 32 levels of nesting, and the
-   compiled-schema cache is bounded. Checks still run in the oracle's own process, with no worker
-   timeout.
+   compiled-schema cache is bounded. After Gpno's second review (N1): `$ref` is counted (64 at
+   most), must resolve, may not be recursive, and the schema may not exceed 4096 nodes once every
+   `$ref` is inlined. The JSON Schema check runs in a worker thread with a 2 s timeout; a run
+   that exceeds it fails the check and the worker is killed.
 
 Other notes:
-- Request replay protection is saved in `data/oracle-replay.json`, so it survives restarts.
+- Request replay protection is saved in `data/oracle-replay.json`, so it survives restarts. It is
+  keyed on a hash of the signer and the signed message, so rewriting the signature (hex case) does
+  not get a second use (Gpno N2).
 - Verdicts are signed with a separate ed25519 key. SDK users pin its address
   (`ORACLE_VERDICT_ADDRESS`).
 - `max-latency` measures from the close time of the ledger that validated the EscrowCreate.
