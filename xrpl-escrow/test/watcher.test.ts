@@ -5,7 +5,7 @@ import { callJson } from "../src/http.js";
 import type { Job } from "../src/registry/db.js";
 import { startRegistry } from "../src/registry/server.js";
 import { LedgerWatcher, eventForTx, eventsForLedger, toLedgerTx } from "../src/watcher.js";
-import { tempDir } from "./helpers.js";
+import { TOKENS, tempDir } from "./helpers.js";
 import { join } from "node:path";
 
 const CLIENT = Wallet.generate().address;
@@ -20,7 +20,7 @@ const job = (over: Partial<Job> = {}): Job => ({
 });
 
 const createMsg = (over: Record<string, unknown> = {}, result = "tesSUCCESS", validated = true) => ({
-  type: "transaction", validated, hash: "H_CREATE", meta: { TransactionResult: result },
+  type: "transaction", validated, hash: "H_CREATE", meta: { TransactionResult: result }, close_time_iso: "2026-10-20T07:40:00Z",
   tx_json: { TransactionType: "EscrowCreate", Account: CLIENT, Destination: PROVIDER, Amount: "10000000",
     Condition: COND, CancelAfter: 800_000_120, Sequence: 55, ...over },
 });
@@ -35,11 +35,12 @@ describe("watcher event mapping", () => {
     const v1 = { validated: true, meta: { TransactionResult: "tesSUCCESS" }, transaction: { hash: "H1", TransactionType: "Payment" } };
     expect(toLedgerTx(v1)?.hash).toBe("H1");
     expect(toLedgerTx({ validated: true, meta: "BLOB", tx_json: {}, hash: "x" })).toBeNull();
+    expect(toLedgerTx({ ...v1, transaction: { ...v1.transaction, date: 0 } })?.closeTimeMs).toBe(946_684_800_000); // Ripple epoch
   });
 
   it("maps a matching validated EscrowCreate to funded", () => {
     const e = eventForTx(toLedgerTx(createMsg())!, [job()]);
-    expect(e).toEqual({ jobId: "j1", body: expect.objectContaining({ source: "ledger", status: "funded", offerSequence: 55, cancelAfter: 800_000_120, txHash: "H_CREATE" }) });
+    expect(e).toEqual({ jobId: "j1", body: expect.objectContaining({ source: "ledger", status: "funded", offerSequence: 55, cancelAfter: 800_000_120, txHash: "H_CREATE", fundedAt: Date.parse("2026-10-20T07:40:00Z") }) });
   });
 
   it("ignores unvalidated, failed, or non-matching creates", () => {
@@ -82,7 +83,7 @@ class FakeLedger extends EventEmitter {
 describe("LedgerWatcher against a registry", () => {
   let registry: Awaited<ReturnType<typeof startRegistry>>;
   beforeAll(async () => {
-    registry = await startRegistry({ dbPath: join(tempDir(), "jobs.db"), port: 0 });
+    registry = await startRegistry({ dbPath: join(tempDir(), "jobs.db"), port: 0, tokens: TOKENS });
   });
   afterAll(() => registry.close());
 
@@ -92,15 +93,15 @@ describe("LedgerWatcher against a registry", () => {
       client: CLIENT, provider: PROVIDER, priceDrops: "10000000", slaSeconds: 120,
       spec: { checks: [{ type: "max-latency", maxMs: 1000 }] },
     });
-    await callJson("PUT", `${reg}/jobs/${created.id}/condition`, { condition: COND });
+    await callJson("PUT", `${reg}/jobs/${created.id}/condition`, { condition: COND }, TOKENS.oracle);
     const ledger = new FakeLedger();
     ledger.history[CLIENT] = [createMsg()]; // the create happened before the watcher was listening
-    const watcher = new LedgerWatcher(ledger as unknown as Client, { registryUrl: reg, pollMs: 50, log: () => {} });
+    const watcher = new LedgerWatcher(ledger as unknown as Client, { serviceToken: TOKENS.watcher, registryUrl: reg, pollMs: 50, log: () => {} });
     await watcher.start();
     await watcher.idle();
     watcher.stop();
     expect(ledger.subscribed).toEqual(expect.arrayContaining([CLIENT, PROVIDER]));
-    expect(await callJson<Job>("GET", `${reg}/jobs/${created.id}`)).toMatchObject({ status: "funded", offerSequence: 55, createTx: "H_CREATE" });
+    expect(await callJson<Job>("GET", `${reg}/jobs/${created.id}`)).toMatchObject({ status: "funded", offerSequence: 55, createTx: "H_CREATE", fundedAt: Date.parse("2026-10-20T07:40:00Z") });
 
     ledger.emit("ledgerClosed", { ledger_time: 800_000_100 });
     await watcher.idle();

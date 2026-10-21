@@ -19,7 +19,7 @@ import { sha256Hex } from "./auth.js";
 import { EXPLORER_TX, connectTestnet } from "./config.js";
 import { cancelEscrow, getEscrow, type TxResult } from "./escrow.js";
 import { HttpError, callJson } from "./http.js";
-import { DATA_DIR, ENV_FILE, ORACLE_PORT, REGISTRY_PORT, VERDICT_LOG, ensureVaultKey } from "./local-config.js";
+import { DATA_DIR, ENV_FILE, ORACLE_PORT, REGISTRY_PORT, ensureLocalSecrets } from "./local-config.js";
 import type { Check } from "./demo.js";
 import { EscrowKit, escrowRef, type Job, type JobSpec } from "./sdk/index.js";
 import { startService, type Service } from "./services.js";
@@ -44,12 +44,13 @@ export async function runPhase2(client: Client, wallets: Wallets, opts: Phase2Op
   const oraclePort = opts.oraclePort ?? ORACLE_PORT;
   const dataDir = resolve(opts.dataDir ?? DATA_DIR);
   const jobsDb = resolve(dataDir, "jobs.db");
-  const verdictLog = resolve(opts.verdictLog ?? VERDICT_LOG);
+  const verdictLog = resolve(opts.verdictLog ?? resolve(dataDir, "verdicts.jsonl"));
   const registryUrl = `http://127.0.0.1:${registryPort}`;
   const oracleUrl = `http://127.0.0.1:${oraclePort}`;
   const serviceEnv = {
     REGISTRY_PORT: String(registryPort), ORACLE_PORT: String(oraclePort), REGISTRY_URL: registryUrl,
     JOBS_DB: jobsDb, VAULT_FILE: resolve(dataDir, "oracle-vault.json"), VERDICT_LOG: verdictLog,
+    REPLAY_FILE: resolve(dataDir, "oracle-replay.json"),
     ENV_FILE: resolve(opts.envFile ?? ENV_FILE),
   };
   const priceXrp = 10;
@@ -176,6 +177,14 @@ export async function runPhase2(client: Client, wallets: Wallets, opts: Phase2Op
       outsider = err instanceof HttpError ? `${err.status} ${err.message}` : String(err);
     }
     check("a non-provider asking the oracle is refused", outsider.startsWith("403"), outsider);
+    const refusal = (p: Promise<unknown>) => p.then(() => "accepted", (e) => (e instanceof HttpError ? `${e.status} ${e.message}` : String(e)));
+    const forged = await refusal(callJson("POST", `${registryUrl}/jobs/${job4.id}/events`, { source: "ledger", status: "refunded", txHash: "FAKE" }));
+    check("a forged ledger event without the watcher's token is refused", forged.startsWith("401"), forged);
+    const redos = await refusal(kit.createJob({
+      client: payer.address, provider: provider.address, priceDrops, slaSeconds: 120,
+      spec: { checks: [{ type: "json-schema", schema: { type: "string", pattern: "^(a+)+$" } }] },
+    }));
+    check("a job schema with a regex pattern is refused", redos.startsWith("400"), redos);
     const logLine = readFileSync(verdictLog, "utf8").trim().split("\n").reverse().find((l) => l.includes(job4.id)) ?? "";
     check("verdict log records the evidence hash, not the content", logLine.includes(sha256Hex(injected)) && !logLine.includes("SYSTEM OVERRIDE"));
 
@@ -240,13 +249,17 @@ async function main() {
     console.log(line);
   };
   const stamp = new Date().toISOString();
+  // logs/<date>-phase2.txt, or <date>-phase2-2.txt and so on when today's name is taken.
+  let base = `${stamp.slice(0, 10)}-phase2`;
+  for (let n = 2; existsSync(resolve("logs", `${base}.txt`)); n++) base = `${stamp.slice(0, 10)}-phase2-${n}`;
+  const txFile = resolve("logs", `${base}-txs.json`);
   log(`npm run demo:phase2 — XRP Ledger testnet, ${stamp}`);
   const client = await connectTestnet();
   let failed: Check[] = [];
   try {
     log(`Connected to ${client.url} (testnet, network_id 1). Loading or funding wallets from the faucet...`);
     const wallets = await loadOrFundWallets(client);
-    ensureVaultKey();
+    ensureLocalSecrets();
     for (const [role, w] of Object.entries(wallets)) {
       log(`  ${role.padEnd(8)} ${w.address}  ${(await xrpBalance(client, w.address)).toFixed(6)} XRP`);
     }
@@ -259,11 +272,23 @@ async function main() {
     log(`\nRun aborted: ${err instanceof Error ? err.stack ?? err.message : String(err)}`);
     process.exitCode = 1;
   } finally {
-    await client.disconnect();
+    // Public testnet servers keep little history, so save each transaction as validated now.
     mkdirSync("logs", { recursive: true });
-    const file = resolve("logs", `${stamp.slice(0, 10)}-phase2.txt`);
+    const hashes = [...new Set(lines.join("\n").match(/(?<=\/transactions\/)[0-9A-F]{64}/g) ?? [])];
+    const txs: unknown[] = [];
+    for (const hash of hashes) {
+      try {
+        txs.push((await client.request({ command: "tx", transaction: hash })).result);
+      } catch (err) {
+        txs.push({ hash, error: err instanceof Error ? err.message : String(err) });
+      }
+    }
+    writeFileSync(txFile, `${JSON.stringify(txs, null, 1)}\n`);
+    await client.disconnect();
+    const file = resolve("logs", `${base}.txt`);
     writeFileSync(file, `${lines.join("\n")}\n`);
     console.log(`\nRun log saved to ${file}`);
+    console.log(`Transaction JSON saved to ${txFile}`);
   }
 }
 

@@ -8,14 +8,15 @@ Don't change any file except `docs/reviews/VERDICT.md`.
 | Document | Path from the repo root `C:\dev\ai-settlement\` |
 |---|---|
 | Phase 1 rules (testnet only, the `network_id` guard, seeds, validated ledgers) | `xrpl-escrow\CLAUDE.md` |
-| EDR-011, the Phase 1 decision | `edr\` (not in the repo yet) |
+| EDR-011, the Phase 1 decision, written down from `CLAUDE.md` and accepted by name on 2026-10-20 | `edr\EDR-011_ESCROW_PHASE1_TESTNET_DEMO.md` |
 | Phase 2 build instructions | `xrpl-escrow\CLAUDE_PHASE2.md` |
-| EDR-012, the Phase 2 decision, accepted on 2026-10-20 | `edr\EDR-012_ESCROW_PHASE2_ORACLE_REGISTRY.md` |
+| EDR-012, the Phase 2 decision, accepted by name on 2026-10-20 | `edr\EDR-012_ESCROW_PHASE2_ORACLE_REGISTRY.md` |
 | Implementer's handoff: scope, expected results, NOT DEMONSTRATED, known gaps | `xrpl-escrow\REVIEW_HANDOFF.md` |
 | Run logs with testnet explorer links | `xrpl-escrow\runs\2026-10-20-testnet.txt` (Phase 1) and `xrpl-escrow\logs\2026-10-20-phase2.txt` (Phase 2) |
 
-The EDR-012 and `CLAUDE_PHASE2.md` copies still say Codex. Christopher has since made Gpno the
-reviewer for both phases.
+`CLAUDE_PHASE2.md` still says Codex. Christopher has since made Gpno the reviewer for both
+phases, and EDR-012 records this. Christopher accepted both EDRs by name on 2026-10-20 (see
+`edr/ACCEPTANCES.md`).
 
 ## What to review
 
@@ -30,16 +31,16 @@ Suggested order:
 
 ## How to run it
 
-Run these in PowerShell from `xrpl-escrow\`, with Node 20 or newer:
+Run these in PowerShell from `xrpl-escrow\`, with Node 22.12 or newer:
 
 ```
 npm ci
 npm run typecheck        # expect 0 errors
-npm run test:unit        # expect 44/44, no network
+npm run test:unit        # expect 52/52, no network
 npm run setup            # funds 3 testnet wallets from the faucet and writes .env (testnet only)
 npm run demo             # Phase 1: expect 18/18 checks
-npm run demo:phase2      # Phase 2: expect 47/47 checks; the log goes to logs\<date>-phase2.txt
-npm test                 # expect 46/46, including both testnet flows (about 6 minutes)
+npm run demo:phase2      # Phase 2: expect 49/49 checks; the log goes to logs\<date>-phase2.txt
+npm test                 # expect 54/54, including both testnet flows (about 6 minutes)
 ```
 
 Windows has never been run, so your Windows results are new evidence. Record them either way.
@@ -77,8 +78,9 @@ Windows has never been run, so your Windows results are new evidence. Record the
 10. **Windows compatibility.** npm scripts only, and the spawn in `src/services.ts`.
 11. **Tests.** Do they prove the acceptance evidence in both EDRs?
 
-The known gaps (unauthenticated localhost registry writes, and ReDoS risk when Ajv compiles a
-schema) and the NOT DEMONSTRATED items are listed in `REVIEW_HANDOFF.md`. Repeat one only if you
+The first review's verdict is in `VERDICT.md`, and the response to each finding is in
+`FINDINGS_RESPONSE.md`. The remaining gaps and the NOT DEMONSTRATED items are listed in
+`REVIEW_HANDOFF.md`. Repeat one only if you
 rate it differently or it should block Phase 3.
 
 ## Verdict

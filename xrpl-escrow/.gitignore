@@ -1,4 +1,4 @@
 node_modules/
 .env
 data/
-src/oracle/verdicts.jsonl
+node_modules

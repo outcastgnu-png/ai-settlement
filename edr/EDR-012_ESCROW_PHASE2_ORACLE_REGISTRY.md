@@ -2,10 +2,15 @@
 
 ## Status
 
-Proposed
+Accepted
 
-This record is Proposed. It does not govern until the owner accepts it by name.
-It depends on EDR-011 being Accepted, with the Phase 1 Codex review verdict recorded.
+Accepted by Christopher (owner) by name on 2026-10-20 at 17:04 UTC: "I accept EDR-011 and
+EDR-012, reviewer Gpno". See `edr/ACCEPTANCES.md`.
+
+Originally: "This record is Proposed. It does not govern until the owner accepts it by name.
+It depends on EDR-011 being Accepted, with the Phase 1 Codex review verdict recorded."
+EDR-011 was accepted in the same statement. The Phase 1 and Phase 2 review verdict is Gpno's,
+recorded in `xrpl-escrow/docs/reviews/VERDICT.md`.
 
 ## Date
 
@@ -13,8 +18,8 @@ It depends on EDR-011 being Accepted, with the Phase 1 Codex review verdict reco
 
 ## Deciders
 
-Christopher (owner). Implementer: Claude (builds end to end). Reviewer: Codex
-(one final review). Drafted by: Grok Bot.
+Christopher (owner). Implementer: Claude (builds end to end). Reviewer: Gpno
+(one final review for Phase 1 and Phase 2; replaced Codex on 2026-10-20). Drafted by: Grok Bot.
 
 ## Investigation
 

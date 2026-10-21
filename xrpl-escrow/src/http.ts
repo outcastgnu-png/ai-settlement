@@ -1,6 +1,6 @@
 // Minimal JSON-over-HTTP helpers on node:http, shared by the registry and the
 // oracle. Servers only ever bind to 127.0.0.1.
-import { Agent, createServer, request, type IncomingMessage, type Server } from "node:http";
+import { Agent, createServer, request, type IncomingHttpHeaders, type IncomingMessage, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { LOCALHOST } from "./local-config.js";
 
@@ -15,7 +15,7 @@ export class HttpError extends Error {
 export interface Route {
   method: "GET" | "POST" | "PUT";
   path: string; // e.g. "/jobs/:id"
-  handler: (params: Record<string, string>, body: unknown, query: URLSearchParams) => unknown | Promise<unknown>;
+  handler: (params: Record<string, string>, body: unknown, query: URLSearchParams, headers: IncomingHttpHeaders) => unknown | Promise<unknown>;
 }
 
 function match(pattern: string, path: string): Record<string, string> | null {
@@ -58,7 +58,7 @@ export function jsonServer(routes: Route[]): Server {
         if (route.method !== req.method) continue;
         const params = match(route.path, url.pathname);
         if (!params) continue;
-        const result = await route.handler(params, await readJson(req), url.searchParams);
+        const result = await route.handler(params, await readJson(req), url.searchParams, req.headers);
         return send(200, result ?? {});
       }
       send(404, { error: "not found" });
@@ -81,14 +81,17 @@ export function listenLocal(server: Server, port: number): Promise<number> {
 // A private agent so localhost calls never go through an HTTP proxy configured in the environment.
 const directAgent = new Agent();
 
-/** Call a local JSON service. Throws HttpError on a non-2xx response. */
-export function callJson<T>(method: string, url: string, body?: unknown): Promise<T> {
+/** Call a local JSON service. Throws HttpError on a non-2xx response. `token` is sent as a bearer token. */
+export function callJson<T>(method: string, url: string, body?: unknown, token?: string): Promise<T> {
   const payload = body === undefined ? undefined : Buffer.from(JSON.stringify(body));
   return new Promise((resolveCall, reject) => {
     const req = request(url, {
       method,
       agent: directAgent,
-      headers: payload ? { "content-type": "application/json", "content-length": payload.length } : {},
+      headers: {
+        ...(payload ? { "content-type": "application/json", "content-length": payload.length } : {}),
+        ...(token ? { authorization: `Bearer ${token}` } : {}),
+      },
     }, async (res) => {
       const chunks: Buffer[] = [];
       for await (const chunk of res) chunks.push(chunk as Buffer);

@@ -7,6 +7,7 @@ import { sha256Hex, signRequest } from "../src/auth.js";
 import { HttpError, callJson } from "../src/http.js";
 import type { Job, JobEvent } from "../src/registry/db.js";
 import { startRegistry } from "../src/registry/server.js";
+import { TOKENS } from "./helpers.js";
 
 const client = Wallet.generate();
 const provider = Wallet.generate();
@@ -18,14 +19,16 @@ const newJob = (extra: Record<string, unknown> = {}) => ({
 
 let registry: Awaited<ReturnType<typeof startRegistry>>;
 let url: string;
-const call = <T = Job>(method: string, path: string, body?: unknown) => callJson<T>(method, `${url}${path}`, body);
+const call = <T = Job>(method: string, path: string, body?: unknown, token?: string) => callJson<T>(method, `${url}${path}`, body, token);
 const status = (p: Promise<unknown>) => p.then(() => 200, (e: HttpError) => e.status);
-const event = (id: string, body: Record<string, unknown>) => call("POST", `/jobs/${id}/events`, body);
+const event = (id: string, body: Record<string, unknown>) =>
+  call("POST", `/jobs/${id}/events`, body, body.source === "oracle" ? TOKENS.oracle : TOKENS.watcher);
+const setCondition = (id: string, condition: string, token = TOKENS.oracle) => call("PUT", `/jobs/${id}/condition`, { condition }, token);
 const deliver = (id: string, wallet: Wallet, content: string) =>
   call("POST", `/jobs/${id}/deliverable`, { content, auth: signRequest(wallet, "deliver", id, sha256Hex(content)) });
 
 beforeAll(async () => {
-  registry = await startRegistry({ dbPath: join(mkdtempSync(join(tmpdir(), "registry-")), "jobs.db"), port: 0 });
+  registry = await startRegistry({ dbPath: join(mkdtempSync(join(tmpdir(), "registry-")), "jobs.db"), port: 0, tokens: TOKENS });
   url = registry.url;
 });
 afterAll(() => registry.close());
@@ -63,10 +66,32 @@ describe("job registry API", () => {
 
   it("accepts the condition once, only while draft", async () => {
     const job = await call("POST", "/jobs", newJob());
-    expect(await status(call("PUT", `/jobs/${job.id}/condition`, { condition: "abc" }))).toBe(400);
-    expect((await call("PUT", `/jobs/${job.id}/condition`, { condition: CONDITION })).condition).toBe(CONDITION);
-    expect(await status(call("PUT", `/jobs/${job.id}/condition`, { condition: CONDITION }))).toBe(200); // idempotent
-    expect(await status(call("PUT", `/jobs/${job.id}/condition`, { condition: CONDITION.replace("6668", "7778") }))).toBe(409);
+    expect(await status(setCondition(job.id, "abc"))).toBe(400);
+    expect((await setCondition(job.id, CONDITION)).condition).toBe(CONDITION);
+    expect(await status(setCondition(job.id, CONDITION))).toBe(200); // idempotent
+    expect(await status(setCondition(job.id, CONDITION.replace("6668", "7778")))).toBe(409);
+  });
+
+  it("accepts internal writes only with the right service token", async () => {
+    const job = await call("POST", "/jobs", newJob());
+    expect(await status(setCondition(job.id, CONDITION, ""))).toBe(401);
+    expect(await status(setCondition(job.id, CONDITION, TOKENS.watcher))).toBe(401);
+    const funded = { source: "ledger", status: "funded", offerSequence: 1, cancelAfter: 800_000_000, txHash: "FAKE" };
+    expect(await status(call("POST", `/jobs/${job.id}/events`, funded))).toBe(401);
+    expect(await status(call("POST", `/jobs/${job.id}/events`, funded, TOKENS.oracle))).toBe(401);
+    expect(await status(call("POST", `/jobs/${job.id}/events`, { source: "oracle", status: "verified_pass" }, TOKENS.watcher))).toBe(401);
+    expect(await status(call("POST", `/jobs/${job.id}/events`, { source: "someone", status: "paid" }, TOKENS.watcher))).toBe(400);
+    expect((await call("GET", `/jobs/${job.id}`)).status).toBe("draft");
+    expect((await event(job.id, { ...funded, fundedAt: 1_700_000_000_000 })).fundedAt).toBe(1_700_000_000_000);
+  });
+
+  it("refuses job schemas that could make validation slow", async () => {
+    const schemaJob = (schema: unknown) => call("POST", "/jobs", newJob({ spec: { checks: [{ type: "json-schema", schema }] } }));
+    expect(await status(schemaJob({ type: "string", pattern: "^(a+)+$" }))).toBe(400);
+    expect(await status(schemaJob({ type: "object", patternProperties: { "^x": {} } }))).toBe(400);
+    expect(await status(schemaJob({ type: "array", uniqueItems: true }))).toBe(400);
+    expect(await status(schemaJob({ type: "object", properties: { pattern: { type: "string" } } }))).toBe(200);
+    expect(await status(schemaJob({ type: "object", description: "x".repeat(20_000) }))).toBe(400);
   });
 
   it("walks a job through draft -> funded -> delivered -> verified_pass -> paid", async () => {

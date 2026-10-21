@@ -9,11 +9,12 @@
 // On every validated ledger it also flags escrows within WARN_SECONDS of
 // CancelAfter, and marks passed-but-unclaimed jobs expired_unclaimed once a
 // ledger closes after CancelAfter. Only validated, tesSUCCESS transactions count.
+// Its writes to the registry carry WATCHER_SERVICE_TOKEN from .env.
 import { pathToFileURL } from "node:url";
 import type { Client, TransactionStream } from "xrpl";
-import { connectTestnet } from "./config.js";
+import { RIPPLE_EPOCH_OFFSET, connectTestnet } from "./config.js";
 import { callJson } from "./http.js";
-import { REGISTRY_URL } from "./local-config.js";
+import { REGISTRY_URL, readEnvFile, requireEnv } from "./local-config.js";
 import { TERMINAL, type Job } from "./registry/db.js";
 
 export const WARN_SECONDS = 30;
@@ -23,6 +24,7 @@ export interface LedgerTx {
   validated: boolean;
   result: string;
   tx: Record<string, unknown>;
+  closeTimeMs: number | null; // close time of the ledger that validated it
 }
 
 export interface RegistryEvent {
@@ -36,7 +38,9 @@ export function toLedgerTx(msg: Record<string, unknown>): LedgerTx | null {
   const meta = msg.meta as { TransactionResult?: string } | string | undefined;
   const hash = (msg.hash ?? tx?.hash) as string | undefined;
   if (!tx || !hash || typeof meta !== "object") return null;
-  return { hash, validated: msg.validated === true, result: meta.TransactionResult ?? "", tx };
+  const iso = typeof msg.close_time_iso === "string" ? Date.parse(msg.close_time_iso) : NaN;
+  const closeTimeMs = Number.isFinite(iso) ? iso : typeof tx.date === "number" ? (tx.date + RIPPLE_EPOCH_OFFSET) * 1000 : null;
+  return { hash, validated: msg.validated === true, result: meta.TransactionResult ?? "", tx, closeTimeMs };
 }
 
 /** The registry event a validated escrow transaction implies, if it belongs to a known job. */
@@ -52,7 +56,7 @@ export function eventForTx(t: LedgerTx, jobs: Job[]): RegistryEvent | null {
         jobId: job.id,
         body: {
           source: "ledger", status: "funded", offerSequence: tx.Sequence, cancelAfter: tx.CancelAfter, txHash: t.hash,
-          detail: `EscrowCreate ${t.hash}`,
+          fundedAt: t.closeTimeMs ?? undefined, detail: `EscrowCreate ${t.hash}`,
         },
       };
     }
@@ -84,6 +88,7 @@ export function eventsForLedger(closeTime: number, jobs: Job[], warnSeconds = WA
 }
 
 export interface WatcherOptions {
+  serviceToken: string; // WATCHER_SERVICE_TOKEN
   registryUrl?: string;
   pollMs?: number;
   log?: (line: string) => void;
@@ -91,14 +96,16 @@ export interface WatcherOptions {
 
 export class LedgerWatcher {
   readonly #registry: string;
+  readonly #token: string;
   readonly #log: (line: string) => void;
   readonly #accounts = new Set<string>();
   #queue: Promise<void> = Promise.resolve();
   #timer: NodeJS.Timeout | null = null;
   #pollMs: number;
 
-  constructor(private readonly client: Client, opts: WatcherOptions = {}) {
+  constructor(private readonly client: Client, opts: WatcherOptions) {
     this.#registry = opts.registryUrl ?? REGISTRY_URL;
+    this.#token = opts.serviceToken;
     this.#pollMs = opts.pollMs ?? 1000;
     this.#log = opts.log ?? ((line) => console.log(`[watcher] ${line}`));
   }
@@ -171,7 +178,7 @@ export class LedgerWatcher {
 
   async #send({ jobId, body }: RegistryEvent) {
     try {
-      const job = await callJson<Job>("POST", `${this.#registry}/jobs/${jobId}/events`, body);
+      const job = await callJson<Job>("POST", `${this.#registry}/jobs/${jobId}/events`, body, this.#token);
       this.#log(`job ${jobId}: ${body.status ? `status ${job.status}` : "flagged"} (${body.detail})`);
     } catch (err) {
       this.#log(`job ${jobId}: registry refused ${String(body.status ?? "flag")}: ${err instanceof Error ? err.message : String(err)}`);
@@ -180,8 +187,9 @@ export class LedgerWatcher {
 }
 
 async function main() {
+  const serviceToken = requireEnv(readEnvFile(), "WATCHER_SERVICE_TOKEN");
   const client = await connectTestnet();
-  const watcher = new LedgerWatcher(client);
+  const watcher = new LedgerWatcher(client, { serviceToken });
   await watcher.start();
   console.log(`[watcher] connected to ${client.url} (testnet), watching jobs in ${REGISTRY_URL}`);
   const shutdown = async () => {

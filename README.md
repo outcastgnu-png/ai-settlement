@@ -4,7 +4,7 @@ Verified-delivery escrow for AI agent jobs on the XRP Ledger (testnet only).
 
 | Folder | What's in it |
 |---|---|
-| `edr/` | Engineering decision records. EDR-012 governs Phase 2. Add EDR-011 (Phase 1) here. |
+| `edr/` | Engineering decision records. EDR-011 governs Phase 1 and EDR-012 governs Phase 2. |
 | `research/` | The market writeup behind the project |
 | `xrpl-escrow/` | The code. Start with `xrpl-escrow/README.md`. Rules: `CLAUDE.md` (Phase 1), `CLAUDE_PHASE2.md` |
 | `xrpl-escrow/docs/reviews/` | Review brief (`REVIEW.md`), Phase 2 diff, and the reviewer's verdict (`VERDICT.md`). Reviewer: Gpno |

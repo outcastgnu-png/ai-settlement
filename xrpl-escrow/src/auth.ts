@@ -3,7 +3,10 @@
 // A provider proves who it is by signing "<action>|<jobId>|<timestamp>|<payloadHash>"
 // with its wallet key; the server checks that the public key derives to the
 // job's provider address. The oracle signs its verdicts the same way.
-import { createHash } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import type { IncomingHttpHeaders } from "node:http";
+import { dirname } from "node:path";
 import { deriveAddress, sign, verify } from "ripple-keypairs";
 import type { Wallet } from "xrpl";
 import { HttpError } from "./http.js";
@@ -31,9 +34,39 @@ export function signRequest(wallet: Wallet, action: string, jobId: string, paylo
   };
 }
 
+/**
+ * Remembers request signatures for longer than the freshness window, so a
+ * signed request can be used once. With a file path it survives restarts.
+ */
+export class ReplayGuard {
+  readonly #used = new Map<string, number>(); // signature -> request timestamp (ms)
+
+  constructor(readonly path?: string) {
+    if (path && existsSync(path)) {
+      const saved = JSON.parse(readFileSync(path, "utf8")) as Record<string, number>;
+      for (const [sig, ts] of Object.entries(saved)) this.#used.set(sig, ts);
+    }
+  }
+
+  /** Records the signature; false if it was already used. */
+  use(signature: string, timestamp: number): boolean {
+    const cutoff = Date.now() - 2 * MAX_SKEW_MS;
+    for (const [sig, ts] of this.#used) if (ts < cutoff) this.#used.delete(sig);
+    if (this.#used.has(signature)) return false;
+    this.#used.set(signature, timestamp);
+    if (this.path) {
+      mkdirSync(dirname(this.path), { recursive: true });
+      const tmp = `${this.path}.tmp`;
+      writeFileSync(tmp, JSON.stringify(Object.fromEntries(this.#used)));
+      renameSync(tmp, this.path);
+    }
+    return true;
+  }
+}
+
 /** Throws 401/403 unless `auth` is a fresh, valid signature by `expectedAddress`. */
 export function checkRequest(
-  auth: unknown, action: string, jobId: string, payloadHash: string, expectedAddress: string, seen?: Set<string>,
+  auth: unknown, action: string, jobId: string, payloadHash: string, expectedAddress: string, replay?: ReplayGuard,
 ): void {
   const a = auth as Partial<RequestAuth> | undefined;
   if (!a || typeof a.publicKey !== "string" || typeof a.signature !== "string" || typeof a.timestamp !== "number") {
@@ -48,9 +81,17 @@ export function checkRequest(
   }
   if (!valid) throw new HttpError(401, "bad signature");
   if (deriveAddress(a.publicKey) !== expectedAddress) throw new HttpError(403, "only the job's provider may do this");
-  if (seen) {
-    if (seen.has(a.signature)) throw new HttpError(401, "auth already used");
-    seen.add(a.signature);
+  if (replay && !replay.use(a.signature, a.timestamp)) throw new HttpError(401, "auth already used");
+}
+
+const digest = (text: string) => createHash("sha256").update(text).digest();
+
+/** Throws 401 unless the request carries `Authorization: Bearer <expected>`. Compared in constant time. */
+export function checkBearer(headers: IncomingHttpHeaders, expected: string, who: string): void {
+  const header = headers.authorization ?? "";
+  const given = header.startsWith("Bearer ") ? header.slice(7) : "";
+  if (!given || !timingSafeEqual(digest(given), digest(expected))) {
+    throw new HttpError(401, `only the ${who} may do this`);
   }
 }
 

@@ -1,5 +1,7 @@
-// Passes when the work was delivered within maxMs of the escrow being funded,
-// using the registry's own timestamps.
+// Passes when the work was delivered within maxMs of the escrow being funded.
+// fundedAt is the close time of the ledger that validated the EscrowCreate, as
+// reported by the authenticated watcher; deliveredAt is when the registry
+// stored the work.
 import type { CheckContext, CheckResult } from "./types.js";
 
 export function maxLatency(spec: { maxMs: number }, ctx: CheckContext): CheckResult {

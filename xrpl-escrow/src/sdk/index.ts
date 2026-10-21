@@ -12,7 +12,7 @@ import type { Client, Wallet } from "xrpl";
 import { signRequest, sha256Hex, verifyPayload } from "../auth.js";
 import { cancelEscrow, createEscrow, finishEscrow, sleep, waitPastCancelAfter, type EscrowRef, type TxResult } from "../escrow.js";
 import { callJson } from "../http.js";
-import { ORACLE_URL, REGISTRY_URL } from "../local-config.js";
+import { ORACLE_URL, REGISTRY_URL, readEnvFile } from "../local-config.js";
 import type { Job, JobEvent, JobSpec, JobStatus } from "../registry/db.js";
 import type { SignedVerdict, VerdictBody } from "../oracle/server.js";
 
@@ -23,6 +23,12 @@ export interface KitOptions {
   xrpl?: Client; // needed for fundJob, claim and refund
   registryUrl?: string;
   oracleUrl?: string;
+  /**
+   * The oracle's verdict signing address. Verdicts are only trusted when signed by
+   * this address. Defaults to ORACLE_VERDICT_ADDRESS from .env; never taken from
+   * the oracle's own /health answer.
+   */
+  oracleAddress?: string;
   /** How long to wait for the watcher to reflect a validated transaction. */
   statusTimeoutMs?: number;
 }
@@ -42,10 +48,10 @@ export interface DeliverResult {
   fulfillment: string | null;
 }
 
-/** Check a verdict's signature, and that it came from `oracleAddress` when given. */
-export function verifyVerdict(verdict: SignedVerdict, oracleAddress?: string): boolean {
+/** Check a verdict's signature, and that it came from the pinned `oracleAddress`. */
+export function verifyVerdict(verdict: SignedVerdict, oracleAddress: string): boolean {
   const { signature, ...unsigned } = verdict;
-  if (oracleAddress && verdict.oracle !== oracleAddress) return false;
+  if (!oracleAddress || verdict.oracle !== oracleAddress) return false;
   return verifyPayload(unsigned as VerdictBody, signature, verdict.publicKey, verdict.oracle);
 }
 
@@ -60,6 +66,7 @@ export class EscrowKit {
   readonly registryUrl: string;
   readonly oracleUrl: string;
   readonly #xrpl?: Client;
+  readonly oracleAddress: string | null;
   readonly #timeout: number;
 
   constructor(opts: KitOptions = {}) {
@@ -67,6 +74,7 @@ export class EscrowKit {
     this.oracleUrl = opts.oracleUrl ?? ORACLE_URL;
     this.#xrpl = opts.xrpl;
     this.#timeout = opts.statusTimeoutMs ?? 60_000;
+    this.oracleAddress = opts.oracleAddress ?? readEnvFile().ORACLE_VERDICT_ADDRESS ?? null;
   }
 
   #ledger(): Client {
@@ -130,11 +138,11 @@ export class EscrowKit {
       content, auth: signRequest(providerWallet, "deliver", jobId, sha256Hex(content)),
     });
     const { verdict, fulfillment } = await this.requestVerification(jobId, providerWallet);
-    const { oracle } = await this.oracleInfo();
     return {
       job: await this.getJob(jobId),
       verdict,
-      verdictSignatureValid: verifyVerdict(verdict, oracle) && verdict.evidenceHash === sha256Hex(content),
+      verdictSignatureValid: this.oracleAddress !== null && verifyVerdict(verdict, this.oracleAddress)
+        && verdict.evidenceHash === sha256Hex(content),
       fulfillment: fulfillment ?? null,
     };
   }

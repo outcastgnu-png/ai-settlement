@@ -5,7 +5,7 @@ import { afterAll, beforeAll, expect, it } from "vitest";
 import type { Client } from "xrpl";
 import { connectTestnet } from "../src/config.js";
 import { runPhase2 } from "../src/demo-phase2.js";
-import { ensureVaultKey } from "../src/local-config.js";
+import { ensureLocalSecrets } from "../src/local-config.js";
 import { loadOrFundWallets } from "../src/wallets.js";
 import { tempDir } from "./helpers.js";
 
@@ -21,7 +21,7 @@ afterAll(async () => {
 
 it("all Phase 2 scenarios pass through the local services on testnet", async () => {
   const wallets = await loadOrFundWallets(client);
-  ensureVaultKey();
+  ensureLocalSecrets();
   const dir = tempDir();
   // Separate ports and files so the test never touches a registry you started by hand.
   const checks = await runPhase2(client, wallets, {
@@ -29,5 +29,5 @@ it("all Phase 2 scenarios pass through the local services on testnet", async () 
   });
   const failed = checks.filter((c) => !c.ok).map((c) => `${c.scenario}: ${c.label} ${c.detail}`);
   expect(failed).toEqual([]);
-  expect(checks.length).toBeGreaterThan(40);
+  expect(checks.length).toBeGreaterThan(45);
 }, 600_000);

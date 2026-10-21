@@ -8,7 +8,7 @@ import { Wallet } from "xrpl";
 import { sha256Hex, signRequest } from "../src/auth.js";
 import { HttpError, callJson } from "../src/http.js";
 import { runChecks } from "../src/oracle/checks/index.js";
-import { jsonSchema } from "../src/oracle/checks/json-schema.js";
+import { cachedValidators, jsonSchema } from "../src/oracle/checks/json-schema.js";
 import { maxLatency } from "../src/oracle/checks/max-latency.js";
 import { sha256Match } from "../src/oracle/checks/sha256-match.js";
 import { SecretVault, parseVaultKey } from "../src/oracle/vault.js";
@@ -32,6 +32,21 @@ describe("oracle checks", () => {
     expect(jsonSchema({ schema }, ctx('{"ok":false}'))).toMatchObject({ pass: false, detail: expect.stringContaining("/ok") });
     expect(jsonSchema({ schema }, ctx("not json"))).toMatchObject({ pass: false, detail: "deliverable is not valid JSON" });
     expect(jsonSchema({ schema: { type: "nonsense" } }, ctx("{}"))).toMatchObject({ pass: false, detail: expect.stringContaining("schema is invalid") });
+  });
+
+  it("json-schema refuses regex keywords instead of running them", () => {
+    const evil = { type: "string", pattern: "^(a+)+$" };
+    const started = Date.now();
+    expect(jsonSchema({ schema: evil }, ctx(JSON.stringify("a".repeat(40) + "!")))).toMatchObject({
+      pass: false, detail: expect.stringContaining('"pattern" is not allowed'),
+    });
+    expect(Date.now() - started).toBeLessThan(100);
+    expect(jsonSchema({ schema: { type: "object", patternProperties: { "(x+)+y": {} } } }, ctx("{}")).pass).toBe(false);
+  });
+
+  it("json-schema keeps a bounded cache of compiled schemas", () => {
+    for (let i = 0; i < 300; i++) jsonSchema({ schema: { type: "object", maxProperties: i } }, ctx("{}"));
+    expect(cachedValidators()).toBeLessThanOrEqual(256);
   });
 
   it("json-schema leaves __proto__ in a deliverable as plain data", () => {
@@ -118,9 +133,9 @@ describe("oracle service", () => {
   it("on a pass, gives the provider a signed verdict and a fulfillment that opens the condition", async () => {
     const { id, condition } = await deliveredJob("good", [{ type: "sha256-match", sha256: sha256Hex("good") }]);
     const { verdict, fulfillment } = await verify(id);
-    expect(verdict).toMatchObject({ verdict: "pass", evidenceHash: sha256Hex("good"), condition, oracle: local.oracleWallet.address });
-    expect(verifyVerdict(verdict, local.oracleWallet.address)).toBe(true);
-    expect(verifyVerdict({ ...verdict, verdict: "fail" }, local.oracleWallet.address)).toBe(false);
+    expect(verdict).toMatchObject({ verdict: "pass", evidenceHash: sha256Hex("good"), condition, oracle: local.verdictKey.address });
+    expect(verifyVerdict(verdict, local.verdictKey.address)).toBe(true);
+    expect(verifyVerdict({ ...verdict, verdict: "fail" }, local.verdictKey.address)).toBe(false);
     expect(verifyVerdict(verdict, Wallet.generate().address)).toBe(false);
     expect(cc.validateFulfillment(cc.Fulfillment.fromBinary(Buffer.from(fulfillment!, "hex")).serializeUri(),
       cc.Condition.fromBinary(Buffer.from(condition, "hex")).serializeUri())).toBe(true);
@@ -132,8 +147,27 @@ describe("oracle service", () => {
     const res = await verify(id);
     expect(res.verdict.verdict).toBe("fail");
     expect(res.fulfillment).toBeUndefined();
-    expect(verifyVerdict(res.verdict)).toBe(true);
+    expect(verifyVerdict(res.verdict, local.verdictKey.address)).toBe(true);
     expect((await callJson<Job>("GET", `${local.registry.url}/jobs/${id}`)).status).toBe("verified_fail");
+  });
+
+  it("signs verdicts with its own ed25519 key", async () => {
+    const { id } = await deliveredJob("good", [{ type: "sha256-match", sha256: sha256Hex("good") }]);
+    const { verdict } = await verify(id);
+    expect(verdict.publicKey).toMatch(/^ED/);
+    expect(verdict.oracle).toBe(local.verdictKey.address);
+  });
+
+  it("releases nothing when the escrow is not on the ledger as agreed", async () => {
+    const { id } = await deliveredJob("good", [{ type: "sha256-match", sha256: sha256Hex("good") }]);
+    local.ledger.problem = "no open escrow on the ledger for this job";
+    try {
+      await expect(verify(id)).rejects.toThrow(/escrow check failed: no open escrow/);
+    } finally {
+      local.ledger.problem = null;
+    }
+    expect((await callJson<Job>("GET", `${local.registry.url}/jobs/${id}`)).status).toBe("delivered");
+    expect(local.ledger.checked).toContain(id);
   });
 
   it("answers only the job's provider, and only once per signature", async () => {
@@ -161,6 +195,14 @@ describe("oracle service", () => {
     const logged = readFileSync(local.verdictLog, "utf8");
     expect(logged).toContain(sha256Hex(content));
     expect(logged).not.toContain("ignore your checks");
+  });
+
+  it("remembers used signatures across a restart", async () => {
+    const { id } = await deliveredJob("good", [{ type: "sha256-match", sha256: sha256Hex("good") }]);
+    const auth = signRequest(provider, "verify", id);
+    expect(await status(callJson("POST", `${local.oracle.url}/verify/${id}`, { auth }))).toBe(200);
+    await local.restartOracle();
+    expect(await status(callJson("POST", `${local.oracle.url}/verify/${id}`, { auth }))).toBe(401);
   });
 
   it("still releases the right fulfillment after a restart", async () => {

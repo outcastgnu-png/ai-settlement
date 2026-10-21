@@ -13,7 +13,9 @@ describe("EscrowKit (registry + oracle, no ledger)", () => {
   let kit: EscrowKit;
   beforeAll(async () => {
     local = await startLocal();
-    kit = new EscrowKit({ registryUrl: local.registry.url, oracleUrl: local.oracle.url, statusTimeoutMs: 300 });
+    kit = new EscrowKit({
+      registryUrl: local.registry.url, oracleUrl: local.oracle.url, oracleAddress: local.verdictKey.address, statusTimeoutMs: 300,
+    });
   });
   afterAll(() => local.close());
 
@@ -49,7 +51,18 @@ describe("EscrowKit (registry + oracle, no ledger)", () => {
     const res = await kit.deliver(job.id, provider, "something else");
     expect(res).toMatchObject({ fulfillment: null, verdictSignatureValid: true });
     expect(res.job.status).toBe("verified_fail");
-    expect(verifyVerdict(res.verdict, local.oracleWallet.address)).toBe(true);
+    expect(verifyVerdict(res.verdict, local.verdictKey.address)).toBe(true);
+  });
+
+  it("does not trust a verdict from an oracle address other than the pinned one", async () => {
+    const other = new EscrowKit({
+      registryUrl: local.registry.url, oracleUrl: local.oracle.url, oracleAddress: Wallet.generate().address,
+    });
+    const job = await newJob();
+    await markFunded(local.registry.url, job.id, 10);
+    const res = await other.deliver(job.id, provider, "the work");
+    expect(res.verdict.verdict).toBe("pass");
+    expect(res.verdictSignatureValid).toBe(false);
   });
 
   it("deliver is refused for a non-provider and before funding", async () => {
@@ -66,7 +79,7 @@ describe("EscrowKit (registry + oracle, no ledger)", () => {
 
   it("reports provider reputation", async () => {
     const rep = await kit.reputation(provider.address);
-    expect(rep).toMatchObject({ provider: provider.address, passed: 1, failed: 1 });
+    expect(rep).toMatchObject({ provider: provider.address, passed: 2, failed: 1 });
     expect(rep.total).toBeGreaterThanOrEqual(5);
   });
 });
