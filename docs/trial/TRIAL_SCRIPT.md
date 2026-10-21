@@ -6,7 +6,7 @@
 > client's XRP is locked on the ledger and only released when a verifier checks the
 > delivered work. It runs on testnet only, with free test XRP, on your own machine.
 > Would you spend about 45 minutes trying it and answering 12 short questions?
-> The kit is attached as `ai-settlement-0.3.0.zip`; unzip it and start with `QUICKSTART.md`.
+> The kit is at https://github.com/outcastgnu-png/ai-settlement (release v0.3.0); start with `QUICKSTART.md`.
 > Nothing you do can cost real money.
 
 ## What the tester does
@@ -28,8 +28,8 @@
 
 ## What the organizer does
 
-- Before sending: check the quickstart still works from a fresh unzip on Windows, and attach
-  the release zip. Once the public repository exists, send its link instead.
+- Before sending: check the quickstart still works from a fresh clone of the release on
+  Windows, and send the repository link.
 - Answer questions within a day, and note every question in the tester's results
   file. A question is a sign the docs need fixing.
 - After each tester: copy their answers into `results/<date>-<handle>.md`, update

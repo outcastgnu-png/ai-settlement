@@ -10,8 +10,9 @@ Please report anything that could let someone get a fulfillment without passing
 the checks, finish or cancel an escrow they shouldn't, forge a job status or a
 verdict, read a secret, or make the oracle run deliverable content.
 
-- Report privately to the maintainer, Christopher Terrell, at **outcastgnu@gmail.com** (until the
-  public repository is up; then use its private security advisories).
+- Report privately through the repository's security advisories
+  (<https://github.com/outcastgnu-png/ai-settlement/security/advisories/new>), or email the maintainer, Christopher Terrell, at
+  **outcastgnu@gmail.com**.
 - Don't open a public issue for it, and don't test against other people's services.
 - Include the commit, what you did, what happened, and what you expected.
 

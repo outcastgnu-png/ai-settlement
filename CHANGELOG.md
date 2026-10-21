@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.3.0 (Phase 3 developer preview, EDR-013) - unreleased
+## 0.3.0 (Phase 3 developer preview, EDR-013) - 2026-10-21
 
 Still testnet only, and every service listens on 127.0.0.1 only.
 
@@ -35,7 +35,7 @@ Still testnet only, and every service listens on 127.0.0.1 only.
   code unit (N13, N14); `claim()` refuses a fulfillment that doesn't open the job's condition,
   and the docs say it does not check the verdict (N15); `submit_validated` raises a tem/tef/tel
   rejection at once instead of reporting it as expired (N16).
-- `QUICKSTART.md` gets the code from the release zip until the public repository exists, uses
+- `QUICKSTART.md` gets the code from the `v0.3.0` release at https://github.com/outcastgnu-png/ai-settlement, uses
   `npm ci`, and notes the macOS and Linux spellings (N17).
 - Wallets are topped up from the faucet below 60 XRP (was 30), in both SDKs. Paid jobs drain
   the client for good, and below about 45 XRP the Phase 2 demo could not lock its third

@@ -12,11 +12,14 @@ money is involved at any point.
   On Windows, tick "Add python.exe to PATH" in the installer.
 ## 2. Get the code and set up the kit
 
-Until the public repository is up, the kit comes as a zip file,
-`ai-settlement-0.3.0.zip`. Unzip it so that you have a folder called
-`ai-settlement` (for example `C:\dev\ai-settlement`). Then, in PowerShell:
+The code is at <https://github.com/outcastgnu-png/ai-settlement>. Clone the `v0.3.0` release with
+[Git](https://git-scm.com/downloads) (or download it as a zip from the repository's
+Releases page and unzip it), so that you have a folder called `ai-settlement`, for example
+`C:\dev\ai-settlement`. Then, in PowerShell:
 
 ```
+cd C:\dev
+git clone --branch v0.3.0 https://github.com/outcastgnu-png/ai-settlement.git
 cd C:\dev\ai-settlement\xrpl-escrow
 npm ci
 npm run setup

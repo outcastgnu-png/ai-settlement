@@ -32,6 +32,7 @@
   },
   "type": "module",
   "private": true,
+  "repository": { "type": "git", "url": "git+https://github.com/outcastgnu-png/ai-settlement.git", "directory": "xrpl-escrow" },
   "engines": {
     "node": ">=22.12"
   },
