@@ -58,7 +58,7 @@ npx tsx examples/first-job.ts
 ## 4b. Or run a job from Python
 
 ```
-cd ai-settlement\xrpl-escrow-py
+cd C:\dev\ai-settlement\xrpl-escrow-py
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -e .[test]
