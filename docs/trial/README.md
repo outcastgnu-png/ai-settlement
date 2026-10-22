@@ -2,7 +2,8 @@
 
 The goal from the writeup's phased plan: **5 outside developers try the kit**
 and tell us what worked. This folder holds what a tester gets and where their
-answers go. The trial starts only after the owner approves the public release.
+answers go. The public release (v0.3.0) was approved on 2026-10-22, so the trial
+can run.
 
 | File | For |
 |---|---|
@@ -18,6 +19,6 @@ would use Python, and at least one on Windows.
 
 ## When the gate is met
 
-Five testers have finished step 3 of the script (a job paid on testnet from their
-own code or the example) and returned the form. Record the date in
+Five testers have got a job paid on testnet (step 2 of the script, from the
+example or their own code) and returned the form. Record the date in
 `results/README.md`.

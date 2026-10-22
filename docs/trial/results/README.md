@@ -1,7 +1,8 @@
 # Trial results
 
 One file per tester: `<date>-<handle>.md`, holding their form answers and any
-questions they asked. Testers are named only by the handle they agreed to.
+questions they asked, made from [`TEMPLATE.md`](TEMPLATE.md). Testers are named only by
+the handle they agreed to; contact details never go in this repository.
 
 | # | Date | Handle | Language / OS | Setup minutes | Paid job? | Refunded job? | Main issue |
 |---|---|---|---|---|---|---|---|

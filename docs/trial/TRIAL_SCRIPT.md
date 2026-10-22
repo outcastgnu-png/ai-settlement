@@ -21,10 +21,21 @@
      `json-schema` check on a JSON deliverable), and
    - one job fails and is refunded.
    Use the SDK in your language. Only the kit's own calls are needed.
+   A job's `spec.checks` takes up to 8 of these:
+   ```
+   { "type": "sha256-match", "sha256": "<64 hex chars>" }
+   { "type": "json-schema",  "schema": { "type": "object", "required": ["answer"] } }
+   { "type": "max-latency",  "maxMs": 60000 }
+   ```
+   For `json-schema`, deliver the JSON as a string. Give the failing job
+   `slaSeconds: 30` (the minimum), so its refund comes about a minute later
+   instead of after the example's 5 minutes.
 4. **Try to break it (optional).** Can you get a fulfillment without passing the
    check, or get paid without one? If you find something, report it as
    `SECURITY.md` describes, not in the form.
-5. **Fill in [`FEEDBACK_FORM.md`](FEEDBACK_FORM.md)** and send it back.
+5. **Fill in [`FEEDBACK_FORM.md`](FEEDBACK_FORM.md)** and send it back the way
+   the invitation says. Never paste anything from `.env`: it holds your wallet
+   seeds. Explorer links and addresses are fine to share.
 
 ## What the organizer does
 
@@ -32,5 +43,6 @@
   Windows, and send the repository link.
 - Answer questions within a day, and note every question in the tester's results
   file. A question is a sign the docs need fixing.
-- After each tester: copy their answers into `results/<date>-<handle>.md`, update
+- After each tester: copy their answers into `results/<date>-<handle>.md` (start from
+  [`results/TEMPLATE.md`](results/TEMPLATE.md)), update
   the summary table in `results/README.md`, and open an issue for each real bug.
