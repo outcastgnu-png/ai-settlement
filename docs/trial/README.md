@@ -11,6 +11,17 @@ can run.
 | [`FEEDBACK_FORM.md`](FEEDBACK_FORM.md) | The questions they answer |
 | [`results/`](results/README.md) | One file per tester, plus the running summary |
 
+## Returning feedback from v0.3.0
+
+Run the v0.3.0 kit, but use the
+[current trial script](https://github.com/outcastgnu-png/ai-settlement/blob/main/docs/trial/TRIAL_SCRIPT.md)
+and [current feedback form](https://github.com/outcastgnu-png/ai-settlement/blob/main/docs/trial/FEEDBACK_FORM.md)
+for submission instructions. The release snapshot has older instructions.
+Email the completed form to **[outcastgnu@gmail.com](mailto:outcastgnu@gmail.com)**
+with subject **AI Settlement developer trial feedback**, after the form's
+redaction checks. Report suspected vulnerabilities separately through
+[`SECURITY.md`](../../SECURITY.md).
+
 ## Who to ask
 
 Developers who build or run AI agents, or who have shipped something on the XRP
