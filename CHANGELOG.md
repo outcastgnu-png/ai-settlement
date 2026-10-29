@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- Give developer trial invitations, scripts and forms an explicit feedback email,
+  current-form links for v0.3.0 users, and redaction/private-security-reporting
+  instructions. Preserve the five-tester paid-job-plus-returned-form gate.
+
 ## 0.3.0 (Phase 3 developer preview, EDR-013) - 2026-10-21
 
 Still testnet only, and every service listens on 127.0.0.1 only.
