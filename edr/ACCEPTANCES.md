@@ -36,3 +36,14 @@ Notes:
 - Gpno replaced Codex as the single final reviewer for both phases at 08:14 UTC. Gpno's verdict
   is in `xrpl-escrow/docs/reviews/VERDICT.md`.
 - Christopher's statements were made in the project chat for ai_settlement_model.
+
+## Decision on the Phase 2 confirmation review (2026-10-26 04:09 UTC)
+
+Christopher: "Yes lets record it that way without inference".
+
+| Item | Fact |
+|---|---|
+| Handoff | Confirmation review of `a0f6e1b` handed to Gpno on 2026-10-21 at 05:55 UTC (`handoff/REVIEW-3-confirmation.md`, `ai-settlement-gpno-review.zip`) |
+| Verdict | None received from Gpno |
+| Later review | Gpno's Phase 3 re-review, unconditional PASS WITH FINDINGS on `8dab15e` (`xrpl-escrow/docs/reviews/VERDICT.md`, commit `4aa780e`); `8dab15e` contains the Phase 2 fixes from `a0f6e1b` |
+| Decision | Christopher closed the Phase 2 confirmation round as superseded by the Phase 3 pass. No opinion or verdict on it is attributed to Gpno |

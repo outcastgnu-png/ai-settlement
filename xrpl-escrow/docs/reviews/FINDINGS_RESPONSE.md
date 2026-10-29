@@ -103,11 +103,21 @@ Evidence:
   **49/49** on testnet (`logs/2026-10-21-phase2-fixes2.txt`, transactions in
   `logs/2026-10-21-phase2-fixes2-txs.json`). `npm test` in full not yet re-run.
 
+## Phase 2 confirmation review (on `a0f6e1b`): closed as superseded
+
+- 2026-10-21 05:55 UTC: the confirmation review of `a0f6e1b` (blockers N1 and N2) was handed to
+  Gpno as `handoff/REVIEW-3-confirmation.md` and `ai-settlement-gpno-review.zip`, outside the repo.
+- No confirmation verdict was received from Gpno.
+- Gpno's Phase 3 re-review (`VERDICT.md`, recorded in `4aa780e`) is an unconditional PASS WITH
+  FINDINGS on `8dab15e`. `a0f6e1b`, the commit with the Phase 2 fixes, is an ancestor of `8dab15e`.
+- 2026-10-26 04:09 UTC: Christopher closed the Phase 2 confirmation round as superseded by the
+  Phase 3 pass (`edr/ACCEPTANCES.md`). This records his decision only; no confirmation verdict
+  is attributed to Gpno.
+
 ## Phase 3 review (2026-10-21, `VERDICT.md`, on `a0f6e1b` plus the uncommitted Phase 3 tree): FAIL
 
-The second review's verdict is archived as `VERDICT-2026-10-21-af9a4db.md`. The third
-(confirmation) verdict on `a0f6e1b` was never placed in the repo; it should be archived as
-`VERDICT-2026-10-21-a0f6e1b.md` once Christopher shares its text.
+The second review's verdict is archived as `VERDICT-2026-10-21-af9a4db.md`. There is no
+confirmation verdict on `a0f6e1b` to archive (see the section above).
 
 | # | Status | Where | Test that fails when the fix is reverted |
 |---|---|---|---|
