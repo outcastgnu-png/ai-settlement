@@ -1,6 +1,6 @@
 # Tester <handle>, <YYYY-MM-DD>
 
-Language: TypeScript / Python. OS: . Kit version: v0.3.0.
+Language: TypeScript / Python. OS: . Kit version: v0.3.1 (or v0.3.0).
 
 ## Run
 
