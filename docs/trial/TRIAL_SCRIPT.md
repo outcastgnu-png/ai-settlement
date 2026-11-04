@@ -6,7 +6,7 @@
 > client's XRP is locked on the ledger and only released when a verifier checks the
 > delivered work. It runs on testnet only, with free test XRP, on your own machine.
 > Would you spend about 45 minutes trying it and answering 12 short questions?
-> Use the [v0.3.0 kit](https://github.com/outcastgnu-png/ai-settlement/releases/tag/v0.3.0);
+> Use the [v0.3.1 kit](https://github.com/outcastgnu-png/ai-settlement/releases/tag/v0.3.1);
 > start with its `QUICKSTART.md`. Follow the
 > [current trial script](https://github.com/outcastgnu-png/ai-settlement/blob/main/docs/trial/TRIAL_SCRIPT.md)
 > and use the [current feedback form](https://github.com/outcastgnu-png/ai-settlement/blob/main/docs/trial/FEEDBACK_FORM.md),
@@ -64,9 +64,9 @@
 
 - Before sending: check the quickstart still works from a fresh clone of the release on
   Windows, and send the invitation above with its explicit email destination and
-  links to the current trial script and feedback form. The v0.3.0 snapshot has
-  older return instructions; these links supplement it without changing the kit
-  version testers run.
+  links to the current trial script and feedback form. Testers who started on the
+  v0.3.0 snapshot can keep it; its return instructions are older, and these links
+  supplement them.
 - Answer questions within a day, and note every question in the tester's results
   file. A question is a sign the docs need fixing.
 - Before publishing results: agree a public handle or alias with the tester.

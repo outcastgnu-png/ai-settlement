@@ -63,19 +63,46 @@ xrpl = connect_testnet()                       # aborts unless network_id is 1 (
 w = load_or_fund_wallets(xrpl, "../xrpl-escrow/.env")
 kit = EscrowKit(xrpl=xrpl, env_file="../xrpl-escrow/.env")
 work = "the deliverable"
-job = kit.create_job(w["client"].address, w["provider"].address, "10000000", 300,
-                     {"checks": [{"type": "sha256-match", "sha256": sha256_hex(work)}]})
+job = kit.create_job(
+    client=w["client"].address,
+    provider=w["provider"].address,
+    price_drops="10000000",                    # 10 XRP, in drops, as a string
+    sla_seconds=300,                           # 30 to 86400
+    spec={"checks": [{"type": "sha256-match", "sha256": sha256_hex(work)}]},
+)
 kit.fund_job(job["id"], w["client"])                       # EscrowCreate
 res = kit.deliver(job["id"], w["provider"], work)
 if res.fulfillment and res.verdict_signature_valid:
-    kit.claim(job["id"], w["provider"], res.fulfillment)   # EscrowFinish
+    out = kit.claim(job["id"], w["provider"], res.fulfillment)   # EscrowFinish
 else:
-    kit.refund(job["id"], w["client"])                     # EscrowCancel after the deadline
+    out = kit.refund(job["id"], w["client"])                     # EscrowCancel after the deadline
+print(out.tx.code, out.job["status"])                      # e.g. tesSUCCESS paid
 xrpl.close()
 ```
 
-Jobs come back as plain dicts with the registry's field names (`status`,
+### What each call returns
+
+| Call | Returns |
+|---|---|
+| `create_job()` | The job, as a plain dict |
+| `fund_job()`, `claim()`, `refund()` | A `TxOutcome` with `.tx` and `.job`, not a dict: use `out.job["status"]`, not `out.get("status")` |
+| `deliver()` | A `DeliverResult` with `.job`, `.verdict`, `.verdict_signature_valid` and `.fulfillment` |
+
+Jobs are plain dicts with the registry's field names (`id`, `status`,
 `condition`, `offerSequence`, `cancelAfter` and so on).
+
+`TxOutcome.tx` is a `TxResult` read from a validated ledger: `.hash`, `.code`
+(the engine result, such as `tesSUCCESS`) and `.sequence`. If `.code` is not
+`tesSUCCESS`, `.job` is the job as it stands and its status has not moved.
+
+`DeliverResult` fields:
+
+| Field | Meaning |
+|---|---|
+| `job` | The job after delivery |
+| `verdict` | The oracle's signed verdict, as a dict: `jobId`, `verdict` (`"pass"` or `"fail"`), `checks` (one `{type, pass, detail}` per check), `evidenceHash` (SHA-256 of the work judged), `condition`, `provider`, `oracle`, `publicKey`, `issuedAt` and `signature` |
+| `verdict_signature_valid` | True only if the verdict is signed by the pinned `ORACLE_VERDICT_ADDRESS` and its `evidenceHash` matches the work you sent |
+| `fulfillment` | The secret that opens the escrow, on a pass; `None` on a fail |
 
 ## Tests
 
