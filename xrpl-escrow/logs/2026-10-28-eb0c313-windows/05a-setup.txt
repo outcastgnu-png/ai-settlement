@@ -1,0 +1,10 @@
+﻿$ npm.cmd run setup
+
+> xrpl-verified-escrow-demo@0.3.0 setup
+> tsx src/setup.ts
+
+  client   rp2MDLB3h1R8ASdWob6G89HX16D8SFX4aT  100.000000 XRP
+  provider r3HtuRAgFRuwStoyMwXhJvTdcMavYZLg9j  100.000000 XRP
+  oracle   rNd4iidwwtaMq4iy6fBtUNEiXPSSk2dNgD  100.000000 XRP
+Wallet seeds, the vault key, service tokens and the verdict key are in .env (testnet only, gitignored).
+EXIT 0

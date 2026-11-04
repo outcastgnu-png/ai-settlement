@@ -18,6 +18,7 @@ Christopher answered, in order: "approve, yes, restore, yes, keep the numbers".
 | N3: four clauses dropped from EDR-011 | Restore them (done in `EDR-011_ESCROW_PHASE1_TESTNET_DEMO.md`) |
 | N5: no approval in the owner's own hand | Christopher signs this file himself (below) |
 | N7: EDR numbers continue PersonalAi's series | Keep the numbers |
+| eb0c313: N19–N23 fixes, committed to main without prior approval | Approved after the fact on condition of a Windows run; passed 2026-10-28 (Windows 11, Node 24.18.0, Python 3.14.6: unit 62/62, testnet 66/66, pytest 25+1 skipped and 26 testnet) |
 
 ## Owner signature
 

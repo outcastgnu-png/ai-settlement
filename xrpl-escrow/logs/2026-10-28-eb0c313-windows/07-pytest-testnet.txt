@@ -1,0 +1,17 @@
+﻿$ .venv\Scripts\python.exe -m pytest --testnet
+============================= test session starts =============================
+platform win32 -- Python 3.14.6, pytest-9.2.0, pluggy-1.7.0
+rootdir: C:\dev\ai-settlement-eb0c313\xrpl-escrow-py
+configfile: pyproject.toml
+testpaths: tests
+plugins: anyio-4.15.1
+collected 26 items
+
+tests\test_condition.py .....                                            [ 19%]
+tests\test_demo_testnet.py .                                             [ 23%]
+tests\test_kit_local.py ..........                                       [ 61%]
+tests\test_parity.py ........                                            [ 92%]
+tests\test_retry.py ..                                                   [100%]
+
+======================== 26 passed in 95.16s (0:01:35) ========================
+EXIT 0

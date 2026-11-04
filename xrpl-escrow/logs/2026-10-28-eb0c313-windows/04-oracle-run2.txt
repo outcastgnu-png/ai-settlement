@@ -1,0 +1,11 @@
+﻿$ npx.cmd vitest run test/oracle.test.ts
+
+ RUN  v5.0.5 C:/dev/ai-settlement-eb0c313/xrpl-escrow
+
+
+ Test Files  1 passed (1)
+      Tests  28 passed (28)
+   Start at  23:41:40
+   Duration  8.38s (tests 97%, import 3%)
+
+EXIT 0
