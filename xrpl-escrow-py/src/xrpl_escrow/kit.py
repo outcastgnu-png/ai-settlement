@@ -105,8 +105,10 @@ class EscrowKit:
                 raise TimeoutError(f"job {job_id} is {job['status']}, still waiting for {' or '.join(statuses)}")
             time.sleep(0.5)
 
-    def create_job(self, client: str, provider: str, price_drops: str, sla_seconds: int, spec: dict[str, Any]) -> Job:
-        """Register a draft job, then have the oracle create its secret and set the condition."""
+    def create_job(self, *, client: str, provider: str, price_drops: str, sla_seconds: int, spec: dict[str, Any]) -> Job:
+        """Register a draft job, then have the oracle create its secret and set the condition.
+
+        Every argument is keyword-only, like the fields of the TypeScript ``createJob()``."""
         draft = call_json("POST", f"{self.registry_url}/jobs", {
             "client": client, "provider": provider, "priceDrops": price_drops, "slaSeconds": sla_seconds, "spec": spec,
         })

@@ -7,7 +7,7 @@ from .escrow import EscrowRef, TxResult, cancel_escrow, create_escrow, finish_es
 from .http import ServiceError
 from .kit import DeliverResult, EscrowKit, Job, TxOutcome, escrow_ref
 
-__version__ = "0.3.1"
+__version__ = "0.4.0"
 
 __all__ = [
     "EXPLORER_TX", "TESTNET_NETWORK_ID", "DeliverResult", "EscrowKit", "EscrowRef", "Job", "NotTestnetError",

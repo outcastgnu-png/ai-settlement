@@ -20,7 +20,12 @@ def kit(local_services):
 
 
 def new_job(kit):
-    return kit.create_job(CLIENT.address, PROVIDER.address, "5000000", 60, SPEC)
+    return kit.create_job(client=CLIENT.address, provider=PROVIDER.address, price_drops="5000000", sla_seconds=60, spec=SPEC)
+
+
+def test_create_job_takes_keyword_arguments_only(kit):
+    with pytest.raises(TypeError):
+        kit.create_job(CLIENT.address, PROVIDER.address, "5000000", 60, SPEC)
 
 
 def test_create_job_registers_a_draft_with_the_oracles_condition(kit):

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.0 (unreleased)
+
+Still testnet only.
+
+### Changed
+- Python SDK: `create_job()` takes keyword arguments only (`client`, `provider`,
+  `price_drops`, `sla_seconds`, `spec`), like the fields of the TypeScript `createJob()`.
+  A positional call now raises `TypeError` instead of quietly mixing up the price and the
+  SLA. Breaking for code that called it positionally; the README example already uses names.
+
 ## 0.3.1 (trial docs) - 2026-11-04
 
 Docs and packaging only; no code changes. Still testnet only.
@@ -8,7 +18,7 @@ Docs and packaging only; no code changes. Still testnet only.
 - Python SDK README: say what each call returns. `fund_job`, `claim` and `refund` return a
   `TxOutcome` (`.tx`, `.job`), not a dict, and `deliver` returns a `DeliverResult`, whose fields
   are now listed. The example passes `create_job`'s arguments by name. Reported by the first
-  trial tester (MetaPhor).
+  trial tester.
 - Give developer trial invitations, scripts and forms an explicit feedback email,
   current-form links for v0.3.0 users, and redaction/private-security-reporting
   instructions. Preserve the five-tester paid-job-plus-returned-form gate.
