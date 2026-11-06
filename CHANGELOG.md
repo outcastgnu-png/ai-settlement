@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.0 (unreleased)
+
+Still testnet only.
+
+### Changed
+- Python SDK: `create_job()` takes keyword arguments only (`client`, `provider`,
+  `price_drops`, `sla_seconds`, `spec`), like the fields of the TypeScript `createJob()`.
+  A positional call now raises `TypeError` instead of quietly mixing up the price and the
+  SLA. Breaking for code that called it positionally; the README example already uses names.
+
 ## 0.3.1 (trial docs) - 2026-11-04
 
 Docs and packaging only; no code changes. Still testnet only.

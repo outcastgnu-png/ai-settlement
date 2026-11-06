@@ -56,8 +56,8 @@ def run(kit: EscrowKit, xrpl, wallets, log=print) -> list[Check]:
     log(f"  before: {balances()}")
     provider_before = xrp_balance(xrpl, provider.address)
     work = f"python sdk deliverable {stamp}\n"
-    job = kit.create_job(payer.address, provider.address, PRICE_DROPS, 300,
-                         {"title": "python demo", "checks": [{"type": "sha256-match", "sha256": sha256_hex(work)}]})
+    job = kit.create_job(client=payer.address, provider=provider.address, price_drops=PRICE_DROPS, sla_seconds=300,
+                         spec={"title": "python demo", "checks": [{"type": "sha256-match", "sha256": sha256_hex(work)}]})
     check("job registered as draft with the oracle's condition", job["status"] == "draft" and bool(job["condition"]), f"job {job['id']}")
     funded = kit.fund_job(job["id"], payer)
     check("EscrowCreate -> tesSUCCESS, watcher -> funded", funded.tx.code == "tesSUCCESS" and funded.job["status"] == "funded",
@@ -79,8 +79,8 @@ def run(kit: EscrowKit, xrpl, wallets, log=print) -> list[Check]:
     log(f"\n{scenario}: the work fails the checks; the client is refunded after the deadline")
     log(f"  before: {balances()}")
     work = f"python sdk deliverable {stamp}, the one that was ordered\n"
-    job = kit.create_job(payer.address, provider.address, PRICE_DROPS, 60,
-                         {"title": "python demo", "checks": [{"type": "sha256-match", "sha256": sha256_hex(work)}]})
+    job = kit.create_job(client=payer.address, provider=provider.address, price_drops=PRICE_DROPS, sla_seconds=60,
+                         spec={"title": "python demo", "checks": [{"type": "sha256-match", "sha256": sha256_hex(work)}]})
     funded = kit.fund_job(job["id"], payer)
     check("EscrowCreate -> tesSUCCESS, watcher -> funded", funded.tx.code == "tesSUCCESS" and funded.job["status"] == "funded",
           f"{funded.tx.code} {EXPLORER_TX}{funded.tx.hash}")
