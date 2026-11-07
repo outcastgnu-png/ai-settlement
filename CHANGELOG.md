@@ -18,7 +18,7 @@ Docs and packaging only; no code changes. Still testnet only.
 - Python SDK README: say what each call returns. `fund_job`, `claim` and `refund` return a
   `TxOutcome` (`.tx`, `.job`), not a dict, and `deliver` returns a `DeliverResult`, whose fields
   are now listed. The example passes `create_job`'s arguments by name. Reported by the first
-  trial tester.
+  trial tester (MetaPhor).
 - Give developer trial invitations, scripts and forms an explicit feedback email,
   current-form links for v0.3.0 users, and redaction/private-security-reporting
   instructions. Preserve the five-tester paid-job-plus-returned-form gate.

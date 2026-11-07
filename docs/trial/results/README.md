@@ -6,7 +6,7 @@ the handle they agreed to; contact details never go in this repository.
 
 | # | Date | Handle | Language / OS | Setup minutes | Paid job? | Refunded job? | Main issue |
 |---|---|---|---|---|---|---|---|
-| 1 | | | | | | | |
+| 1 | 2026-11-03 | [MetaPhor](2026-11-03-MetaPhor.md) | Python / Linux | about 1 | Yes | Yes | README said `claim()`/`refund()` return dicts, not `TxOutcome` |
 | 2 | | | | | | | |
 | 3 | | | | | | | |
 | 4 | | | | | | | |
