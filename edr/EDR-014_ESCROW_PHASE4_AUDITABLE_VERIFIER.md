@@ -118,7 +118,7 @@ Build option 1, still **testnet-only and local-only** (127.0.0.1):
      anchors do and don't protect (an oracle can still sign a wrong verdict; it just can't
      hide it).
 6. **Trial continues.** The five-tester gate stays open. Invitations point at the 0.4.0
-   release. The owner set the new end date on 2026-11-07: **2026-11-20**.
+   release. The owner set the new end date on 2026-11-07: **2026-12-04**.
 
 ## Boundaries
 
