@@ -306,7 +306,7 @@ describe("oracle service", () => {
     expect(res.fulfillment).toBeUndefined();
     expect(existsSync(marker)).toBe(false);
     expect(({} as Record<string, unknown>).verdict).toBeUndefined();
-    const logged = readFileSync(local.verdictLog, "utf8");
+    const logged = readFileSync(local.verdictChain, "utf8");
     expect(logged).toContain(sha256Hex(content));
     expect(logged).not.toContain("ignore your checks");
   });
@@ -330,7 +330,7 @@ describe("oracle service", () => {
   it("answers 503 with no verdict and no status change when the checker is unavailable, then verifies on a retry (Gpno N9)", async () => {
     const work = JSON.stringify({ ok: true });
     const { id } = await deliveredJob(work, [{ type: "json-schema", schema: { type: "object", required: ["ok"], properties: { ok: { const: true } } } }]);
-    const logLines = () => (existsSync(local.verdictLog) ? readFileSync(local.verdictLog, "utf8").trim().split("\n").length : 0);
+    const logLines = () => (existsSync(local.verdictChain) ? readFileSync(local.verdictChain, "utf8").trim().split("\n").length : 0);
     const linesBefore = logLines();
     const fill = async () => {
       const head = busySchemaCheck(800, 2_000);
@@ -379,9 +379,14 @@ describe("oracle service", () => {
     expect(schemaRuns() - before).toBe(2); // only the busy run was added
   });
 
-  it("appends one JSONL line per verdict and never logs the fulfillment", async () => {
-    const lines = readFileSync(local.verdictLog, "utf8").trim().split("\n").map((l) => JSON.parse(l));
-    expect(lines.length).toBeGreaterThanOrEqual(4);
-    for (const l of lines) expect(Object.keys(l)).not.toContain("fulfillment");
+  it("appends one chained JSONL line per verdict and never logs the fulfillment or check details", async () => {
+    const lines = readFileSync(local.verdictChain, "utf8").trim().split("\n").map((l) => JSON.parse(l));
+    expect(lines.length).toBeGreaterThanOrEqual(5); // genesis + at least four verdicts
+    expect(lines[0].kind).toBe("genesis");
+    for (const l of lines) {
+      expect(Object.keys(l)).not.toContain("fulfillment");
+      for (const c of l.checks ?? []) expect(Object.keys(c).sort()).toEqual(["pass", "type"]);
+    }
+    expect(existsSync(local.verdictLog)).toBe(false); // the old unchained log is no longer written
   });
 });

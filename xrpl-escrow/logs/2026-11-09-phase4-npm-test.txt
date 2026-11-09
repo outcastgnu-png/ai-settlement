@@ -1,0 +1,13 @@
+
+> xrpl-verified-escrow-demo@0.4.0 test
+> vitest run
+
+
+ RUN  v5.0.5 /home/user/ai-settlement/xrpl-escrow
+
+
+ Test Files  12 passed (12)
+      Tests  108 passed (108)
+   Start at  03:23:44
+   Duration  590.69s (tests 100%)
+

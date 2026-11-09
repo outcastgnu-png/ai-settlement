@@ -19,11 +19,11 @@ import { sha256Hex } from "./auth.js";
 import { EXPLORER_TX, connectTestnet } from "./config.js";
 import { cancelEscrow, getEscrow, type TxResult } from "./escrow.js";
 import { HttpError, callJson } from "./http.js";
-import { DATA_DIR, ENV_FILE, ORACLE_PORT, REGISTRY_PORT, ensureLocalSecrets } from "./local-config.js";
+import { DATA_DIR, ENV_FILE, ORACLE_PORT, REGISTRY_PORT, ensureLocalSecrets, readEnvFile } from "./local-config.js";
 import type { Check } from "./demo.js";
 import { EscrowKit, escrowRef, type Job, type JobSpec } from "./sdk/index.js";
 import { startService, type Service } from "./services.js";
-import { loadOrFundWallets, xrpBalance, type Wallets } from "./wallets.js";
+import { loadOrFundAnchor, loadOrFundWallets, xrpBalance, type Wallets } from "./wallets.js";
 
 export interface Phase2Options {
   registryPort?: number;
@@ -50,13 +50,19 @@ export async function runPhase2(client: Client, wallets: Wallets, opts: Phase2Op
   const serviceEnv = {
     REGISTRY_PORT: String(registryPort), ORACLE_PORT: String(oraclePort), REGISTRY_URL: registryUrl,
     JOBS_DB: jobsDb, VAULT_FILE: resolve(dataDir, "oracle-vault.json"), VERDICT_LOG: verdictLog,
-    REPLAY_FILE: resolve(dataDir, "oracle-replay.json"),
+    REPLAY_FILE: resolve(dataDir, "oracle-replay.json"), VERDICT_CHAIN: resolve(dataDir, "verdict-log.jsonl"),
+    ANCHOR_FILE: resolve(dataDir, "verdict-anchors.jsonl"),
     ENV_FILE: resolve(opts.envFile ?? ENV_FILE),
   };
   const priceXrp = 10;
   const priceDrops = xrpToDrops(priceXrp);
   const { client: payer, provider } = wallets;
-  const kit = new EscrowKit({ xrpl: client, registryUrl, oracleUrl, statusTimeoutMs: 90_000 });
+  // The oracle's verdict address comes from the same .env the services get.
+  const env = readEnvFile(serviceEnv.ENV_FILE);
+  const kit = new EscrowKit({
+    xrpl: client, registryUrl, oracleUrl, statusTimeoutMs: 90_000,
+    oracleAddress: env.ORACLE_VERDICT_ADDRESS, anchorAddress: env.ORACLE_ANCHOR_ADDRESS,
+  });
   const checks: Check[] = [];
   const fmt = (n: number) => `${n.toFixed(6)} XRP`;
   const bal = (address: string) => xrpBalance(client, address);
@@ -185,8 +191,8 @@ export async function runPhase2(client: Client, wallets: Wallets, opts: Phase2Op
       spec: { checks: [{ type: "json-schema", schema: { type: "string", pattern: "^(a+)+$" } }] },
     }));
     check("a job schema with a regex pattern is refused", redos.startsWith("400"), redos);
-    const logLine = readFileSync(verdictLog, "utf8").trim().split("\n").reverse().find((l) => l.includes(job4.id)) ?? "";
-    check("verdict log records the evidence hash, not the content", logLine.includes(sha256Hex(injected)) && !logLine.includes("SYSTEM OVERRIDE"));
+    const logEntry = JSON.stringify((await kit.fetchVerdictLog()).filter((e) => e.kind === "verdict" && e.jobId === job4.id));
+    check("verdict log records the evidence hash, not the content", logEntry.includes(sha256Hex(injected)) && !logEntry.includes("SYSTEM OVERRIDE"));
 
     // ---- 3. Oracle restart mid-job ------------------------------------------
     scenario = "3. Oracle restart";
@@ -260,6 +266,7 @@ async function main() {
     log(`Connected to ${client.url} (testnet, network_id 1). Loading or funding wallets from the faucet...`);
     const wallets = await loadOrFundWallets(client);
     ensureLocalSecrets();
+    await loadOrFundAnchor(client);
     for (const [role, w] of Object.entries(wallets)) {
       log(`  ${role.padEnd(8)} ${w.address}  ${(await xrpBalance(client, w.address)).toFixed(6)} XRP`);
     }

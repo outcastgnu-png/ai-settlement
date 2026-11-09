@@ -2,6 +2,8 @@
 
     1. Pass and claim: the work passes the oracle's checks and the provider is paid.
     2. Fail and refund: the work fails, and after the deadline the client gets the price back.
+    3. Verdict log: the oracle's public log is fetched and checked, signatures, chain and the
+       anchor of its head that the SDK reads from the testnet ledger itself (EDR-014).
 
 Run from the xrpl-escrow-py folder, after ``npm install`` and ``npm run setup``
 in ../xrpl-escrow:
@@ -13,6 +15,7 @@ Without --start-services it uses services you started yourself with
 """
 import argparse
 import sys
+import time
 from contextlib import nullcontext
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -23,6 +26,7 @@ from .config import EXPLORER_TX, connect_testnet
 from .env import load_or_fund_wallets, xrp_balance
 from .escrow import get_escrow
 from .http import ServiceError
+from .http import call_json
 from .kit import REGISTRY_URL, ORACLE_URL, EscrowKit, escrow_ref
 from .services import ts_services
 
@@ -63,6 +67,7 @@ def run(kit: EscrowKit, xrpl, wallets, log=print) -> list[Check]:
     check("EscrowCreate -> tesSUCCESS, watcher -> funded", funded.tx.code == "tesSUCCESS" and funded.job["status"] == "funded",
           f"{funded.tx.code} {EXPLORER_TX}{funded.tx.hash}")
     res = kit.deliver(job["id"], provider, work)
+    pass_verdict = res.verdict
     check("oracle verdict is pass, signed by the pinned oracle address", res.verdict["verdict"] == "pass" and res.verdict_signature_valid,
           f"oracle {res.verdict['oracle']}")
     check("fulfillment released to the provider", res.fulfillment is not None)
@@ -100,6 +105,31 @@ def run(kit: EscrowKit, xrpl, wallets, log=print) -> list[Check]:
     back = xrp_balance(xrpl, payer.address) - client_after_create
     check("client gets the price back minus the cancel fee", 9.99 < back <= 10, f"+{back:.6f} XRP")
     log(f"  after: {balances()}")
+
+    scenario = "3. Verdict log"
+    log(f"\n{scenario}: the oracle anchors its log head on the testnet; the SDK checks the log against the ledger")
+    head = call_json("GET", f"{kit.oracle_url}/verdicts/head")
+    log(f"  log head: entry {head['seq']}, hash {head['hash']} ({head['count']} entries)")
+    result = None
+    deadline = time.monotonic() + 120
+    while time.monotonic() < deadline:
+        result = kit.verify_verdict_log(verdict=pass_verdict)
+        if result.ok and result.anchor and result.anchor["seq"] >= head["seq"]:
+            break
+        time.sleep(3)
+    assert result is not None
+    anchor = result.anchor or {}
+    check("the log head is anchored on a validated testnet ledger", anchor.get("seq") == head["seq"] and anchor.get("hash") == head["hash"],
+          f"entry {anchor.get('seq')} in ledger {anchor.get('ledgerIndex')}, {EXPLORER_TX}{anchor.get('txHash')}" if anchor else "no anchor")
+    check("Python SDK verified the log: signatures, chain, and the anchor read from the ledger", result.ok,
+          f"{result.count} entries, {result.unanchored} after the anchor" if result.ok else "; ".join(result.problems))
+    check("job 1's own signed verdict is in the log", result.verdict_entry is not None,
+          f"entry {(result.verdict_entry or {}).get('seq')}")
+    edited = kit.fetch_verdict_log()
+    target = next(i for i, e in enumerate(edited) if e.get("verdict") == "fail")
+    edited[target]["verdict"] = "pass"
+    tampered = kit.verify_verdict_log(entries=edited)
+    check("an edited copy of the log fails the check", not tampered.ok, tampered.problems[0] if tampered.problems else "")
     return checks
 
 
@@ -112,6 +142,9 @@ def main(argv: list[str] | None = None) -> int:
     env_file = Path(args.env) if args.env else Path(args.ts_kit) / ".env"
     if not env_file.exists():
         print(f"{env_file} not found: run `npm run setup` in {args.ts_kit} first", file=sys.stderr)
+        return 2
+    if "ORACLE_ANCHOR_ADDRESS" not in env_file.read_text(encoding="utf-8"):
+        print(f"{env_file} has no anchor wallet yet (new in 0.4.0): run `npm run setup` in {args.ts_kit} again", file=sys.stderr)
         return 2
 
     xrpl = connect_testnet()
@@ -128,7 +161,7 @@ def main(argv: list[str] | None = None) -> int:
             except Exception:  # noqa: BLE001
                 print(f"no oracle at {kit.oracle_url}: start the services or pass --start-services", file=sys.stderr)
                 return 2
-            print(f"oracle verdict key pinned to {kit.oracle_address}")
+            print(f"oracle verdict key pinned to {kit.oracle_address}, anchor account pinned to {kit.anchor_address}")
             checks = run(kit, xrpl, wallets)
     finally:
         xrpl.close()

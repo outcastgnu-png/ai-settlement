@@ -153,6 +153,30 @@ open and non-blocking because it reviewed `8dab15e`; they are fixed in `eb0c313`
 | N23 | fixed | `QUICKSTART.md` faucet threshold 60 XRP; `npm ci` in `docs/trial/TRIAL_SCRIPT.md` and both READMEs; N5 and N11 rows above. "UTC5" in the signature is Christopher's own wording and is left as he wrote it | — |
 | N24 | closed by Gpno (addendum) | From the repository: HEAD `8dab15e`, `git status --porcelain` empty, `8dab15e` authored by Christopher Terrell <outcastgnu@gmail.com> and touching only `edr/ACCEPTANCES.md` (5+, 1-), and `git diff a0f6e1b 8dab15e` identical to `phase3-fixes.diff`. Output in `handoff/N24-integrity.txt` | — |
 
+## Phase 4 review (2026-11-08, `VERDICT.md`, on `5986030` plus the uncommitted Phase 4 tree): FAIL
+
+Gpno's Phase 4 verdict is now `VERDICT.md`; the Phase 3 re-review it replaces is archived as
+`VERDICT-2026-10-21-phase3-8dab15e.md`. All findings are fixed in the tree handed back for
+re-review. Linux, 2026-11-09: typecheck 0 errors, `npm run test:unit` 103/103, `npm test`
+108/108 on testnet, `npm run demo:phase4` 28/28, `pytest` 36 passed and 1 skipped,
+`pytest --testnet` 37/37, Python demo 16/16 (`logs/2026-11-09-*`, `../xrpl-escrow-py/logs/2026-11-09-*`).
+The 2026-11-07 logs from the reviewed tree are removed: they were made with an anchor account
+that had already anchored several logs (N29), and the code they ran has changed.
+
+| # | Status | Where | Test that fails when the fix is reverted |
+|---|---|---|---|
+| N25 | fixed | `src/oracle/verdict-store.ts` indexes the log by job id and `issued(jobId)` returns the job's entry and, from a private sidecar `verdict-log-signed.jsonl`, its full signed verdict; `append` refuses a second verdict for a job. `src/oracle/server.ts` `/verify` answers with that verdict and never re-runs checks; a fulfillment is returned only for a pass. If the log has the job but the signed copy is gone, or the registry says `verified_*` with nothing logged (a 0.3.x job), it answers 409 and releases nothing. On start, a signed verdict the log missed (a crash between the two writes) is written into the log. A thrown ledger lookup is still a 503 with no log line | `test/finality.test.ts`: "keeps a fail after 1024 later verdicts, even once the transaction would pass", "keeps a fail across an oracle restart", "keeps a pass too, and still returns the fulfillment for it after a restart", "answers 409 … when the log has the job but the signed copy is gone", "writes a signed verdict the log missed … into the log on start", "refuses to re-verify a job that failed before the chained log existed" |
+| N26 | fixed | `src/verdict-log.ts` `entryMismatch` / `findVerdict`: an entry is a verdict's entry only if `verdict`, `checks` (type and pass, in order), `evidenceHash`, `condition`, `provider` and `issuedAt` match it as well as `verdictHash` and `jobId`. `verifyVerdictLog` / `verify_verdict_log` add a problem and set `ok` false when they differ. `VerdictStore.append` refuses to write such an entry. Same in `verdict_log.py` | `test/verdict-log.test.ts` "verifyVerdictLog fails when a signed entry's public fields disagree with the verdict it names (Gpno N26)"; vector `findCases` "public summary lies", checked by `tests/test_verdict_log.py::test_a_lying_public_summary_is_caught` |
+| N27 | fixed | `anchorProblem` / `anchor_problem` return a problem when the anchored index holds a non-object | `test/verdict-log.test.ts` "compares a log with an anchor"; vector `anchorCases` "null entry at the anchored index" |
+| N28 | fixed | `parseAnchorMemo` requires whole bytes in `MemoType` and `MemoData`, like Python | `test/verdict-log.test.ts` "writes and reads anchor memos"; vectors `memoCases` "odd-length MemoType" and "odd-length MemoData" |
+| N29 | fixed | `src/anchors.ts` `listAnchors` reads every anchor the account posted (up to 400 account transactions, `lookbackComplete` says whether it reached the start; a missing anchor still fails closed). `anchorHistoryProblems` reports every anchor whose hash is not the log's entry at that seq, every anchor beyond the log, and more than one anchored genesis; `verifyVerdictLog` fails on any of them. `startOracle` reads the same history and refuses to start when it disagrees with the log ("One anchor account anchors one log"). The anchor schedule's "already anchored" mark is seeded from the ledger, not the local anchor book, so editing the book no longer suppresses the next anchor. `npm run setup`, the README and the threat model say a fresh log needs a fresh anchor wallet; tests and the Python testnet test use a throwaway verdict key and anchor wallet | `test/verdict-log.test.ts` "verifyVerdictLog checks every anchor on the ledger, and fails on a second anchored genesis (Gpno N29)"; `test/finality.test.ts` "refuses to start when the anchor account already anchored a different log"; vectors `historyCases` |
+| N30 | fixed | With a `verdict`, `verifyVerdictLog` sets `verdictAnchored` from `entry.seq <= anchor.seq` and adds a problem ("after the newest anchor") when it is not, unless `allowUnanchored` / `allow_unanchored` is set. README, Python README and threat model say so | `test/verdict-log.test.ts` "verifyVerdictLog passes on the real log …" (tail case); `tests/test_verdict_log.py::test_verify_verdict_log_puts_it_together` |
+| N31 | open | Needs Christopher's commit approval, then a commit hash and `git diff 5986030 <hash>` for Gpno, and the Windows run on Christopher's PC with its log in `logs/` | — |
+
+Not numbered in the verdict, answered here: the anchor book suppression (see N29: the schedule's
+mark now comes from the ledger) and the local clock limitation (10 s slack against the ledger's
+close time; unchanged, stated in the threat model's clock row as a known limit of a local preview).
+
 ## Still open
 
 - The NOT DEMONSTRATED items from the first review were all run on Christopher's Windows PC on

@@ -30,7 +30,8 @@ same with `/` instead of `\` in paths, and `source .venv/bin/activate` in step 4
 `npm ci` installs exactly the versions in `package-lock.json`.
 
 `npm run setup` asks the testnet faucet for XRP for three wallets (client,
-provider, oracle) and writes their seeds and the oracle's keys to `.env`. That
+provider, oracle), plus, from 0.4.0, the oracle's anchor wallet, which puts the
+public verdict log's head on the testnet. It writes their seeds and the oracle's keys to `.env`. That
 file is gitignored and only ever holds testnet keys.
 
 ## 3. Start the three services
@@ -90,6 +91,7 @@ finished.
 | `EBADENGINE` on `npm ci` | Your Node is older than 22.12. Install the current LTS. |
 | `could not reach any testnet server` | Check your network; behind a proxy set `HTTPS_PROXY` and `NODE_USE_ENV_PROXY=1`. |
 | `ORACLE_VERDICT_SEED is missing from .env` | Run `npm run setup` in `xrpl-escrow`. |
+| `ORACLE_ANCHOR_SEED is missing from .env` | Your `.env` is from 0.3.x. Run `npm run setup` in `xrpl-escrow` once more. |
 | `no oracle at http://127.0.0.1:8802` | Start the services (step 3), or run the Python demo with `--start-services`. |
 | The faucet is slow or refuses | Wait a minute and rerun `npm run setup`; it only funds wallets below 60 XRP. |
 

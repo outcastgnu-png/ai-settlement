@@ -46,7 +46,7 @@ the ledger. Everything still runs on the testnet and listens on `127.0.0.1` only
 | Service | Address | What it does |
 |---|---|---|
 | Job registry | `http://127.0.0.1:8801` | Stores each job's spec, price, parties, condition, escrow sequence, status and timestamps in SQLite (`data/jobs.db`). It never stores the secret. |
-| Verification oracle | `http://127.0.0.1:8802` | Holds each job's secret, encrypted with AES-256-GCM under `ORACLE_VAULT_KEY` from `.env` (`data/oracle-vault.json`). Before verifying, it confirms on the ledger that the job's escrow exists with the agreed amount, provider, condition and deadline. Runs the job's checks (`sha256-match`, `json-schema`, `max-latency`), signs the verdict with its own ed25519 verdict key (`ORACLE_VERDICT_SEED`), and returns the fulfillment only on a pass and only to the job's provider. Appends every verdict to `data/verdicts.jsonl`. |
+| Verification oracle | `http://127.0.0.1:8802` | Holds each job's secret, encrypted with AES-256-GCM under `ORACLE_VAULT_KEY` from `.env` (`data/oracle-vault.json`). Before verifying, it confirms on the ledger that the job's escrow exists with the agreed amount, provider, condition and deadline. Runs the job's checks (`sha256-match`, `json-schema`, `max-latency`, `xrpl-tx-validated`), signs the verdict with its own ed25519 verdict key (`ORACLE_VERDICT_SEED`), and returns the fulfillment only on a pass and only to the job's provider. Writes every verdict to the public, hash-chained verdict log `data/verdict-log.jsonl` and anchors its head on the testnet from `ORACLE_ANCHOR_SEED` (Phase 4, below). |
 | Ledger watcher | (no port) | Subscribes to the client and provider accounts over WebSocket. A validated `EscrowCreate` marks the job `funded`, `EscrowFinish` marks it `paid`, `EscrowCancel` marks it `refunded`. It flags escrows within 30 s of `CancelAfter`, and marks a passed job nobody claimed in time `expired_unclaimed`. |
 
 Job states: `draft -> funded -> delivered -> verified_pass | verified_fail -> paid | refunded | expired_unclaimed`.
@@ -147,8 +147,10 @@ after the review fixes is
 | `POST /jobs/:id/events`, `GET /jobs/:id/events` | Status changes from the watcher (`WATCHER_SERVICE_TOKEN`) or the oracle (`ORACLE_SERVICE_TOKEN`), and the history |
 | `GET /providers/:address/reputation` | Reputation stub: passed, failed, paid, refunded and expired-unclaimed counts (a job that expired unclaimed and was then refunded counts in both) |
 
-Oracle: `GET /health` (verdict signer address and public key), `POST /jobs/:id/condition`,
-`POST /verify/:id` with `{auth}` signed by the provider.
+Oracle: `GET /health` (verdict signer address and public key, anchor account), `POST /jobs/:id/condition`,
+`POST /verify/:id` with `{auth}` signed by the provider, and the read-only verdict log:
+`GET /verdicts?from=&limit=` (a page of entries, at most 500), `GET /verdicts/head`,
+`GET /verdicts/anchors`.
 
 ## Phase 1: run the escrow demo (Windows, macOS or Linux)
 
@@ -177,7 +179,7 @@ A sample testnet run, with explorer links for every transaction, is in
 Other commands:
 
 ```
-npm test            # unit tests + Phase 1, 2 and 3 flows on testnet (about 8 minutes)
+npm test            # unit tests + Phase 1 to 4 flows on testnet (about 12 minutes)
 npm run test:unit   # unit tests only, no network needed
 npm run typecheck
 ```
@@ -202,12 +204,83 @@ A Python client with the same five calls lives in
 services. The step-by-step setup for a new developer, in either language, is
 [`../QUICKSTART.md`](../QUICKSTART.md).
 
+## Phase 4: auditable verifier (EDR-014)
+
+Anyone on the machine can now check that the oracle issued every verdict it
+claims, in order and unchanged, and a job can require that a given testnet
+transaction went through.
+
+**Public verdict log.** Every signed verdict becomes an entry in
+`data/verdict-log.jsonl`. Each entry has a sequence number, the SHA-256 of the
+entry before it, and a signature by the verdict key, so dropping, reordering or
+editing an entry breaks the chain. Entries hold hashes and outcomes only: the job
+id, condition, provider, each check's type and pass/fail, the evidence hash, and
+the hash of the full signed verdict the provider got. No deliverables, check
+details, secrets or fulfillments. The older `data/verdicts.jsonl` is kept as it
+was and no longer written; the new log's first (genesis) entry names its hash.
+An oracle whose own log does not check refuses to start.
+
+**Anchors on the testnet.** Every 10 minutes when the head has moved
+(`ANCHOR_INTERVAL_MS`), and when the oracle stops with Ctrl+C, it sends the head
+(sequence number and hash) in a memo on an `AccountSet` from a dedicated anchor
+wallet. `npm run setup` funds that wallet from the faucet and saves
+`ORACLE_ANCHOR_SEED` and the public `ORACLE_ANCHOR_ADDRESS` in `.env`. **If your
+`.env` is from 0.3.x, run `npm run setup` once more** to add it. One anchor
+wallet anchors one log: if you start over with a fresh data folder or a new
+verdict key, remove the `ORACLE_ANCHOR_*` lines and run `npm run setup` for a
+fresh anchor wallet, or the oracle refuses to start (its anchors on the ledger
+would disagree with the new log).
+
+**Checking the log.** `kit.verifyVerdictLog({ verdict })` (Python:
+`kit.verify_verdict_log(verdict=...)`) fetches the log, checks every signature
+against the pinned `ORACLE_VERDICT_ADDRESS`, checks the chain, and reads the
+newest anchor from a validated ledger itself (the latest `AccountSet` from the
+pinned `ORACLE_ANCHOR_ADDRESS`), never from the oracle. It also reads every
+older anchor from that account and fails if any of them disagrees with the log
+or if two different logs were anchored. Pass your own signed verdict to also
+check that it is in the log, with the same outcome, checks, evidence hash,
+condition, provider and time. It returns `ok`, a list of `problems`, the head,
+the anchor and how many entries came after it.
+
+With a `verdict`, `ok` means your verdict is in the log *and* pinned by an
+anchor on the ledger. A verdict newer than the newest anchor is not pinned yet
+(the oracle anchors every 10 minutes and on shutdown): `ok` is false and
+`verdictAnchored` is false. Pass `allowUnanchored: true` to accept it anyway, or
+ask again after the next anchor.
+
+**`xrpl-tx-validated` check.** The deliverable is a transaction hash (exactly 64
+hex characters, nothing else). The oracle reads it from its testnet connection
+and passes only if it is in a validated ledger, succeeded (`tesSUCCESS`), was
+validated after the job was created, and matches the spec:
+
+```json
+{ "type": "xrpl-tx-validated", "txType": "Payment", "destination": "r...", "minDrops": "1000000",
+  "account": "r... (optional)", "destinationTag": 7, "memo": "order 42 (optional)" }
+```
+
+`txType` is `Payment` or `EscrowCreate`. For a payment, `minDrops` is compared
+with what was actually delivered (`delivered_amount`), never the `Amount` field.
+A job may have at most two such checks. If the ledger lookup fails or takes more
+than 10 seconds, the oracle answers 503 and signs nothing, like a busy schema
+checker. Deliver the hash only once your transaction is validated: one that is
+not found or not yet validated fails, and a job's first verdict is final. The
+oracle answers every later verify of that job with the same signed verdict,
+also after a restart, and never releases the fulfillment after a fail.
+
+```
+npm run demo:phase4   # tx check pass/claim, tec* fail/refund, unvalidated, malformed hash,
+                      # then the log anchored on testnet and verified (about 3 minutes)
+```
+
+The run log goes to `logs/<date>-phase4.txt`; `test/phase4-flow.test.ts` runs the
+same scenarios in `npm test`.
+
 ## Safety rails
 
 - Testnet only. On connect the code reads `network_id` from the server and
   aborts unless it is `1` (testnet).
 - Wallets are funded only by the testnet faucet. No mainnet seeds are loaded.
-- Seeds, the vault key, the service tokens, the verdict key and the secret are
+- Seeds (the anchor wallet's too), the vault key, the service tokens, the verdict key and the secret are
   never printed or logged.
 - Phase 2 services bind to 127.0.0.1 only.
 - Results are read from validated ledgers only.
@@ -229,30 +302,35 @@ services. The step-by-step setup for a new developer, in either language, is
 | `src/schema-policy.ts` | Which JSON Schemas a job spec may contain |
 | `src/http.ts`, `src/auth.ts` | JSON over `node:http` on 127.0.0.1; signed requests, replay guard, service tokens, signed verdicts |
 | `src/registry/` | `db.ts` (SQLite job store, transitions, reputation) and `server.ts` (HTTP API on 8801) |
-| `src/oracle/` | `server.ts` (HTTP on 8802), `vault.ts` (AES-256-GCM secrets), `checks/` (`sha256-match`, `json-schema`, `max-latency`) |
+| `src/oracle/` | `server.ts` (HTTP on 8802), `vault.ts` (AES-256-GCM secrets), `verdict-store.ts` (the chained log file and its testnet anchors), `checks/` (`sha256-match`, `json-schema`, `max-latency`, `xrpl-tx-validated`) |
+| `src/verdict-log.ts` | Verdict log rules shared by the oracle and the SDK: entries, chain check, anchor memos |
 | `src/watcher.ts` | Ledger subscription that drives job status from validated transactions |
-| `src/sdk/index.ts` | `createJob`, `fundJob`, `deliver`, `claim`, `refund`, `verifyVerdict` |
+| `src/sdk/index.ts` | `createJob`, `fundJob`, `deliver`, `claim`, `refund`, `verifyVerdict`, `verifyVerdictLog`, `latestAnchor` |
 | `src/services.ts`, `src/setup.ts` | Start services as child processes; one-time wallet and key setup |
 | `src/demo-phase2.ts` | The four Phase 2 scenarios |
+| `src/demo-phase4.ts` | The Phase 4 scenarios: transaction check and verdict log |
 | `test/registry.test.ts`, `oracle.test.ts`, `watcher.test.ts`, `sdk.test.ts` | Phase 2 unit tests, no network needed |
 | `test/phase2-flow.test.ts` | All Phase 2 scenarios through the services on the live testnet |
 | `test/phase3-flow.test.ts` | `expired_unclaimed` then refund, and watcher reconnect, on the live testnet |
-| `test/vectors/` | `make-sdk-vectors.ts` and the `sdk-parity.json` it writes, which the Python SDK must match |
+| `test/verdict-log.test.ts`, `xrpl-tx.test.ts` | Phase 4 unit tests: tampered logs, anchors, the transaction check, no network needed |
+| `test/phase4-flow.test.ts` | All Phase 4 scenarios through the services on the live testnet |
+| `test/vectors/` | `make-sdk-vectors.ts` and `make-verdict-log-vectors.ts`, and the `sdk-parity.json` and `verdict-log.json` they write, which the Python SDK must match |
 | `test/py-harness.ts` | Throwaway registry and oracle for the Python SDK's tests |
 
 ## Not in these phases
 
-RLUSD, the AI judge, disputes and multisig, the x402 bridge, payments,
+RLUSD, the AI judge, multiple oracles, disputes and multisig, the x402 bridge, payments,
 mainnet, a UI, and any hosted or non-localhost deployment. The governing
 records are `CLAUDE.md` (Phase 1), `CLAUDE_PHASE2.md`,
-`../edr/EDR-012_ESCROW_PHASE2_ORACLE_REGISTRY.md` and
-`../edr/EDR-013_ESCROW_PHASE3_DEVELOPER_PREVIEW.md`. What the kit does not
+`../edr/EDR-012_ESCROW_PHASE2_ORACLE_REGISTRY.md`,
+`../edr/EDR-013_ESCROW_PHASE3_DEVELOPER_PREVIEW.md` and
+`../edr/EDR-014_ESCROW_PHASE4_AUDITABLE_VERIFIER.md`. What the kit does not
 protect against is in [`../docs/THREAT_MODEL.md`](../docs/THREAT_MODEL.md).
 
 ## Review
 
 Gpno is the single final reviewer for each phase (Phase 1 and 2 together, then
-Phase 3). The handoff is
+Phase 3, then Phase 4). The handoff is
 [`REVIEW_HANDOFF.md`](REVIEW_HANDOFF.md), the review brief is
 [`docs/reviews/REVIEW.md`](docs/reviews/REVIEW.md), and the verdict goes in
 [`docs/reviews/VERDICT.md`](docs/reviews/VERDICT.md).

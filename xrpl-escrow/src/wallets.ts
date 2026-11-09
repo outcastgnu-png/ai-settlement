@@ -52,3 +52,25 @@ function saveSeeds(wallets: Wallets, env: Record<string, string>, envPath: strin
   const body = Object.entries(merged).map(([k, v]) => `${k}=${v}`).join("\n");
   writeFileSync(envPath, `# Testnet-only seeds created by the demo. Never put mainnet seeds here.\n${body}\n`, { mode: 0o600 });
 }
+
+/** The anchor wallet only pays AccountSet fees (about 12 drops each), so a little above the reserve is plenty. */
+export const MIN_ANCHOR_BALANCE_XRP = 5;
+
+/**
+ * The oracle's anchor wallet (EDR-014): a dedicated faucet-funded testnet account
+ * that puts the verdict log's head on the ledger. Its seed goes in .env as
+ * ORACLE_ANCHOR_SEED and its address as ORACLE_ANCHOR_ADDRESS, which SDK users pin.
+ */
+export async function loadOrFundAnchor(client: Client, envPath = ".env"): Promise<Wallet> {
+  const current = existsSync(envPath) ? readFileSync(envPath, "utf8") : "";
+  const seed = parse(current).ORACLE_ANCHOR_SEED;
+  const wallet = seed ? Wallet.fromSeed(seed) : Wallet.generate();
+  if (!seed) {
+    const sep = current === "" || current.endsWith("\n") ? "" : "\n";
+    writeFileSync(envPath, `${current}${sep}ORACLE_ANCHOR_SEED=${wallet.seed}\nORACLE_ANCHOR_ADDRESS=${wallet.address}\n`, { mode: 0o600 });
+  }
+  if ((await xrpBalance(client, wallet.address)) < MIN_ANCHOR_BALANCE_XRP) {
+    await client.fundWallet(wallet, { faucetHost: FAUCET_HOST });
+  }
+  return wallet;
+}

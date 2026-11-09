@@ -205,3 +205,71 @@ release. Windows is run separately by Claude Code on Christopher's PC.
 
 Your Phase 3 verdict is now `VERDICT.md`; the fixes and the test for each are listed in
 `FINDINGS_RESPONSE.md`, section "Phase 3 review". Check N8, N9 and N12 first, then N13 to N17.
+
+## Phase 4 review: the auditable verifier (EDR-014)
+
+Christopher accepted EDR-014 by name on 2026-11-07 at 18:14 UTC, with you as the one final
+reviewer for Phase 4 (`edr/EDR-014_ESCROW_PHASE4_AUDITABLE_VERIFIER.md`, `edr/ACCEPTANCES.md`).
+It stays testnet only and 127.0.0.1 only. Archive the current `VERDICT.md` (the Phase 3 verdict)
+as `VERDICT-2026-10-21-phase3.md` and write the Phase 4 verdict in a fresh `VERDICT.md`.
+
+### What to read
+
+`git diff 5986030 <Phase 4 commit>`. The main pieces:
+
+| Piece | Where |
+|---|---|
+| Log rules shared by the oracle and the SDK: entries, chain check, anchor memos | `src/verdict-log.ts` |
+| The log file, anchoring on a timer and on shutdown | `src/oracle/verdict-store.ts`; wiring and the `/verdicts` routes in `src/oracle/server.ts` |
+| Anchor wallet | `src/wallets.ts` `loadOrFundAnchor`, `src/setup.ts` |
+| SDK log check (TypeScript) | `src/sdk/index.ts` `verifyVerdictLog`, `latestAnchor`, `fetchVerdictLog` |
+| SDK log check (Python) | `../xrpl-escrow-py/src/xrpl_escrow/verdict_log.py`, `kit.py` |
+| `xrpl-tx-validated` check | `src/oracle/checks/xrpl-tx.ts`; spec rules in `src/registry/server.ts` `validTxCheck` |
+| Shared vectors | `test/vectors/make-verdict-log-vectors.ts`, `test/vectors/verdict-log.json` |
+| Tests | `test/verdict-log.test.ts`, `test/xrpl-tx.test.ts`, `test/phase4-flow.test.ts`, `../xrpl-escrow-py/tests/test_verdict_log.py` |
+| Demo | `src/demo-phase4.ts` (`npm run demo:phase4`); Python demo scenario 3 |
+| Docs | `../docs/THREAT_MODEL.md` (what the log and anchors do and don't protect), `README.md` Phase 4, `../CHANGELOG.md` |
+
+### What to check
+
+| Claim | How to break it |
+|---|---|
+| Editing, removing or reordering an entry, or a wrong signature, fails the chain check in both SDKs | Edit `data/verdict-log.jsonl` by hand (any field, any entry, recompute hashes, re-sign with another key) and run `verifyVerdictLog`; the oracle must also refuse to start on it |
+| A log copy that disagrees with the ledger anchor fails | Rewrite the log with the real verdict key after an anchor (`test/verdict-log.test.ts` "rewritten log"), or truncate it below the anchored entry |
+| The SDKs read the anchor from the ledger, never from the oracle | `latestAnchor` / `latest_anchor`: only validated, `tesSUCCESS` `AccountSet`s from the pinned anchor account with an exact anchor memo for the pinned oracle |
+| Entries hold hashes and outcomes only | Look for any path where a deliverable, a check detail, a secret or a fulfillment reaches `verdict-log.jsonl` |
+| The two SDKs agree | Change `make-verdict-log-vectors.ts`, regenerate, run `pytest` |
+| `xrpl-tx-validated` passes only on a validated `tesSUCCESS` transaction that matches | Partial payments (`delivered_amount` vs `Amount`), an IOU payment, a transaction from before the job, a `tec*` result, an unvalidated one, a hash with whitespace or `0x` |
+| A failed ledger lookup never signs a verdict | Kill the oracle's connection or stall the lookup: 503, no log entry, status unchanged |
+| A job's first signed verdict is final (N25) | Verify a job whose transaction is not found, verify 1024 other jobs or restart the oracle, make the transaction valid, verify again: same fail, no fulfillment, log unchanged (`test/finality.test.ts`) |
+| An entry's public fields match the signed verdict it names (N26) | Sign an entry that names a fail verdict's hash but says pass; `verifyVerdictLog({ verdict })` must fail (vector `findCases`) |
+| Every anchor the account posted is checked, and one account anchors one log (N29) | Anchor a second genesis from the same account; the SDK check must fail and the oracle must refuse to start |
+| `ok` with a verdict means the verdict is pinned (N30) | Pass a verdict newer than the newest anchor: `ok` false, `verdictAnchored` false, unless `allowUnanchored` |
+| The threat model is accurate about the log's limits | The unanchored tail, split views between anchors, a verdict never logged, a new chain under the same key |
+
+### Expected results
+
+```
+npm ci
+npm run typecheck         # 0 errors
+npm run test:unit         # 103/103, no network
+npm run setup             # adds the anchor wallet to an older .env
+npm test                  # 108/108 (unit + Phase 1 to 4 testnet flows), about 10 minutes
+npm run demo:phase4       # 28/28
+cd ..\xrpl-escrow-py
+pip install -e .[test]
+python -m pytest          # 36 passed, 1 skipped (testnet), no network
+python -m pytest --testnet  # 37 passed
+python -m xrpl_escrow.demo --start-services   # 16/16
+```
+
+The exact counts from Claude's Linux run are in `logs/2026-11-09-phase4-*.txt` and
+`../xrpl-escrow-py/logs/2026-11-09-*.txt` (after the fixes for Gpno's first Phase 4 verdict, N25 to N30).
+
+A Windows run needs a fresh anchor wallet if the PC's `.env` already anchored another log:
+remove the `ORACLE_ANCHOR_*` lines and the `data/verdict-*` files, then `npm run setup` (N29).
+
+### Verdict
+
+Same format: PASS, PASS WITH FINDINGS or FAIL, each finding saying whether it blocks the 0.4.0
+release. Windows is run separately by Claude Code on Christopher's PC.

@@ -1,10 +1,39 @@
 # Changelog
 
-## 0.4.0 (unreleased)
+## 0.4.0 (Phase 4 auditable verifier, EDR-014; unreleased)
 
-Still testnet only.
+Still testnet only, and every service listens on 127.0.0.1 only.
+
+### Added
+- Public, hash-chained verdict log (`data/verdict-log.jsonl`). Each entry is signed by the
+  oracle's verdict key and names the hash of the one before; entries hold hashes and
+  outcomes only, never deliverables, check details, secrets or fulfillments. Read-only
+  routes on the oracle: `GET /verdicts`, `GET /verdicts/head`, `GET /verdicts/anchors`.
+- Testnet anchors: on a timer (`ANCHOR_INTERVAL_MS`, default 10 minutes) and on shutdown
+  the oracle puts the log head in a memo on an `AccountSet` from a dedicated anchor wallet
+  (`ORACLE_ANCHOR_SEED`, `ORACLE_ANCHOR_ADDRESS`, created by `npm run setup`).
+- `verifyVerdictLog()` (TypeScript) and `verify_verdict_log()` (Python): check every
+  signature against the pinned oracle address, the chain, and the newest anchor read from
+  a validated ledger; optionally that your own verdict is in the log. Both SDKs give the
+  same answers on `xrpl-escrow/test/vectors/verdict-log.json`. With a verdict, `ok` also
+  needs the entry's public fields to match it and an anchor to cover it (`allowUnanchored`
+  / `allow_unanchored` to accept the tail); every older anchor from the account is checked.
+- `xrpl-tx-validated` check: the deliverable is a testnet transaction hash; it passes when
+  the transaction is validated with `tesSUCCESS`, after the job was created, and matches
+  the spec's type, destination, minimum delivered amount and optional sender, tag or memo.
+- `npm run demo:phase4` and `test/phase4-flow.test.ts`; the Python demo now also checks
+  the verdict log.
 
 ### Changed
+- The oracle no longer appends to `data/verdicts.jsonl`; the file is kept as it was and
+  its hash is in the new log's genesis entry. Asking the oracle again about a verified job
+  returns the same signed verdict, so the log gets one entry per job and deliverable.
+- A job's first signed verdict is final: the oracle loads it from the log (and a private
+  signed copy) on start, answers later verifies with it, and never returns a fulfillment
+  after a fail (Gpno N25). It refuses to start when the anchor account's anchors on the
+  ledger disagree with its log (N29): one anchor wallet anchors one log.
+- `.env` from 0.3.x: run `npm run setup` again to add the anchor wallet; the oracle won't
+  start without it.
 - Python SDK: `create_job()` takes keyword arguments only (`client`, `provider`,
   `price_drops`, `sla_seconds`, `spec`), like the fields of the TypeScript `createJob()`.
   A positional call now raises `TypeError` instead of quietly mixing up the price and the

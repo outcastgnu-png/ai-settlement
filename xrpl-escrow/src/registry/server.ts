@@ -20,13 +20,17 @@ import { isValidClassicAddress } from "xrpl";
 import { checkBearer, checkRequest, sha256Hex } from "../auth.js";
 import { HttpError, jsonServer, listenLocal, type Route } from "../http.js";
 import { JOBS_DB, REGISTRY_PORT, readEnvFile, requireEnv } from "../local-config.js";
+import { TX_TYPES } from "../oracle/checks/xrpl-tx.js";
 import { schemaProblem } from "../schema-policy.js";
 import { JobStore, TERMINAL, canMove, type CheckSpec, type Job, type JobPatch, type JobStatus, type NewJob } from "./db.js";
 
 const FORBIDDEN_KEYS = ["secret", "fulfillment", "preimage"];
-const CHECK_TYPES = ["sha256-match", "json-schema", "max-latency"];
+const CHECK_TYPES = ["sha256-match", "json-schema", "max-latency", "xrpl-tx-validated"];
 /** Each json-schema check may hold the oracle's schema worker for up to its timeout, so a job gets a few checks, not hundreds (Gpno N9). */
 export const MAX_CHECKS = 8;
+/** Each xrpl-tx-validated check makes one ledger lookup, so a job gets at most this many (EDR-014). */
+export const MAX_TX_CHECKS = 2;
+const TX_KEYS = ["type", "txType", "destination", "minDrops", "account", "destinationTag", "memo"];
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 
 function containsForbiddenKey(value: unknown): boolean {
@@ -39,7 +43,19 @@ function validCheck(c: unknown): c is CheckSpec {
   if (!isObject(c) || !CHECK_TYPES.includes(c.type as string)) return false;
   if (c.type === "sha256-match") return typeof c.sha256 === "string" && /^[0-9a-fA-F]{64}$/.test(c.sha256);
   if (c.type === "json-schema") return isObject(c.schema) && schemaProblem(c.schema) === null;
+  if (c.type === "xrpl-tx-validated") return validTxCheck(c);
   return typeof c.maxMs === "number" && c.maxMs > 0;
+}
+
+function validTxCheck(c: Record<string, unknown>): boolean {
+  if (!Object.keys(c).every((k) => TX_KEYS.includes(k))) return false;
+  if (!(TX_TYPES as readonly unknown[]).includes(c.txType)) return false;
+  if (typeof c.destination !== "string" || !isValidClassicAddress(c.destination)) return false;
+  if (typeof c.minDrops !== "string" || !/^[1-9][0-9]{0,16}$/.test(c.minDrops)) return false;
+  if (c.account !== undefined && (typeof c.account !== "string" || !isValidClassicAddress(c.account))) return false;
+  if (c.destinationTag !== undefined && !(Number.isInteger(c.destinationTag) && (c.destinationTag as number) >= 0 && (c.destinationTag as number) <= 0xffffffff)) return false;
+  if (c.memo !== undefined && (typeof c.memo !== "string" || c.memo.length === 0 || Buffer.byteLength(c.memo) > 256)) return false;
+  return true;
 }
 
 export function parseNewJob(body: unknown): NewJob {
@@ -55,6 +71,10 @@ export function parseNewJob(body: unknown): NewJob {
   }
   if (isObject(spec) && Array.isArray(spec.checks) && spec.checks.length > MAX_CHECKS) {
     throw new HttpError(400, `spec.checks may hold at most ${MAX_CHECKS} checks`);
+  }
+  if (isObject(spec) && Array.isArray(spec.checks)
+    && spec.checks.filter((c) => isObject(c) && c.type === "xrpl-tx-validated").length > MAX_TX_CHECKS) {
+    throw new HttpError(400, `spec.checks may hold at most ${MAX_TX_CHECKS} xrpl-tx-validated checks`);
   }
   if (isObject(spec) && Array.isArray(spec.checks)) {
     for (const c of spec.checks) {

@@ -7,7 +7,7 @@ import { connectTestnet } from "../src/config.js";
 import { runPhase2 } from "../src/demo-phase2.js";
 import { ensureLocalSecrets } from "../src/local-config.js";
 import { loadOrFundWallets } from "../src/wallets.js";
-import { tempDir } from "./helpers.js";
+import { tempDir, throwawayOracleEnv } from "./helpers.js";
 
 let client: Client;
 
@@ -23,9 +23,10 @@ it("all Phase 2 scenarios pass through the local services on testnet", async () 
   const wallets = await loadOrFundWallets(client);
   ensureLocalSecrets();
   const dir = tempDir();
+  const { envFile } = await throwawayOracleEnv(client); // a new log in a temp folder gets its own anchor account
   // Separate ports and files so the test never touches a registry you started by hand.
   const checks = await runPhase2(client, wallets, {
-    registryPort: 18801, oraclePort: 18802, dataDir: dir, verdictLog: join(dir, "verdicts.jsonl"), log: () => {},
+    registryPort: 18801, oraclePort: 18802, dataDir: dir, verdictLog: join(dir, "verdicts.jsonl"), envFile, log: () => {},
   });
   const failed = checks.filter((c) => !c.ok).map((c) => `${c.scenario}: ${c.label} ${c.detail}`);
   expect(failed).toEqual([]);

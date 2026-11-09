@@ -18,7 +18,13 @@ export const REGISTRY_URL = env("REGISTRY_URL", `http://${LOCALHOST}:${REGISTRY_
 export const ORACLE_URL = env("ORACLE_URL", `http://${LOCALHOST}:${ORACLE_PORT}`);
 export const JOBS_DB = env("JOBS_DB", resolve(DATA_DIR, "jobs.db"));
 export const VAULT_FILE = env("VAULT_FILE", resolve(DATA_DIR, "oracle-vault.json"));
+/** The Phase 2/3 unchained verdict log. Kept as it is; the chained log's genesis entry names its hash. */
 export const VERDICT_LOG = env("VERDICT_LOG", resolve(DATA_DIR, "verdicts.jsonl"));
+/** The hash-chained public verdict log (EDR-014). */
+export const VERDICT_CHAIN = env("VERDICT_CHAIN", resolve(DATA_DIR, "verdict-log.jsonl"));
+export const ANCHOR_FILE = env("ANCHOR_FILE", resolve(DATA_DIR, "verdict-anchors.jsonl"));
+/** How often the oracle anchors a moved log head on the testnet. */
+export const ANCHOR_INTERVAL_MS = Number(env("ANCHOR_INTERVAL_MS", String(10 * 60_000)));
 export const REPLAY_FILE = env("REPLAY_FILE", resolve(DATA_DIR, "oracle-replay.json"));
 
 /** Values from .env, with process.env taking precedence. */

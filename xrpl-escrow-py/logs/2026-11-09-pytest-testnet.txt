@@ -1,0 +1,48 @@
+============================= test session starts ==============================
+platform linux -- Python 3.13.18, pytest-9.2.0, pluggy-1.7.0 -- /tmp/claude-0/venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/user/ai-settlement/xrpl-escrow-py
+configfile: pyproject.toml
+testpaths: tests
+plugins: anyio-4.16.0
+collecting ... collected 37 items
+
+tests/test_condition.py::test_known_vector_for_a_zero_secret PASSED      [  2%]
+tests/test_condition.py::test_matches_the_typescript_kit PASSED          [  5%]
+tests/test_condition.py::test_condition_holds_the_sha256_of_the_secret PASSED [  8%]
+tests/test_condition.py::test_rejects_secrets_that_are_not_32_bytes PASSED [ 10%]
+tests/test_condition.py::test_fresh_secret_each_time PASSED              [ 13%]
+tests/test_demo_testnet.py::test_pass_claim_and_fail_refund_on_testnet PASSED [ 16%]
+tests/test_kit_local.py::test_create_job_takes_keyword_arguments_only PASSED [ 18%]
+tests/test_kit_local.py::test_create_job_registers_a_draft_with_the_oracles_condition PASSED [ 21%]
+tests/test_kit_local.py::test_ledger_calls_need_an_xrpl_client PASSED    [ 24%]
+tests/test_kit_local.py::test_deliver_returns_a_checked_signed_pass_with_the_fulfillment PASSED [ 27%]
+tests/test_kit_local.py::test_deliver_returns_a_signed_fail_with_no_fulfillment PASSED [ 29%]
+tests/test_kit_local.py::test_does_not_trust_a_verdict_from_another_oracle_address PASSED [ 32%]
+tests/test_kit_local.py::test_deliver_is_refused_for_a_non_provider_and_before_funding PASSED [ 35%]
+tests/test_kit_local.py::test_a_python_signed_verify_request_works_once PASSED [ 37%]
+tests/test_kit_local.py::test_wait_for_status_times_out_with_the_current_status PASSED [ 40%]
+tests/test_kit_local.py::test_reports_provider_reputation PASSED         [ 43%]
+tests/test_kit_local.py::test_claim_refuses_a_fulfillment_that_does_not_open_the_jobs_condition PASSED [ 45%]
+tests/test_parity.py::test_content_hash PASSED                           [ 48%]
+tests/test_parity.py::test_signed_requests_are_byte_for_byte_the_same PASSED [ 51%]
+tests/test_parity.py::test_replay_key_matches_the_oracle PASSED          [ 54%]
+tests/test_parity.py::test_canonical_json_matches_including_non_ascii PASSED [ 56%]
+tests/test_parity.py::test_verdict_signature_matches_and_verifies PASSED [ 59%]
+tests/test_parity.py::test_verdict_from_another_address_or_tampered_is_refused PASSED [ 62%]
+tests/test_parity.py::test_canonical_json_refuses_values_javascript_would_encode_differently PASSED [ 64%]
+tests/test_parity.py::test_canonical_json_sorts_keys_like_javascript PASSED [ 67%]
+tests/test_retry.py::test_retries_a_503_with_fresh_signatures PASSED     [ 70%]
+tests/test_retry.py::test_gives_up_after_the_last_attempt_and_never_retries_other_errors PASSED [ 72%]
+tests/test_verdict_log.py::test_entry_and_verdict_hashes_match_the_typescript_kit PASSED [ 75%]
+tests/test_verdict_log.py::test_chain_checks_give_the_same_answers PASSED [ 78%]
+tests/test_verdict_log.py::test_anchor_comparison_gives_the_same_answers PASSED [ 81%]
+tests/test_verdict_log.py::test_anchor_history_gives_the_same_answers PASSED [ 83%]
+tests/test_verdict_log.py::test_a_lying_public_summary_is_caught PASSED  [ 86%]
+tests/test_verdict_log.py::test_anchor_memos_parse_the_same PASSED       [ 89%]
+tests/test_verdict_log.py::test_the_newest_usable_account_tx_row_is_the_anchor PASSED [ 91%]
+tests/test_verdict_log.py::test_a_party_finds_its_own_verdict PASSED     [ 94%]
+tests/test_verdict_log.py::test_verify_verdict_log_puts_it_together PASSED [ 97%]
+tests/test_verdict_log.py::test_against_the_typescript_oracle PASSED     [100%]
+
+======================== 37 passed in 100.70s (0:01:40) ========================
