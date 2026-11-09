@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import Database from "better-sqlite3";
+import type { TxCheckSpec } from "../oracle/checks/xrpl-tx.js";
 
 export type JobStatus =
   | "draft" | "funded" | "delivered" | "verified_pass" | "verified_fail"
@@ -15,7 +16,8 @@ export const TERMINAL: JobStatus[] = ["paid", "refunded"];
 export type CheckSpec =
   | { type: "sha256-match"; sha256: string }
   | { type: "json-schema"; schema: Record<string, unknown> }
-  | { type: "max-latency"; maxMs: number };
+  | { type: "max-latency"; maxMs: number }
+  | TxCheckSpec;
 
 export interface JobSpec {
   title?: string;

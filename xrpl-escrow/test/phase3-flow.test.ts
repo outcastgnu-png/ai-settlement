@@ -17,7 +17,8 @@ import { startRegistry } from "../src/registry/server.js";
 import { EscrowKit } from "../src/sdk/index.js";
 import { LedgerWatcher } from "../src/watcher.js";
 import { loadOrFundWallets, type Wallets } from "../src/wallets.js";
-import { TOKENS, tempDir } from "./helpers.js";
+import { TOKENS, fakeAnchor, tempDir } from "./helpers.js";
+import { ledgerTxLookup } from "../src/oracle/checks/xrpl-tx.js";
 
 let xrpl: Client; // the parties' and the oracle's connection
 let watcherClient: Client; // the watcher's own connection, so it can be cut alone
@@ -38,6 +39,8 @@ beforeAll(async () => {
     port: 0, verdictKey, vault: new SecretVault(join(dir, "vault.json"), randomBytes(32)), registryUrl: registry.url,
     verdictLog: join(dir, "verdicts.jsonl"), serviceToken: TOKENS.oracle, escrowCheck: ledgerEscrowCheck(xrpl),
     replay: new ReplayGuard(join(dir, "replay.json")),
+    verdictChain: join(dir, "verdict-log.jsonl"), anchorFile: join(dir, "anchors.jsonl"), anchorIntervalMs: 0,
+    anchorer: async (head) => ({ ...fakeAnchor(head, verdictKey.address), account: "" }), lookupTx: ledgerTxLookup(xrpl as never),
   });
   watcher = new LedgerWatcher(watcherClient, { serviceToken: TOKENS.watcher, registryUrl: registry.url, log: (l) => watcherLog.push(l) });
   await watcher.start();

@@ -6,6 +6,8 @@
 //   deliver()    provider posts the work and asks the oracle for a verdict (and, on a pass, the fulfillment)
 //   claim()      provider submits EscrowFinish with the fulfillment; resolves once the watcher marks it paid
 //   refund()     after CancelAfter, submits EscrowCancel; resolves once the watcher marks it refunded
+//   verifyVerdictLog()  fetch the oracle's public verdict log and check its chain, signatures and
+//                       latest testnet anchor (EDR-014); optionally that your own verdict is in it
 //
 // Every transaction is signed locally by the wallet that sends it.
 import type { Client, Wallet } from "xrpl";
@@ -15,9 +17,14 @@ import { HttpError, callJson } from "../http.js";
 import { ORACLE_URL, REGISTRY_URL, readEnvFile } from "../local-config.js";
 import type { Job, JobEvent, JobSpec, JobStatus } from "../registry/db.js";
 import type { SignedVerdict, VerdictBody } from "../oracle/server.js";
+import { listAnchors } from "../anchors.js";
+import { anchorHistoryProblems, checkChain, findVerdict, type Anchor, type LogEntry, type LogHead } from "../verdict-log.js";
 
 export type { Job, JobSpec, JobStatus } from "../registry/db.js";
 export type { SignedVerdict } from "../oracle/server.js";
+export type { Anchor, LogEntry, LogHead } from "../verdict-log.js";
+export { ANCHOR_MEMO_TYPE, anchorHistoryProblems, anchorProblem, checkChain, entryMismatch, findVerdict, verdictInLog } from "../verdict-log.js";
+export { listAnchors } from "../anchors.js";
 
 export interface KitOptions {
   xrpl?: Client; // needed for fundJob, claim and refund
@@ -29,6 +36,11 @@ export interface KitOptions {
    * the oracle's own /health answer.
    */
   oracleAddress?: string;
+  /**
+   * The oracle's anchor account, which puts the verdict log's head on the ledger.
+   * Defaults to ORACLE_ANCHOR_ADDRESS from .env; never taken from the oracle's /health answer.
+   */
+  anchorAddress?: string;
   /** How long to wait for the watcher to reflect a validated transaction. */
   statusTimeoutMs?: number;
 }
@@ -46,6 +58,31 @@ export interface DeliverResult {
   verdict: SignedVerdict;
   verdictSignatureValid: boolean;
   fulfillment: string | null;
+}
+
+export interface LogVerification {
+  /** True when the chain, every signature and the latest anchor check, and (if asked) your verdict is in the log. */
+  ok: boolean;
+  problems: string[];
+  count: number;
+  head: LogHead | null;
+  /** The newest anchor on a validated ledger from the pinned anchor account, or null if none was found. */
+  anchor: Anchor | null;
+  /** Entries written after the anchored one: checked for chain and signature, not yet pinned on the ledger. */
+  unanchored: number | null;
+  /** Every anchor found within the lookback, newest first. Each one must agree with the log. */
+  anchors: Anchor[];
+  /** False when the anchor account has more history than was read, so an older anchor could be missing. */
+  lookbackComplete: boolean;
+  /** When a verdict was passed in: its log entry, or null if the log doesn't have it with matching fields. */
+  verdictEntry?: LogEntry | null;
+  /** When a verdict was passed in: whether its entry is at or before the newest anchor, so pinned on the ledger. */
+  verdictAnchored?: boolean;
+}
+
+/** The newest anchor of `verdictAddress`'s log, read from the ledger itself (see `listAnchors`). */
+export async function latestAnchor(client: Client, anchorAddress: string, verdictAddress: string, maxTx = 400): Promise<Anchor | null> {
+  return (await listAnchors(client, anchorAddress, verdictAddress, maxTx)).anchors[0] ?? null;
 }
 
 /** Check a verdict's signature, and that it came from the pinned `oracleAddress`. */
@@ -67,6 +104,7 @@ export class EscrowKit {
   readonly oracleUrl: string;
   readonly #xrpl?: Client;
   readonly oracleAddress: string | null;
+  readonly anchorAddress: string | null;
   readonly #timeout: number;
 
   constructor(opts: KitOptions = {}) {
@@ -74,7 +112,9 @@ export class EscrowKit {
     this.oracleUrl = opts.oracleUrl ?? ORACLE_URL;
     this.#xrpl = opts.xrpl;
     this.#timeout = opts.statusTimeoutMs ?? 60_000;
-    this.oracleAddress = opts.oracleAddress ?? readEnvFile().ORACLE_VERDICT_ADDRESS ?? null;
+    const env = opts.oracleAddress && opts.anchorAddress ? {} : readEnvFile();
+    this.oracleAddress = opts.oracleAddress ?? env.ORACLE_VERDICT_ADDRESS ?? null;
+    this.anchorAddress = opts.anchorAddress ?? env.ORACLE_ANCHOR_ADDRESS ?? null;
   }
 
   #ledger(): Client {
@@ -97,6 +137,62 @@ export class EscrowKit {
 
   oracleInfo(): Promise<{ oracle: string; publicKey: string }> {
     return callJson("GET", `${this.oracleUrl}/health`);
+  }
+
+  /** Every entry of the oracle's public verdict log, fetched page by page. */
+  async fetchVerdictLog(): Promise<LogEntry[]> {
+    const entries: LogEntry[] = [];
+    for (;;) {
+      const page = await callJson<{ entries: LogEntry[]; count: number }>("GET", `${this.oracleUrl}/verdicts?from=${entries.length}`);
+      entries.push(...page.entries);
+      if (page.entries.length === 0 || entries.length >= page.count) return entries;
+    }
+  }
+
+  /**
+   * Fetch the public verdict log and check it: every entry is signed by the pinned
+   * oracle address, the chain is unbroken from the genesis entry, and every anchor
+   * on a validated ledger from the pinned anchor account agrees with the log (one
+   * genesis only). Pass `verdict` to also check that your own signed verdict is in
+   * the log, with every public field matching it, and at or before the newest
+   * anchor; `allowUnanchored: true` accepts it in the not-yet-anchored tail
+   * (`verdictAnchored` then says false). With `requireAnchor: false`, a log with
+   * no anchor yet is not a problem.
+   */
+  async verifyVerdictLog(opts: {
+    verdict?: SignedVerdict; requireAnchor?: boolean; allowUnanchored?: boolean; entries?: LogEntry[];
+  } = {}): Promise<LogVerification> {
+    const problems: string[] = [];
+    if (!this.oracleAddress) problems.push("no pinned oracle address (ORACLE_VERDICT_ADDRESS)");
+    const entries = opts.entries ?? await this.fetchVerdictLog();
+    const chain = checkChain(entries, this.oracleAddress ?? "");
+    if (this.oracleAddress && !chain.ok) problems.push(chain.problem!);
+    let history = { anchors: [] as Anchor[], complete: true };
+    if (!this.anchorAddress) problems.push("no pinned anchor account (ORACLE_ANCHOR_ADDRESS)");
+    else if (this.oracleAddress) {
+      history = await listAnchors(this.#ledger(), this.anchorAddress, this.oracleAddress);
+      problems.push(...anchorHistoryProblems(entries, history.anchors, this.oracleAddress));
+      if (history.anchors.length === 0 && (opts.requireAnchor ?? true)) {
+        problems.push(`no anchor from ${this.anchorAddress} found on a validated ledger`);
+      }
+    }
+    const anchor = history.anchors[0] ?? null;
+    const result: LogVerification = {
+      ok: false, problems, count: entries.length, head: chain.head, anchor,
+      unanchored: anchor ? entries.length - 1 - anchor.seq : null, anchors: history.anchors, lookbackComplete: history.complete,
+    };
+    if (opts.verdict) {
+      const found = findVerdict(entries, opts.verdict);
+      result.verdictEntry = found.entry;
+      result.verdictAnchored = !!(found.entry && anchor && found.entry.seq <= anchor.seq);
+      if (found.mismatch) problems.push(found.mismatch);
+      else if (!found.entry) problems.push(`verdict for job ${opts.verdict.jobId} is not in the log`);
+      else if (!result.verdictAnchored && !opts.allowUnanchored) {
+        problems.push(`verdict for job ${opts.verdict.jobId} is entry ${found.entry.seq}, after the newest anchor; it is not pinned on the ledger yet`);
+      }
+    }
+    result.ok = problems.length === 0;
+    return result;
   }
 
   /** Poll the registry until the job reaches one of `statuses`. */

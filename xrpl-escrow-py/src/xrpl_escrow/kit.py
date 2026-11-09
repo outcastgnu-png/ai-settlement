@@ -5,6 +5,8 @@
     deliver()     provider posts the work and asks the oracle for a verdict (and, on a pass, the fulfillment)
     claim()       provider submits EscrowFinish with the fulfillment; returns once the watcher marks it paid
     refund()      after CancelAfter, submits EscrowCancel; returns once the watcher marks it refunded
+    verify_verdict_log()  fetch the oracle's public verdict log and check its chain, signatures and
+                          latest testnet anchor (EDR-014); optionally that your own verdict is in it
 
 It talks to the registry, oracle and watcher that the TypeScript kit runs
 (``npm run registry``, ``npm run oracle``, ``npm run watcher``). Every
@@ -25,6 +27,7 @@ from .condition import condition_of_fulfillment
 from .env import read_env_file
 from .escrow import EscrowRef, TxResult, cancel_escrow, create_escrow, finish_escrow, wait_past_cancel_after
 from .http import ServiceError, call_json
+from .verdict_log import LogVerification, list_anchors, verify_verdict_log
 
 Job = dict[str, Any]
 
@@ -62,17 +65,22 @@ class EscrowKit:
         registry_url: str = REGISTRY_URL,
         oracle_url: str = ORACLE_URL,
         oracle_address: str | None = None,
+        anchor_address: str | None = None,
         env_file: str | os.PathLike[str] = ".env",
         status_timeout: float = 60,
     ) -> None:
         """``oracle_address`` pins the oracle's verdict signing address. It defaults to
         ORACLE_VERDICT_ADDRESS from ``env_file``; it is never taken from the oracle's
-        own /health answer. ``xrpl`` is needed for fund_job, claim and refund."""
+        own /health answer. ``anchor_address`` pins the account that anchors the oracle's
+        verdict log on the ledger, from ORACLE_ANCHOR_ADDRESS the same way. ``xrpl`` is
+        needed for fund_job, claim, refund and verify_verdict_log."""
         self.registry_url = registry_url.rstrip("/")
         self.oracle_url = oracle_url.rstrip("/")
         self._xrpl = xrpl
         self._timeout = status_timeout
-        self.oracle_address = oracle_address or read_env_file(env_file).get("ORACLE_VERDICT_ADDRESS")
+        env = read_env_file(env_file)
+        self.oracle_address = oracle_address or env.get("ORACLE_VERDICT_ADDRESS")
+        self.anchor_address = anchor_address or env.get("ORACLE_ANCHOR_ADDRESS")
 
     def _ledger(self) -> WebsocketClient:
         if self._xrpl is None:
@@ -93,6 +101,33 @@ class EscrowKit:
 
     def oracle_info(self) -> dict[str, Any]:
         return call_json("GET", f"{self.oracle_url}/health")
+
+    def fetch_verdict_log(self) -> list[dict[str, Any]]:
+        """Every entry of the oracle's public verdict log, fetched page by page."""
+        entries: list[dict[str, Any]] = []
+        while True:
+            page = call_json("GET", f"{self.oracle_url}/verdicts?from={len(entries)}")
+            entries.extend(page["entries"])
+            if not page["entries"] or len(entries) >= page["count"]:
+                return entries
+
+    def verify_verdict_log(
+        self, *, verdict: dict[str, Any] | None = None, require_anchor: bool = True, allow_unanchored: bool = False,
+        entries: list[dict[str, Any]] | None = None,
+    ) -> LogVerification:
+        """Fetch the public verdict log and check it: every entry is signed by the pinned oracle address,
+        the chain is unbroken from the genesis entry, and every anchor on a validated ledger from the pinned
+        anchor account agrees with the log (one genesis only). Pass ``verdict`` to also check that your own
+        signed verdict is in the log with matching fields, at or before the newest anchor
+        (``allow_unanchored=True`` accepts it in the not-yet-anchored tail). The anchors are read from the
+        ledger itself, never from the oracle."""
+        log = self.fetch_verdict_log() if entries is None else entries
+        anchors: list[dict[str, Any]] = []
+        complete = True
+        if self.anchor_address and self.oracle_address:
+            anchors, complete = list_anchors(self._ledger(), self.anchor_address, self.oracle_address)
+        return verify_verdict_log(log, self.oracle_address, anchors, anchor_address=self.anchor_address, verdict=verdict,
+                                  require_anchor=require_anchor, allow_unanchored=allow_unanchored, lookback_complete=complete)
 
     def wait_for_status(self, job_id: str, statuses: list[str], timeout: float | None = None) -> Job:
         """Poll the registry until the job reaches one of ``statuses``."""

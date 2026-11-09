@@ -11,6 +11,7 @@ same local services, which stay in TypeScript (`../xrpl-escrow`):
 | `deliver()` | The provider posts the work and asks the oracle for a signed verdict (and, on a pass, the fulfillment) |
 | `claim()` | The provider submits `EscrowFinish` with the fulfillment; returns once the job is `paid` |
 | `refund()` | After the deadline, submits `EscrowCancel`; returns once the job is `refunded` |
+| `verify_verdict_log()` | Fetches the oracle's public verdict log and checks every signature, the chain, and the newest anchor read from the testnet ledger (0.4.0, EDR-014) |
 
 The SDK signs every request and transaction locally with the wallet that sends
 it. It checks each verdict's signature against the pinned
@@ -87,6 +88,15 @@ xrpl.close()
 | `create_job()` | The job, as a plain dict |
 | `fund_job()`, `claim()`, `refund()` | A `TxOutcome` with `.tx` and `.job`, not a dict: use `out.job["status"]`, not `out.get("status")` |
 | `deliver()` | A `DeliverResult` with `.job`, `.verdict`, `.verdict_signature_valid` and `.fulfillment` |
+| `verify_verdict_log()` | A `LogVerification` with `.ok`, `.problems` (what is wrong, if anything), `.count`, `.head`, `.anchor` (the newest anchor on the ledger, or `None`), `.unanchored` (entries after it), `.anchors` (every anchor read), `.verdict_entry` and `.verdict_anchored` |
+
+`verify_verdict_log(verdict=res.verdict)` also checks that your own signed verdict is in
+the log. It needs `EscrowKit(xrpl=...)`, and pins the anchor account to
+`ORACLE_ANCHOR_ADDRESS` from `.env` (or `anchor_address=`), never to what the oracle says.
+`require_anchor=False` accepts a log that has not been anchored yet. With a verdict, `.ok`
+means your verdict is in the log with the same outcome and checks *and* pinned by an anchor;
+one newer than the newest anchor gives `.ok == False` and `.verdict_anchored == False` unless
+you pass `allow_unanchored=True`. Every older anchor from that account is checked too.
 
 Jobs are plain dicts with the registry's field names (`id`, `status`,
 `condition`, `offerSequence`, `cancelAfter` and so on).
@@ -120,7 +130,11 @@ python -m pytest --testnet    # also runs both demo scenarios on testnet (about 
 - `tests/test_kit_local.py`: the SDK against the real TypeScript registry and
   oracle with a stub ledger (`../xrpl-escrow/test/py-harness.ts`), including a
   Python-signed request that works once and whose lowercase copy is refused.
-- `tests/test_demo_testnet.py`: both scenarios on testnet, with the services on
+- `tests/test_verdict_log.py`: the verdict log checks give the same answers as the
+  TypeScript kit on the same chain, broken copies, anchor memos and ledger rows
+  (`../xrpl-escrow/test/vectors/verdict-log.json`, made by
+  `npx tsx test/vectors/make-verdict-log-vectors.ts`), and on the real oracle's log.
+- `tests/test_demo_testnet.py`: the demo scenarios on testnet, with the services on
   spare ports and throwaway data.
 
 Behind a proxy, set `HTTPS_PROXY`. The SDK never sends its calls to the local
@@ -136,5 +150,6 @@ services through a proxy.
 | `src/xrpl_escrow/escrow.py` | `create_escrow`, `finish_escrow`, `cancel_escrow`, `get_escrow`; results from validated ledgers only |
 | `src/xrpl_escrow/env.py` | `.env` reading, faucet funding |
 | `src/xrpl_escrow/kit.py` | `EscrowKit` |
+| `src/xrpl_escrow/verdict_log.py` | Verdict log checks: chain, anchors read from the ledger, `verify_verdict_log` |
 | `src/xrpl_escrow/services.py` | Starts the TypeScript services as child processes |
-| `src/xrpl_escrow/demo.py` | The two demo scenarios |
+| `src/xrpl_escrow/demo.py` | The demo scenarios: pass and claim, fail and refund, verdict log |

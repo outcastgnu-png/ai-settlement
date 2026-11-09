@@ -21,11 +21,13 @@ def ts_services(
     oracle_port: int = 8802,
     data_dir: str | os.PathLike[str] | None = None,
     env_file: str | os.PathLike[str] | None = None,
+    anchor_interval_ms: int = 5_000,
     log: Callable[[str], None] = print,
 ) -> Iterator[dict[str, str]]:
     """Run the three services from the TypeScript kit folder until the block ends.
 
-    Yields ``{"registryUrl": ..., "oracleUrl": ...}``.
+    Yields ``{"registryUrl": ..., "oracleUrl": ...}``. The oracle anchors its verdict log
+    head on the testnet ``anchor_interval_ms`` after it moves (the kit's own default is 10 minutes).
     """
     kit = Path(ts_kit).resolve()
     node = shutil.which("node")
@@ -39,6 +41,8 @@ def ts_services(
         "REGISTRY_PORT": str(registry_port), "ORACLE_PORT": str(oracle_port), "REGISTRY_URL": registry_url,
         "JOBS_DB": str(data / "jobs.db"), "VAULT_FILE": str(data / "oracle-vault.json"),
         "VERDICT_LOG": str(data / "verdicts.jsonl"), "REPLAY_FILE": str(data / "oracle-replay.json"),
+        "VERDICT_CHAIN": str(data / "verdict-log.jsonl"), "ANCHOR_FILE": str(data / "verdict-anchors.jsonl"),
+        "ANCHOR_INTERVAL_MS": str(anchor_interval_ms),
         "ENV_FILE": str(Path(env_file).resolve() if env_file else kit / ".env"),
     }
     procs: list[subprocess.Popen[str]] = []
