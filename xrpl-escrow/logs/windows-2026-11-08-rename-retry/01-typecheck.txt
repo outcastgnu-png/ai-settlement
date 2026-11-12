@@ -1,0 +1,5 @@
+
+> xrpl-verified-escrow-demo@0.4.0 typecheck
+> tsc
+
+EXIT 0

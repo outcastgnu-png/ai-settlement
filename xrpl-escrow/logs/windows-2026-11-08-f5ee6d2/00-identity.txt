@@ -1,0 +1,8 @@
+$ git rev-parse HEAD
+f5ee6d2de1a3672b1c89c947ee700a5306370e53
+$ git rev-parse HEAD^{tree}
+868c7cf6dec9381ae5a616087591dff6825b1509
+(same tree as merged main 03e0d77)
+$ git status --porcelain
+node v24.18.0 npm 11.16.0 Python 3.14.6
+Microsoft Windows [Version 10.0.26300.9711]

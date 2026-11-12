@@ -4,7 +4,8 @@
 // with its wallet key; the server checks that the public key derives to the
 // job's provider address. The oracle signs its verdicts the same way.
 import { createHash, timingSafeEqual } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { replaceFileSync } from "./fs-util.js";
 import type { IncomingHttpHeaders } from "node:http";
 import { dirname } from "node:path";
 import { deriveAddress, sign, verify } from "ripple-keypairs";
@@ -65,7 +66,7 @@ export class ReplayGuard {
       mkdirSync(dirname(this.path), { recursive: true });
       const tmp = `${this.path}.tmp`;
       writeFileSync(tmp, JSON.stringify(Object.fromEntries(this.#used)));
-      renameSync(tmp, this.path);
+      replaceFileSync(tmp, this.path);
     }
     return true;
   }

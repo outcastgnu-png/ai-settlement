@@ -1,0 +1,13 @@
+$ npm.cmd run setup
+
+> xrpl-verified-escrow-demo@0.4.0 setup
+> tsx src/setup.ts
+
+  client   rDFzDtcCJfDKxDfXxWZ5KTTZxcmRmDvA4t  100.000000 XRP
+  provider rw2Yr7c83vhTwyMSdT7zEYP6ah1NF5V1QB  100.000000 XRP
+  oracle   r4igGxuBa9wtcxdh3eKu2AcKn4Grd5ETKU  100.000000 XRP
+  anchor   raU1zQN3PxSGmYh9e14cBVSz3R7PKK9xvG  100.000000 XRP
+Wallet seeds (the anchor wallet too), the vault key, service tokens and the verdict key are in .env (testnet only, gitignored).
+The anchor wallet anchors one verdict log. An oracle with a fresh data folder or a new verdict key needs a fresh anchor wallet,
+or it refuses to start: remove ORACLE_ANCHOR_SEED and ORACLE_ANCHOR_ADDRESS from .env and run npm run setup again.
+EXIT 0

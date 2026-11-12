@@ -1,0 +1,11 @@
+$ npx.cmd vitest run test/finality.test.ts (diagnostic rerun 3)
+
+ RUN  v5.0.5 C:/dev/ai-settlement-f5ee6d2/xrpl-escrow
+
+
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+   Start at  22:10:25
+   Duration  18.19s (tests 99%, import 1%)
+
+EXIT 0
