@@ -1,0 +1,44 @@
+$ npx.cmd vitest run test/finality.test.ts (diagnostic rerun 1)
+
+ RUN  v5.0.5 C:/dev/ai-settlement-f5ee6d2/xrpl-escrow
+
+stderr | test/finality.test.ts > a job's first verdict is final > keeps a fail after 1024 later verdicts, even once the transaction would pass
+Error: EPERM: operation not permitted, rename 'C:\Users\outca\AppData\Local\Temp\escrow-test-eGcG5y\replay.json.tmp' -> 'C:\Users\outca\AppData\Local\Temp\escrow-test-eGcG5y\replay.json'
+    at renameSync (node:fs:1013:11)
+    at ReplayGuard.use (C:/dev/ai-settlement-f5ee6d2/xrpl-escrow/src/auth.ts:68:7)
+    at checkRequest (C:/dev/ai-settlement-f5ee6d2/xrpl-escrow/src/auth.ts:95:25)
+    at Object.handler (C:/dev/ai-settlement-f5ee6d2/xrpl-escrow/src/oracle/server.ts:179:9)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at Server.<anonymous> (C:/dev/ai-settlement-f5ee6d2/xrpl-escrow/src/http.ts:61:24) {
+  errno: -4048,
+  code: 'EPERM',
+  syscall: 'rename',
+  path: 'C:\\Users\\outca\\AppData\\Local\\Temp\\escrow-test-eGcG5y\\replay.json.tmp',
+  dest: 'C:\\Users\\outca\\AppData\\Local\\Temp\\escrow-test-eGcG5y\\replay.json'
+}
+
+ ❯ test/finality.test.ts (7 tests | 1 failed) 15024ms
+   ❯ a job's first verdict is final (6)
+     × keeps a fail after 1024 later verdicts, even once the transaction would pass 11135ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/finality.test.ts > a job's first verdict is final > keeps a fail after 1024 later verdicts, even once the transaction would pass
+Error: internal error
+ ❯ ClientRequest.<anonymous> src/http.ts:101:49
+     99|       const parsed = text ? JSON.parse(text) : undefined;
+    100|       const status = res.statusCode ?? 0;
+    101|       if (status < 200 || status >= 300) reject(new HttpError(status, …
+       |                                                 ^
+    102|       else resolveCall(parsed as T);
+    103|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 6 passed (7)
+   Start at  22:09:50
+   Duration  15.34s (tests 98%, import 1%)
+
+EXIT 1

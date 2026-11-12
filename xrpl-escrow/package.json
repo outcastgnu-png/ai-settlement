@@ -11,7 +11,7 @@
     "watcher": "tsx src/watcher.ts",
     "setup": "tsx src/setup.ts",
     "test": "vitest run",
-    "test:unit": "vitest run test/condition.test.ts test/registry.test.ts test/oracle.test.ts test/watcher.test.ts test/sdk.test.ts test/verdict-log.test.ts test/xrpl-tx.test.ts test/finality.test.ts",
+    "test:unit": "vitest run test/condition.test.ts test/registry.test.ts test/oracle.test.ts test/watcher.test.ts test/sdk.test.ts test/verdict-log.test.ts test/xrpl-tx.test.ts test/finality.test.ts test/fs-util.test.ts",
     "typecheck": "tsc"
   },
   "license": "Apache-2.0",

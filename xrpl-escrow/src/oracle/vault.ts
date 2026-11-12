@@ -3,7 +3,8 @@
 // associated data so a sealed secret can't be moved to another job. The file
 // survives oracle restarts; the key never touches disk outside .env.
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { replaceFileSync } from "../fs-util.js";
 import { dirname } from "node:path";
 
 interface Sealed {
@@ -51,7 +52,7 @@ export class SecretVault {
     mkdirSync(dirname(this.path), { recursive: true });
     const tmp = `${this.path}.tmp`;
     writeFileSync(tmp, JSON.stringify(file, null, 1), { mode: 0o600 });
-    renameSync(tmp, this.path);
+    replaceFileSync(tmp, this.path);
   }
 
   /** The job's secret, or null if the vault has none. Throws if the entry fails authentication. */

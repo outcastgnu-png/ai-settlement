@@ -39,6 +39,11 @@ Still testnet only, and every service listens on 127.0.0.1 only.
   A positional call now raises `TypeError` instead of quietly mixing up the price and the
   SLA. Breaking for code that called it positionally; the README example already uses names.
 
+### Fixed
+- Windows: saving the oracle's vault and replay files no longer fails now and then with `EPERM`
+  when another process briefly has the file open; the rename over the old file is retried
+  for about a second (seen in the Phase 4 Windows run).
+
 ## 0.3.1 (trial docs) - 2026-11-04
 
 Docs and packaging only; no code changes. Still testnet only.
