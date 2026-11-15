@@ -11,6 +11,7 @@ details, deliverables or secrets. Ledger data is data: only an exact anchor
 memo with exactly the expected fields is read.
 """
 import json
+import os
 import re
 from dataclasses import dataclass, field
 from typing import Any
@@ -210,17 +211,23 @@ def anchor_from_account_tx(t: dict[str, Any], anchor_address: str, oracle_addres
             "ledgerIndex": int(t.get("ledger_index") or tx.get("ledger_index") or 0), "account": anchor_address}
 
 
+DEFAULT_ANCHOR_LOOKBACK = int(os.environ.get("ANCHOR_LOOKBACK_TX", "10000"))
+"""How many of the anchor account's newest transactions are read, as in the TypeScript kit. Past it the
+read is incomplete and ``verify_verdict_log`` fails closed (Gpno N32)."""
+
+
 def list_anchors(
-    client: WebsocketClient, anchor_address: str, oracle_address: str, max_tx: int = 400,
+    client: WebsocketClient, anchor_address: str, oracle_address: str, max_tx: int = DEFAULT_ANCHOR_LOOKBACK,
 ) -> tuple[list[dict[str, Any]], bool]:
     """Every anchor for ``oracle_address`` among the anchor account's latest ``max_tx`` transactions, newest
-    first, read from validated ledgers. The flag is False when older transactions were not read."""
+    first, read from validated ledgers. The flag is False when older transactions were not read; the caller
+    must then fail closed."""
     anchors: list[dict[str, Any]] = []
     marker = None
     seen = 0
     while True:
         res = client.request(AccountTx(account=anchor_address, ledger_index_min=-1, ledger_index_max=-1,
-                                       limit=100, forward=False, marker=marker))
+                                       limit=200, forward=False, marker=marker))
         if not res.is_successful():
             raise RuntimeError(f"account_tx failed: {res.result.get('error')}")
         for t in res.result.get("transactions", []):
@@ -284,6 +291,9 @@ def verify_verdict_log(
     if not anchor_address:
         problems.append("no pinned anchor account (ORACLE_ANCHOR_ADDRESS)")
     elif oracle_address:
+        if not lookback_complete:
+            problems.append(f"{anchor_address} has more transactions than the lookback reads (max_tx); "
+                            "older anchors were not checked")
         problems.extend(anchor_history_problems(entries, anchors, oracle_address))
         if not anchors and require_anchor:
             problems.append(f"no anchor from {anchor_address} found on a validated ledger")

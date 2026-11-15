@@ -30,13 +30,18 @@ export interface Issued {
  * The chained public log plus a private file of the full signed verdicts
  * (`data/verdicts-signed.jsonl`, never served), so the first verdict for a job
  * survives a restart and is the only one ever issued for it (Gpno N25). The
- * private copy is written first; on start, a signed verdict the log is missing
- * (a crash between the two writes) is appended to the log.
+ * private copy is written first; a signed verdict the log is missing (a crash,
+ * or a public write that failed, between the two writes) is the job's verdict
+ * from then on, and is appended to the log on start or on the next ask (Gpno
+ * N33). A private copy whose fields disagree with the public entry it is linked
+ * to makes the oracle refuse to start, so it never serves or anchors a verdict
+ * the public log contradicts (Gpno N26).
  */
 export class VerdictStore {
   readonly #entries: LogEntry[] = [];
   readonly #byJob = new Map<string, Issued>();
   readonly #signed = new Map<string, SignedVerdict>(); // verdictHash -> full verdict
+  readonly #pending = new Map<string, SignedVerdict>(); // jobId -> signed verdict not yet in the public log
   readonly signedPath: string;
 
   constructor(readonly path: string, readonly key: Wallet, legacyLogPath?: string, signedPath?: string) {
@@ -65,7 +70,14 @@ export class VerdictStore {
       if (!check.ok) throw new Error(`verdict log ${path} does not check (${check.problem}); refusing to start`);
       for (const e of parsed as LogEntry[]) {
         this.#entries.push(e);
-        if (e.kind === "verdict" && !this.#byJob.has(e.jobId)) this.#byJob.set(e.jobId, { entry: e, verdict: this.#signed.get(e.verdictHash) ?? null });
+        if (e.kind !== "verdict" || this.#byJob.has(e.jobId)) continue;
+        const signed = this.#signed.get(e.verdictHash) ?? null;
+        const mismatch = signed ? entryMismatch(e, signed) : null;
+        if (mismatch) {
+          throw new Error(`verdict log entry ${e.seq} (job ${e.jobId}) does not match its signed verdict in ${this.signedPath} `
+            + `(${mismatch} differs); refusing to start rather than serve or anchor a verdict the public log contradicts`);
+        }
+        this.#byJob.set(e.jobId, { entry: e, verdict: signed });
       }
     } else {
       let legacy: { sha256: string; bytes: number } | null = null;
@@ -74,10 +86,11 @@ export class VerdictStore {
       }
       this.#write(genesisEntry(key, legacy));
     }
-    // Repair: signed verdicts whose log entry was never written.
+    // Repair: signed verdicts whose log entry was never written. The first one for a job wins.
     for (const v of this.#signed.values()) {
-      if (!this.#byJob.has(v.jobId) && v.oracle === key.address) this.#appendEntry(v);
+      if (!this.#byJob.has(v.jobId) && !this.#pending.has(v.jobId) && v.oracle === key.address) this.#pending.set(v.jobId, v);
     }
+    for (const v of [...this.#pending.values()]) this.#appendEntry(v);
   }
 
   #write(entry: LogEntry) {
@@ -91,6 +104,7 @@ export class VerdictStore {
     const mismatch = entryMismatch(entry, verdict);
     if (mismatch) throw new Error(`refusing to log an entry whose ${mismatch} differs from its verdict`);
     this.#write(entry);
+    this.#pending.delete(verdict.jobId);
     this.#byJob.set(verdict.jobId, { entry: entry as VerdictLogEntry, verdict });
     return entry;
   }
@@ -104,17 +118,26 @@ export class VerdictStore {
     return this.#entries.length;
   }
 
-  /** The verdict already issued for this job, if any. It is final. */
+  /**
+   * The verdict already issued for this job, if any. It is final. A signed verdict
+   * whose public entry failed to write is logged now (this throws if the log still
+   * can't be written); it is never replaced by a new run of the checks (Gpno N33).
+   */
   issued(jobId: string): Issued | null {
+    const pending = this.#pending.get(jobId);
+    if (pending) this.#appendEntry(pending);
     return this.#byJob.get(jobId) ?? null;
   }
 
   /** Record the first and only verdict for a job: the private full copy, then the public entry. */
   append(verdict: SignedVerdict): LogEntry {
-    if (this.#byJob.has(verdict.jobId)) throw new Error(`job ${verdict.jobId} already has a verdict; it is final`);
+    if (this.#byJob.has(verdict.jobId) || this.#pending.has(verdict.jobId)) {
+      throw new Error(`job ${verdict.jobId} already has a verdict; it is final`);
+    }
     mkdirSync(dirname(this.signedPath), { recursive: true });
     appendFileSync(this.signedPath, `${JSON.stringify(verdict)}\n`);
     this.#signed.set(verdictHash(verdict), verdict);
+    this.#pending.set(verdict.jobId, verdict); // from here on this is the job's verdict, even if the public write fails
     return this.#appendEntry(verdict);
   }
 

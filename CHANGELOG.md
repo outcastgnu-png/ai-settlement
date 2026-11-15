@@ -40,6 +40,13 @@ Still testnet only, and every service listens on 127.0.0.1 only.
   SLA. Breaking for code that called it positionally; the README example already uses names.
 
 ### Fixed
+- Gpno's second Phase 4 review: the oracle refuses to start when a signed verdict in its private
+  copy disagrees with the public entry it is linked to, and never serves one (N26); an
+  incomplete read of the anchor account's history makes `verifyVerdictLog` /
+  `verify_verdict_log` fail and the oracle refuse to start (N32; the lookback is now 10,000
+  transactions); a signed verdict whose public entry failed to write is still the job's verdict
+  and is logged on the next ask (N33); a 0.3.x `verified_pass` with nothing in the log answers 409
+  like a `verified_fail` (N36).
 - Windows: saving the oracle's vault and replay files no longer fails now and then with `EPERM`
   when another process briefly has the file open; the rename over the old file is retried
   for about a second (seen in the Phase 4 Windows run).

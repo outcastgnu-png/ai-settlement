@@ -237,7 +237,10 @@ against the pinned `ORACLE_VERDICT_ADDRESS`, checks the chain, and reads the
 newest anchor from a validated ledger itself (the latest `AccountSet` from the
 pinned `ORACLE_ANCHOR_ADDRESS`), never from the oracle. It also reads every
 older anchor from that account and fails if any of them disagrees with the log
-or if two different logs were anchored. Pass your own signed verdict to also
+or if two different logs were anchored. It reads the account's newest 10,000
+transactions (`maxTx`, or `ANCHOR_LOOKBACK_TX` for the oracle); if the account
+has more, the older anchors can't be checked and `ok` is false, and the oracle
+refuses to start until it gets a fresh anchor wallet or a larger lookback. Pass your own signed verdict to also
 check that it is in the log, with the same outcome, checks, evidence hash,
 condition, provider and time. It returns `ok`, a list of `problems`, the head,
 the anchor and how many entries came after it.

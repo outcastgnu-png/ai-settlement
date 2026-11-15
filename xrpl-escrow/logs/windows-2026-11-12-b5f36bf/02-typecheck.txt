@@ -1,0 +1,8 @@
+$ npm.cmd run typecheck
+start 2026-11-12T00:01:17-06:00
+
+> xrpl-verified-escrow-demo@0.4.0 typecheck
+> tsc
+
+EXIT 0
+elapsed 1 s

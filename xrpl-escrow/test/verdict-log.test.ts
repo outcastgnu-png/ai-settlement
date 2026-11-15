@@ -299,6 +299,33 @@ describe("oracle verdict log routes, anchoring and EscrowKit.verifyVerdictLog", 
     expect(twoChains.problems[0]).toMatch(/2 different genesis entries anchored/);
   });
 
+  it("verifyVerdictLog fails closed when the anchor account has more transactions than it reads (Gpno N32)", async () => {
+    const entries = await kit.fetchVerdictLog();
+    const anchorAccount = Wallet.generate().address;
+    const row = (i: number, memos?: unknown, type = "AccountSet") => ({
+      hash: `${String(i).padStart(4, "0")}${"EF".repeat(30)}`, ledger_index: 50_000 - i, validated: true,
+      meta: { TransactionResult: "tesSUCCESS" }, tx_json: { TransactionType: type, Account: anchorAccount, Memos: memos },
+    });
+    // Newest first: this log's genesis, 399 payments anyone could send, then a second genesis.
+    const rows = [row(0, anchorMemos({ seq: 0, hash: entries[0].hash }, local.verdictKey.address))];
+    for (let i = 1; i < 400; i++) rows.push(row(i, undefined, "Payment"));
+    rows.push(row(400, anchorMemos({ seq: 0, hash: "56".repeat(32) }, local.verdictKey.address)));
+    const paged = {
+      request: async (req: { limit: number; marker?: number }) => {
+        const from = req.marker ?? 0;
+        const transactions = rows.slice(from, from + req.limit);
+        return { result: { transactions, ...(from + req.limit < rows.length ? { marker: from + req.limit } : {}) } };
+      },
+    } as unknown as Client;
+    const kitOn = new EscrowKit({ xrpl: paged, oracleUrl: local.oracle.url, oracleAddress: local.verdictKey.address, anchorAddress: anchorAccount });
+    const capped = await kitOn.verifyVerdictLog({ maxTx: 400 });
+    expect(capped).toMatchObject({ ok: false, lookbackComplete: false });
+    expect(capped.problems.join()).toMatch(/more transactions than the lookback reads/);
+    const full = await kitOn.verifyVerdictLog();
+    expect(full).toMatchObject({ ok: false, lookbackComplete: true });
+    expect(full.problems.join()).toMatch(/2 different genesis entries anchored/);
+  });
+
   it("verifyVerdictLog fails when a signed entry's public fields disagree with the verdict it names (Gpno N26)", async () => {
     const entries = await kit.fetchVerdictLog();
     const failVerdict = jobs[1].verdict; // the "bad" delivery

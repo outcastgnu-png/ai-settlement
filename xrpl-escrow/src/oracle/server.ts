@@ -43,8 +43,8 @@ import { CheckUnavailable, runChecks, stopSchemaWorker, type CheckResult } from 
 import { ledgerTxLookup, type TxLookup } from "./checks/xrpl-tx.js";
 import { SecretVault, parseVaultKey } from "./vault.js";
 import { AnchorBook, AnchorSchedule, MAX_PAGE, VerdictStore, ledgerAnchorer, type Anchorer } from "./verdict-store.js";
-import { listAnchors } from "../anchors.js";
-import { anchorHistoryProblems, type Anchor } from "../verdict-log.js";
+import { listAnchors, type AnchorHistory } from "../anchors.js";
+import { anchorHistoryProblems, entryMismatch } from "../verdict-log.js";
 
 export interface VerdictBody {
   jobId: string;
@@ -86,7 +86,7 @@ export interface OracleOptions {
   /** Reads a transaction from the testnet, for xrpl-tx-validated. */
   lookupTx?: TxLookup;
   /** The anchors already on the ledger for this verdict key, newest first. Defaults to account_tx of the anchor account. */
-  anchorHistory?: () => Promise<Anchor[]>;
+  anchorHistory?: () => Promise<AnchorHistory>;
 }
 
 export interface OracleRoutesOptions extends OracleOptions {
@@ -196,10 +196,15 @@ export function oracleRoutes(opts: OracleRoutesOptions): Route[] {
           if (!prior.verdict) {
             throw new HttpError(409, `this job's verdict was already issued (log entry ${prior.entry.seq}: ${prior.entry.verdict}); it is final`);
           }
+          // Never serve a verdict its public entry contradicts (Gpno N26); the store also refuses to start on one.
+          const mismatch = entryMismatch(prior.entry, prior.verdict);
+          if (mismatch) throw new HttpError(409, `this job's signed verdict does not match its log entry ${prior.entry.seq} (${mismatch}); nothing is released`);
           verdict = prior.verdict;
         } else {
-          // A fail from before the chained log (0.3.x) is final too.
-          if (job.status === "verified_fail") throw new HttpError(409, "this job already failed verification; it is final");
+          // A verdict from before the chained log (0.3.x) is final too, pass or fail (Gpno N36).
+          if (job.status === "verified_fail" || job.status === "verified_pass") {
+            throw new HttpError(409, `this job was already verified (${job.status}) before the chained verdict log; it is final`);
+          }
           let run = running.get(jobId);
           if (!run) {
             run = runChecks(job.spec.checks, {
@@ -264,8 +269,15 @@ export async function startOracle(opts: Partial<OracleOptions> & { port?: number
   // Never extend a log that disagrees with what the anchor account already put on the
   // ledger, such as a second chain started from a fresh data folder (Gpno N29).
   const history = opts.anchorHistory
-    ?? (anchorWallet ? async () => (await listAnchors(ledger!, anchorWallet.address, verdictKey.address)).anchors : async () => []);
-  const onLedger = await history();
+    ?? (anchorWallet ? () => listAnchors(ledger!, anchorWallet.address, verdictKey.address) : async () => ({ anchors: [], complete: true }));
+  const { anchors: onLedger, complete } = await history();
+  // An incomplete read could hide an older, different genesis: fail closed (Gpno N32).
+  if (!complete) {
+    await ledger?.disconnect();
+    throw new Error(`refusing to start: ${anchorAddress} has more transactions than the anchor lookback reads, so older anchors `
+      + "could not be checked against the log. Use a fresh anchor wallet (remove ORACLE_ANCHOR_SEED and ORACLE_ANCHOR_ADDRESS "
+      + "from .env and run npm run setup) or raise ANCHOR_LOOKBACK_TX.");
+  }
   const conflicts = anchorHistoryProblems(store.all(), onLedger, verdictKey.address);
   if (conflicts.length > 0) {
     await ledger?.disconnect();
