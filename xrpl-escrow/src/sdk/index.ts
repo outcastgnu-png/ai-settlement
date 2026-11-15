@@ -157,10 +157,12 @@ export class EscrowKit {
    * the log, with every public field matching it, and at or before the newest
    * anchor; `allowUnanchored: true` accepts it in the not-yet-anchored tail
    * (`verdictAnchored` then says false). With `requireAnchor: false`, a log with
-   * no anchor yet is not a problem.
+   * no anchor yet is not a problem. If the anchor account has more transactions
+   * than `maxTx` (default 10,000), older anchors can't be read and `ok` is false
+   * (Gpno N32).
    */
   async verifyVerdictLog(opts: {
-    verdict?: SignedVerdict; requireAnchor?: boolean; allowUnanchored?: boolean; entries?: LogEntry[];
+    verdict?: SignedVerdict; requireAnchor?: boolean; allowUnanchored?: boolean; entries?: LogEntry[]; maxTx?: number;
   } = {}): Promise<LogVerification> {
     const problems: string[] = [];
     if (!this.oracleAddress) problems.push("no pinned oracle address (ORACLE_VERDICT_ADDRESS)");
@@ -170,7 +172,10 @@ export class EscrowKit {
     let history = { anchors: [] as Anchor[], complete: true };
     if (!this.anchorAddress) problems.push("no pinned anchor account (ORACLE_ANCHOR_ADDRESS)");
     else if (this.oracleAddress) {
-      history = await listAnchors(this.#ledger(), this.anchorAddress, this.oracleAddress);
+      history = await listAnchors(this.#ledger(), this.anchorAddress, this.oracleAddress, opts.maxTx);
+      if (!history.complete) {
+        problems.push(`${this.anchorAddress} has more transactions than the lookback reads (maxTx); older anchors were not checked`);
+      }
       problems.push(...anchorHistoryProblems(entries, history.anchors, this.oracleAddress));
       if (history.anchors.length === 0 && (opts.requireAnchor ?? true)) {
         problems.push(`no anchor from ${this.anchorAddress} found on a validated ledger`);

@@ -1,0 +1,71 @@
+$ npm.cmd run demo:phase4
+start 2026-11-15T01:33:40-06:00
+
+> xrpl-verified-escrow-demo@0.4.0 demo:phase4
+> tsx src/demo-phase4.ts
+
+npm run demo:phase4 — XRP Ledger testnet, 2026-11-15T07:33:41.226Z
+Connected to wss://s.altnet.rippletest.net:51233 (testnet, network_id 1). Loading or funding wallets from the faucet...
+  client   rDFzDtcCJfDKxDfXxWZ5KTTZxcmRmDvA4t  114.999059 XRP
+  provider rw2Yr7c83vhTwyMSdT7zEYP6ah1NF5V1QB  279.988651 XRP
+  oracle   r4igGxuBa9wtcxdh3eKu2AcKn4Grd5ETKU  105.000005 XRP
+  anchor   raU1zQN3PxSGmYh9e14cBVSz3R7PKK9xvG  99.999892 XRP
+
+Starting local services on 127.0.0.1 ...
+    | registry listening on http://127.0.0.1:8811 (db C:\dev\ai-settlement-f5ee6d2\xrpl-escrow\data\jobs.db)
+    | oracle (verdict key rHZ1TRehgeP6tD5h56gBGbLSoVh9Z9ohsB, anchor account raU1zQN3PxSGmYh9e14cBVSz3R7PKK9xvG) listening on http://127.0.0.1:8812
+    | [watcher] connected to wss://s.altnet.rippletest.net:51233 (testnet), watching jobs in http://127.0.0.1:8811
+  PASS  oracle anchors from the pinned anchor account (anchor raU1zQN3PxSGmYh9e14cBVSz3R7PKK9xvG)
+  PASS  oracle signs with the pinned verdict address (oracle rHZ1TRehgeP6tD5h56gBGbLSoVh9Z9ohsB)
+
+1. Transaction check passes: the provider pays 1 XRP to r4igGxuBa9wtcxdh3eKu2AcKn4Grd5ETKU with memo "phase4 order 1794728024042", then hands in the hash
+    | [watcher] subscribed to rDFzDtcCJfDKxDfXxWZ5KTTZxcmRmDvA4t, rw2Yr7c83vhTwyMSdT7zEYP6ah1NF5V1QB
+    | [watcher] job fbb0df39-168f-4a15-8517-31256ea44251: status funded (EscrowCreate 8EEB4E4B57D141FF69AE7FCBEB3998C88CC4AEBA7FCF3FA682110C4AEC8A2ECA)
+  PASS  EscrowCreate -> tesSUCCESS (tesSUCCESS https://testnet.xrpl.org/transactions/8EEB4E4B57D141FF69AE7FCBEB3998C88CC4AEBA7FCF3FA682110C4AEC8A2ECA)
+  PASS  watcher marked the job funded (job fbb0df39-168f-4a15-8517-31256ea44251)
+  PASS  provider's Payment -> tesSUCCESS (tesSUCCESS https://testnet.xrpl.org/transactions/132FFA8C6C3E168EB644CE0EA3B862E2ED47A37FAF3C57E5AC2738BE66353F0A)
+  PASS  oracle verdict is pass (Payment 132FFA8C6C3E168EB644CE0EA3B862E2ED47A37FAF3C57E5AC2738BE66353F0A validated with tesSUCCESS, 1000000 drops to the destination)
+  PASS  verdict is signed by the pinned oracle and covers this deliverable
+    | [watcher] job fbb0df39-168f-4a15-8517-31256ea44251: status paid (EscrowFinish 34BA8FCBD1BB66974A79BEC471E03030D9CFB7D6C27DFC0441CC2675EBDE45F2)
+  PASS  EscrowFinish with the oracle's fulfillment -> tesSUCCESS (tesSUCCESS https://testnet.xrpl.org/transactions/34BA8FCBD1BB66974A79BEC471E03030D9CFB7D6C27DFC0441CC2675EBDE45F2)
+  PASS  watcher marked the job paid
+  PASS  provider gains the price minus the finish fee (+4.999577 XRP)
+
+2. Transaction failed: the provider's payment to an unfunded account rE1paRaarxyVhJaVNbSWyHTpfsRAL8R2hs fails with tecNO_DST_INSUF_XRP
+    | [watcher] job 6ca9ff1e-c581-4df6-997a-87aa65755705: status funded (EscrowCreate 871AB68787C98B52599E05C06A78A73A236BA007F61420620CEC69777DB852AA)
+  PASS  EscrowCreate -> tesSUCCESS (tesSUCCESS https://testnet.xrpl.org/transactions/871AB68787C98B52599E05C06A78A73A236BA007F61420620CEC69777DB852AA)
+  PASS  watcher marked the job funded (job 6ca9ff1e-c581-4df6-997a-87aa65755705)
+  PASS  provider's Payment (validated, but failed) -> tecNO_DST_INSUF_XRP (tecNO_DST_INSUF_XRP https://testnet.xrpl.org/transactions/EA4F652D21F6EC0D8D217F55498D685E3008FD8D2E60978820B508919E5E0DDA)
+  PASS  oracle verdict is fail: the transaction did not succeed (transaction EA4F652D21F6EC0D8D217F55498D685E3008FD8D2E60978820B508919E5E0DDA did not succeed: tecNO_DST_INSUF_XRP)
+  PASS  no fulfillment, signed fail verdict
+
+3. Not validated yet: a transaction still in the open ledger does not count
+  PASS  check fails on a transaction that is not in a validated ledger (transaction 34C62644B56D2049140EC234CF259AF8243A0A5B54DE91A8F0BE678FC70D1C1D is not in a validated ledger, https://testnet.xrpl.org/transactions/34C62644B56D2049140EC234CF259AF8243A0A5B54DE91A8F0BE678FC70D1C1D)
+  PASS  once validated, the same transaction passes (Payment 34C62644B56D2049140EC234CF259AF8243A0A5B54DE91A8F0BE678FC70D1C1D validated with tesSUCCESS, 1 drops to the destination)
+
+4. Malformed hash: anything but exactly 64 hex characters fails without a lookup
+  PASS  check fails on "132FFA8C6C3E...53F0A\n" (deliverable is not a transaction hash (exactly 64 hex characters))
+  PASS  check fails on "2FFA8C6C3E16...353F0A" (deliverable is not a transaction hash (exactly 64 hex characters))
+  PASS  check fails on "{\"hash\":\"132...3F0A\"}" (deliverable is not a transaction hash (exactly 64 hex characters))
+
+2. Transaction failed (after the deadline)
+    | [watcher] job 6ca9ff1e-c581-4df6-997a-87aa65755705: flagged (24 s left before CancelAfter)
+    | [watcher] job 6ca9ff1e-c581-4df6-997a-87aa65755705: status refunded (EscrowCancel 69501B5132EF33DF222AC5802AE43AEC3CCFD3F751A56861A34B71C273618E78)
+  PASS  EscrowCancel after CancelAfter -> tesSUCCESS (tesSUCCESS https://testnet.xrpl.org/transactions/69501B5132EF33DF222AC5802AE43AEC3CCFD3F751A56861A34B71C273618E78)
+  PASS  watcher marked the job refunded
+
+5. Verdict log: the oracle anchors its log head on the testnet; the SDK checks the log against the ledger
+  log head: entry 10, hash 8e9a7431de253f385bd3aef8cbfd096b1415f6c5f1e945cc8780ef8ab181398a (11 entries)
+  PASS  oracle anchored the current head on the testnet (entry 10 in ledger 22339594, https://testnet.xrpl.org/transactions/D15FF0036EA1C4AE8E21A6D8401BDCC2FCABB8DD37B31AF057BA2C4A8B6F9C8C)
+  PASS  every anchor this account put on the ledger agrees with the log (11 anchor(s) read from the ledger)
+  PASS  SDK verified the log: signatures, chain, and the anchor read from the ledger (11 entries, anchored entry 10 https://testnet.xrpl.org/transactions/D15FF0036EA1C4AE8E21A6D8401BDCC2FCABB8DD37B31AF057BA2C4A8B6F9C8C, 0 after it)
+  PASS  job 1's own signed verdict is in the log (entry 9)
+  PASS  an edited copy of the log fails the check (entry 10: signature does not verify)
+  PASS  a copy missing the anchored entry fails the check (the anchor covers entry 10, but the log has only 10 entries)
+
+28/28 checks passed.
+
+Run log saved to C:\dev\ai-settlement-f5ee6d2\xrpl-escrow\logs\2026-11-15-phase4-2.txt
+Transaction JSON saved to C:\dev\ai-settlement-f5ee6d2\xrpl-escrow\logs\2026-11-15-phase4-2-txs.json
+EXIT 0
+elapsed 94 s

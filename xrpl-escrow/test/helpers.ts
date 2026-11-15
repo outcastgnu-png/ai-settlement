@@ -33,6 +33,8 @@ export async function startLocal() {
   const anchored: LogHead[] = [];
   // What the stand-in ledger holds, newest first; tests can add conflicting anchors to it.
   const onLedger: Anchor[] = [];
+  // Whether the stand-in ledger read reached the anchor account's first transaction.
+  const lookback = { complete: true };
   const anchorer: Anchorer = async (head) => {
     anchored.push(head);
     const anchor = { ...fakeAnchor(head, verdictKey.address), account: anchorWallet.address };
@@ -56,11 +58,11 @@ export async function startLocal() {
     port: 0, verdictKey, vault: new SecretVault(vaultFile, vaultKey), registryUrl: registry.url, verdictLog,
     serviceToken: TOKENS.oracle, escrowCheck, replay: new ReplayGuard(replayFile),
     verdictChain, anchorFile, anchorer, anchorAddress: anchorWallet.address, anchorIntervalMs: 0, lookupTx,
-    anchorHistory: async () => [...onLedger],
+    anchorHistory: async () => ({ anchors: [...onLedger], complete: lookback.complete }),
   });
   let oracle = await launchOracle();
   return {
-    dir, registry, verdictKey, vaultFile, vaultKey, verdictLog, verdictChain, anchorFile, anchored, onLedger, txs, ledger, launchOracle,
+    dir, registry, verdictKey, vaultFile, vaultKey, verdictLog, verdictChain, anchorFile, anchored, onLedger, lookback, txs, ledger, launchOracle,
     get oracle() {
       return oracle;
     },

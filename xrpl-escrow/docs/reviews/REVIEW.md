@@ -252,19 +252,19 @@ as `VERDICT-2026-10-21-phase3.md` and write the Phase 4 verdict in a fresh `VERD
 ```
 npm ci
 npm run typecheck         # 0 errors
-npm run test:unit         # 103/103, no network
+npm run test:unit         # 112/112, no network
 npm run setup             # adds the anchor wallet to an older .env
-npm test                  # 108/108 (unit + Phase 1 to 4 testnet flows), about 10 minutes
+npm test                  # 117/117 (unit + Phase 1 to 4 testnet flows), about 10 minutes
 npm run demo:phase4       # 28/28
 cd ..\xrpl-escrow-py
 pip install -e .[test]
-python -m pytest          # 36 passed, 1 skipped (testnet), no network
-python -m pytest --testnet  # 37 passed
+python -m pytest          # 38 passed, 1 skipped (testnet), no network
+python -m pytest --testnet  # 39 passed
 python -m xrpl_escrow.demo --start-services   # 16/16
 ```
 
-The exact counts from Claude's Linux run are in `logs/2026-11-09-phase4-*.txt` and
-`../xrpl-escrow-py/logs/2026-11-09-*.txt` (after the fixes for Gpno's first Phase 4 verdict, N25 to N30).
+The exact counts from Claude's Linux run are in `logs/2026-11-15-phase4-*.txt` and
+`../xrpl-escrow-py/logs/2026-11-15-*.txt` (after the fixes for Gpno's second Phase 4 verdict, N26, N32, N33, N36).
 
 A Windows run needs a fresh anchor wallet if the PC's `.env` already anchored another log:
 remove the `ORACLE_ANCHOR_*` lines and the `data/verdict-*` files, then `npm run setup` (N29).

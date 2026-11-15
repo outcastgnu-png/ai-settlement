@@ -96,7 +96,8 @@ the log. It needs `EscrowKit(xrpl=...)`, and pins the anchor account to
 `require_anchor=False` accepts a log that has not been anchored yet. With a verdict, `.ok`
 means your verdict is in the log with the same outcome and checks *and* pinned by an anchor;
 one newer than the newest anchor gives `.ok == False` and `.verdict_anchored == False` unless
-you pass `allow_unanchored=True`. Every older anchor from that account is checked too.
+you pass `allow_unanchored=True`. Every older anchor from that account is checked too, among its newest 10,000 transactions
+(`max_tx=`); if it has more, `.ok` is False.
 
 Jobs are plain dicts with the registry's field names (`id`, `status`,
 `condition`, `offerSequence`, `cancelAfter` and so on).

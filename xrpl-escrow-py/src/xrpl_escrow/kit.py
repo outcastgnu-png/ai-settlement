@@ -113,19 +113,21 @@ class EscrowKit:
 
     def verify_verdict_log(
         self, *, verdict: dict[str, Any] | None = None, require_anchor: bool = True, allow_unanchored: bool = False,
-        entries: list[dict[str, Any]] | None = None,
+        entries: list[dict[str, Any]] | None = None, max_tx: int | None = None,
     ) -> LogVerification:
         """Fetch the public verdict log and check it: every entry is signed by the pinned oracle address,
         the chain is unbroken from the genesis entry, and every anchor on a validated ledger from the pinned
         anchor account agrees with the log (one genesis only). Pass ``verdict`` to also check that your own
         signed verdict is in the log with matching fields, at or before the newest anchor
         (``allow_unanchored=True`` accepts it in the not-yet-anchored tail). The anchors are read from the
-        ledger itself, never from the oracle."""
+        ledger itself, never from the oracle. If the anchor account has more than ``max_tx`` transactions
+        (default 10,000), older anchors can't be read and ``ok`` is False (Gpno N32)."""
         log = self.fetch_verdict_log() if entries is None else entries
         anchors: list[dict[str, Any]] = []
         complete = True
         if self.anchor_address and self.oracle_address:
-            anchors, complete = list_anchors(self._ledger(), self.anchor_address, self.oracle_address)
+            anchors, complete = list_anchors(self._ledger(), self.anchor_address, self.oracle_address,
+                                             *([max_tx] if max_tx is not None else []))
         return verify_verdict_log(log, self.oracle_address, anchors, anchor_address=self.anchor_address, verdict=verdict,
                                   require_anchor=require_anchor, allow_unanchored=allow_unanchored, lookback_complete=complete)
 

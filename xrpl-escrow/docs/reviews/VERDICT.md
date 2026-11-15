@@ -1,198 +1,248 @@
-# Verdict: ESCROW-001 Phase 4 (EDR-014, auditable verifier)
+# Verdict: ESCROW-001 Phase 4 re-review, round r4 (EDR-014)
 
 **Reviewer:** Gpno (sole final reviewer named in EDR-014)
 **For:** Christopher Terrell
-**Date:** 2026-11-08 (Central Standard Time)
-**Verdict:** FAIL
+**Date:** 2026-11-15, 1:17 AM CST (2026-11-15 07:17 UTC)
+**Verdict:** PASS WITH FINDINGS
 
-This review is of the supplied uncommitted diff against base `5986030831720f144ff9849c48f25020973dc9f2` (`5986030`). There is no Phase 4 commit hash. `e80f884` is not in this clone and was not treated as the target. The Phase 3 verdict is historical context only and is not a Phase 4 approval.
+This review is of the uncommitted tree produced by applying the attached 44-file diff to `6cf7d44`. No branch was created. Nothing was committed. No file in the repository checkout was modified.
 
-0.4.0 must not be tagged on this tree. N25 and N26 break the two properties this phase adds: a transaction check that fails for good, and a public log that cannot show a different outcome from the signed verdict. N31 also blocks a tag: there is no commit to tag, and the Windows run EDR-014 requires has not been done.
+The previous blocking holes are closed for the attacks that failed the 2026-11-14 review. N26's original public-fail / private-pass pair now refuses startup and does not anchor. N32 fails closed when the lookback is incomplete, and the oracle does not anchor in that case. N33 keeps the signed fail when the public write throws. N36 returns 409 for a 0.3.x `verified_pass`. One narrower hole remains (N37): a later entry for a job that already has a matching entry is not compared, so a mismatched head can still be anchored. It does not block 0.4.0. N31 stays open and blocks only the tag.
 
 ## Inputs
 
 | Item | Value |
 |---|---|
-| Base reviewed | `5986030831720f144ff9849c48f25020973dc9f2` (main). Workspace was clean. No branch was created. |
-| Larger diff | SHA-256 `5d50eadedd4b42ca3ebbfdd493013b2650766ac50f3045151f28c19b7eefc8ab` (5515 lines, 42 files) |
-| Smaller diff | SHA-256 `affeab30571fb7f298751909381a45f5248eebda060d2fe987b5208aef10b81e` (4633 lines, 36 files) |
-| Diff comparison | All 36 files present in both diffs are byte-identical. The larger diff only adds six log files: `xrpl-escrow/logs/2026-11-07-phase4.txt`, `2026-11-07-phase4-npm-test.txt`, `2026-11-07-phase4-test-unit.txt`, `2026-11-07-phase4-txs.json`, and `xrpl-escrow-py/logs/2026-11-07-pytest-testnet.txt`, `2026-11-07-python-demo.txt`. No source ambiguity. |
-| Governing EDR | `edr/EDR-014_ESCROW_PHASE4_AUDITABLE_VERIFIER.md` and `edr/ACCEPTANCES.md` at the base. Status Accepted. Christopher, 2026-11-07 12:14 PM CST (18:14 UTC). Reviewer Gpno. Scope "Auditable verifier (as drafted)". |
-| Handoff | Says the work is not committed, and also says "push of e80f884" is not done. Those statements conflict. The review target is the diff, not that hash. `claude/project-thread-c278tc` is not a remote branch tip from this clone. |
-| How the tree was built | `git archive 5986030` into `/tmp/escrow-phase4-review` (no `.git`, no branch), then `git apply` of the larger diff. One apply warning: a new blank line at EOF. Not a source difference. |
+| Base | `6cf7d4455919fbfac6cf19f0c3223f07d2323bbf` (current main). Same `xrpl-escrow/src` and `xrpl-escrow-py/src` as `b5f36bf` (`git diff` of those directories is empty). |
+| Authoritative diff | `phase4-r4-since-6cf7d44.diff`, SHA-256 `2d2c0e48d1008d71c7cd296cc8b2dcbca6fadedf8fb58eab91d333de3de4488e`, 12,058 lines, 44 files. The other two diffs named in the brief were not in this environment and were not reviewed. |
+| Apply | `git archive 6cf7d44` into `/tmp/phase4-r4`, then `git apply --check --whitespace=nowarn` and `git apply --whitespace=nowarn`. Both exited 0. No reject. |
+| Resulting tree | `b7030cd12e6208b47c5d0c3ce457e45c21df6488`, from `git add -A` and `git write-tree` in a scratch repo under `/tmp/phase4-r4`. `git rev-parse HEAD` failed. There is no commit. A second `git write-tree` after `npm ci` returned the same hash; `node_modules` was not in the index. |
+| Source vs `b5f36bf` | Under `xrpl-escrow/src` and `xrpl-escrow-py/src`, the only files that differ are the six this diff changes: `anchors.ts`, `oracle/server.ts`, `oracle/verdict-store.ts`, `sdk/index.ts`, `kit.py`, `verdict_log.py`. Because those directories are identical on `6cf7d44` and `b5f36bf`, that difference is exactly this diff. |
+| Prior verdict in the tree | `xrpl-escrow/docs/reviews/VERDICT.md` SHA-256 `6e6135f219b069274c4a995df676c050aee5a4ffb0b05c8673478b62d433da9c`, matching the brief's `6e6135f2…da9c`. |
+| Tags | Still no `v0.4.0`. |
 
 ## What was run, and what was only claimed
 
-Independently run in the isolated Linux review environment, Node v22.23.4, npm 11.21.1 for `npm ci`, Python 3.12.3. Services in the local repro bound to `127.0.0.1`. No testnet transaction was submitted. No seeds, fulfillments, or preimages were printed.
+Run on the applied tree. Node v22.23.4, npm 10.9.9, Python 3.12.3, pytest 9.2.0. Services bound to `127.0.0.1`. No testnet transaction was submitted. No seed, fulfillment, or preimage was printed.
 
 | Step | Result | Status |
 |---|---|---|
 | `npx tsc --noEmit` | 0 errors | Reproduced |
-| `vitest` unit files named in `package.json` `test:unit` | 7 files, **94/94** | Reproduced. Matches the claimed Linux unit log. |
-| `python -m pytest` (no `--testnet`) | **34 passed, 1 skipped** | Reproduced. Matches the claimed offline count. |
-| `npm test` (98/98, includes testnet flows) | — | **Not run.** Would submit testnet transactions. The supplied log is claimed evidence only. |
-| `npm run demo:phase4` (27/27) | — | **Not run.** Claimed log only. The public transaction hashes in that log were re-fetched read-only; see below. |
-| `pytest --testnet` (35) and Python demo (16/16) | — | **Not run.** Claimed logs only. |
-| Windows | — | **Not done**, by the handoff and by the absence of a Windows log in either diff. |
-| Read-only testnet | `network_id=1` on `wss://s.altnet.rippletest.net:51233` | Reproduced for lookups only. |
+| `npm run test:unit` | 9 files, **112/112** | Reproduced. Matches the claim |
+| `python -m pytest` (no `--testnet`) | **38 passed, 1 skipped** | Reproduced. Matches the claim |
+| Reviewer bypass script | `phase4-r4-repro/bypass-output.json` | Reproduced |
+| `npm test` 117/117, `demo:phase4` 28/28, `pytest --testnet` 39, Python demo 16/16 | — | **Claimed only**, in the 2026-11-15 logs inside the diff. Not run here |
+| Windows on this tree | — | **Not run.** The log in the tree is the earlier `b5f36bf` run |
 
-Read-only confirmation of the supplied demo transactions (not a re-run of the demo):
-
-- `BD6866AA…61DEF` is a validated `tesSUCCESS` Payment. `meta.delivered_amount` is `"1000000"`. API v2 has `DeliverMax` and no `Amount`. Partial-payment flag is clear.
-- `41F7DFE0…F6E8` is a validated Payment with `tecNO_DST_INSUF_XRP` and `delivered_amount` null.
-- `7B8039EE…0EF9` is a validated `tesSUCCESS` AccountSet. It is the demo's anchor (ledger 22144195, seq 2, hash `884f09f5…80f5`). It is still on the ledger.
-- `latestAnchor` against the demo anchor account and verdict address does **not** return that anchor. It returns a later seq-2 anchor with a different hash. Fifteen anchor memos from that account are listed in `phase4-repro/anchors-readonly.txt`. Five different seq-0 hashes are on the ledger. See N29.
+The record named `n32-401` inside `bypass-output.json` is a bad harness: the memo's oracle address was not the address passed to the kit, so both calls reported "no anchor". It is not evidence about the product. The 401-transaction behavior below comes from `listAnchors` in `n32-maxTx-values`, from `floodCases` in `test/vectors/verdict-log.json`, and from the unit test that passed in the 112.
 
 ## Checklist
 
 | Claim | Result |
 |---|---|
-| Edit, remove, reorder, or a wrong key fails `checkChain` / `check_chain`, and a broken file refuses startup | **Holds** for a broken chain and for a different key. Covered by `test/verdict-log.test.ts` (passed in the 94) and by `tests/test_verdict_log.py` (passed). `VerdictStore` re-reads the file and throws unless `checkChain` passes (`src/oracle/verdict-store.ts` 26–35). A same-key fork that still links is a different question; the oracle will start on it and can anchor it (N29). |
-| A copy that disagrees with the anchor fails | **Holds for the newest anchor.** Truncation below the anchored sequence fails. A rewritten suffix at the anchored index fails. Tested in the unit file. Older anchors are not compared (N29). |
-| SDKs read the anchor from the ledger, not from the oracle | **Holds.** `latestAnchor` / `latest_anchor` use `account_tx`. `verifyVerdictLog` does not read `GET /verdicts/anchors`. That route serves the local book, which the comment correctly calls a convenience (`verdict-store.ts` 89). Pins come from `ORACLE_VERDICT_ADDRESS` and `ORACLE_ANCHOR_ADDRESS`, not from `/health` (`sdk/index.ts` 32–42, 132–134). I called `latestAnchor` on testnet and got a real AccountSet memo. |
-| Entries hold hashes and outcomes only | **Holds for the writer.** `verdictEntry` keeps check type and pass/fail and drops `detail` (`verdict-log.ts` 102–109). A local job whose deliverable was `PRIVACY-TOKEN-deliverable-9f3c` did not put that string or the fulfillment in `verdict-log.jsonl`. The check type name is stored, which is intended. The public summary can still disagree with the hashed verdict (N26). |
-| The two SDKs agree | **Holds on the shared vectors** (pytest). U+2028 canonical form is the same 16-byte string on Node 22.23.4 and Python 3.12.3 (raw U+2028, not a `\u2028` escape). **Does not hold** for an odd-length `MemoType` (N28). |
-| `xrpl-tx-validated` passes only on a validated `tesSUCCESS` transaction with the stated fields, using `delivered_amount` for payments | **Holds as a predicate.** Partial payment: delivered `"1"` against a 5 XRP `Amount` fails; a tiny `Amount` with delivered `"1000000"` passes, so `Amount` / `DeliverMax` is not what is counted (`xrpl-tx.ts` 87–89). IOU object fails the drop-string test. `tec*`, `validated: false`, null close time, and a non-64-hex deliverable (`0x`, whitespace, JSON) fail. Registry rejects a bad spec and a third tx check (`registry/server.ts` 50–58, `MAX_TX_CHECKS = 2`). `createdAt` is set by the registry (`db.ts` 159–161), not by the client. The 10 s slack is implemented and the unit test allows a close 5 s before `createdAt`. I did not submit a partial payment. The live demo payments are full payments; their shape matches the field the code reads. The fail is not final (N25). |
-| A failed ledger lookup signs nothing | **Holds for a thrown lookup.** `txnNotFound` and a timeout/`noNetwork` were classified separately: not-found becomes `{found:false}` and is a signed fail (the unit test requires that); a thrown error becomes `CheckUnavailable`, HTTP 503, no log line, status left at `delivered` (unit test plus this review's probe). Persistence and the later race do not hold (N25). |
-| Pagination, startup, shutdown | **Mostly holds.** `from=-1` and `limit=1e2` return 400 (`server.ts` 141–145). `limit` is capped at 500. Startup refuses non-JSON and a broken chain. Shutdown calls `AnchorSchedule.stop`, which anchors again (`server.ts` 273–279, 286–291). The anchor book is not checked against the ledger, so a local edit can suppress the next publish until the head moves (`verdict-store.ts` 145–149). Readers still use the ledger. |
-| Threat model | **Does not hold on two sentences** it adds. "it just can't … show it differently" (`docs/THREAT_MODEL.md` 72) is N26. "A transaction still unvalidated when verified fails for good, since a job's verdict is final" (line 74) is N25. The unanchored tail, split views between readers, a verdict never logged, a new chain, a lying testnet server, and local-only scope are stated and match the code. The new-chain row understates how easily honest re-runs do it (N29). |
-| Own verdict inclusion | Inclusion is by `verdictHash` plus `jobId` only. It returns the entry even when the public `verdict` field is the opposite (N26), and `ok` is true when that entry sits past the anchor (N30). |
+| N26 original pair refuses startup, does not anchor, and is not served | **Holds.** Startup throws, and the anchor callback count stays 0. A checks flip and an `issuedAt` shift also refuse. Editing either file while the process is up does not change the verdict the process serves or the head it will anchor; the next start then refuses. |
+| N32 incomplete read | **Holds** for `verifyVerdictLog` / `verify_verdict_log` and for startup. A 400-transaction cap over a 401-row history returns `complete: false` and only the newest genesis. At 10,000, or at the default, both geneses are read. |
+| N33 signed line sticks | **Holds** for a directory in place of the log and for mode `0444`. The lookup runs once. Later verifies return the same fail and no fulfillment, including after restart. |
+| N36 `verified_pass` | **Holds.** HTTP 409, nothing logged. |
+| N25, N27, N28, N29, N30, and the earlier holds | **Hold** on the checks below. |
+| Threat model | The N32 sentence is now true, including the payment flood. The N26 sentence is true for the first entry of a job and too broad for a later entry (N37). |
 
 ## Findings
 
-### N25 — A signed fail is not final, and a later pass releases the fulfillment
+### N25 — A signed fail is not final
 
-**Severity:** High
-**Blocks 0.4.0 release:** Yes
-
-**Where:** `xrpl-escrow/src/oracle/server.ts` 107–108, 115, 181–183, 194–223, 228–234. `xrpl-escrow/src/oracle/checks/xrpl-tx.ts` 78–82. `docs/THREAT_MODEL.md` 74. The log is not consulted on a cache miss (`verdict-store.ts` has `append` and no lookup by job).
-
-**What the code does:** The signed verdict is remembered only in a process-local map of 1024 entries. `POST /verify/:jobId` still accepts `verified_fail` and `verified_pass`. On a miss it runs the checks again, appends a new signed entry, and, on a pass, returns `toFulfillment(secret)`. The registry status is updated only while the job is still `delivered`, so it stays `verified_fail`. `xrpl-tx-validated` turns "not found" and "not validated" into a signed fail, not a 503. Those outcomes change if the same hash is looked up later.
-
-**Repro (local, no testnet write):** `phase4-repro/repro.ts`, output in `phase4-repro/repro-output.txt`.
-
-1. Deliver a 64-hex hash. Lookup returns not found. Result: `verdict=fail`, no fulfillment, status `verified_fail`, one log entry.
-2. Verify 1024 other funded jobs (12.5 s, escrow double held open). The victim's map entry is evicted.
-3. Point the same hash at a validated `tesSUCCESS` payment whose `delivered_amount` meets `minDrops` and whose close time is after `createdAt`. Verify again.
-4. Result: `verdict=pass`, fulfillment present, status still `verified_fail`, signatures differ, log entries for that job are `fail,pass`, `checkChain` is ok. The fulfillment string is not in the log file.
-5. Separate job, unvalidated lookup, then `restartOracle()`, then a validated lookup. Same result: fail, then pass with a fulfillment, status stays `verified_fail`, log grew by one.
-
-The escrow double returns "open", which is what `ledgerEscrowCheck` (`server.ts` 92–104) returns while the escrow object is still on the ledger. A `verified_fail` does not finish or cancel it. I did not submit `EscrowFinish`. The value returned is the fulfillment that `finishEscrow` submits.
-
-**Impact:** The provider can take the XRP after the oracle has signed a fail and the registry shows `verified_fail`. The client who believed the new threat-model sentence and waited out `CancelAfter` loses the race if the provider repeats verify after a restart or after 1024 other verdicts. Restart is enough on its own; the operator does not have to be malicious. Both verdicts stay in the chain, so the log shows the contradiction and does not hide it. The secret is still released. A thrown lookup (timeout, disconnect) is still a 503 with no verdict; this finding is the signed not-found / unvalidated / fail path, not the 503 path.
-
-**Resolution:** Make the first signed verdict for a job id sticky. On startup, load it from the log. On a later verify, return that verdict and do not run checks again. Do not return a fulfillment if the stored verdict is fail. Add two tests: fill 1024 later jobs, and restart the process. Both must keep the original fail, omit the fulfillment, and leave the log length unchanged. Keep 503, with no log line, for thrown lookups.
-
-### N26 — The public log can say pass while the signed verdict says fail, and the SDK returns ok
-
-**Severity:** Medium
-**Blocks 0.4.0 release:** Yes
-
-**Where:** `xrpl-escrow/src/verdict-log.ts` 162–164 (`verdictInLog` matches `verdictHash` and `jobId` only). `xrpl-escrow/src/sdk/index.ts` 197–201 (inclusion does not compare fields and does not change `ok` when the summary disagrees). `xrpl-escrow-py/src/xrpl_escrow/verdict_log.py` 107–112 and 231–234. Writer at `verdict-log.ts` 102–109 copies `verdict` and `checks` separately from `verdictHash`. `docs/THREAT_MODEL.md` 72.
-
-**Repro:** same script, line `summary-lie`. A verdict key signed an entry whose `verdict` is `pass` and whose `checks[0].pass` is true, while `verdictHash` is the hash of a fail verdict for that `jobId`. `checkChain` returned ok. `verdictInLog` returned seq 1. `EscrowKit.verifyVerdictLog` against a ledger whose newest anchor is that entry returned `sdkOk=true` and `problems=none`. The holder's verdict is `fail`. The public field is `pass`.
-
-**Impact:** This is the operator the log is meant to constrain. The entry is signed, so the contradiction is inside a signature, but the check a holder is told to run does not notice it. Anchoring does not fix it: the anchor commits to the entry hash, and that hash covers both the lie and the `verdictHash`. Anyone who only reads the log sees the summary. Anyone who only checks `ok` and a non-null `verdictEntry` is told their verdict is logged.
-
-**Resolution:** `verdictInLog` / `verdict_in_log` must require `verdict`, `checks` (type and pass), `evidenceHash`, `condition`, `provider`, and `issuedAt` to match the signed verdict. `verifyVerdictLog` must add a problem and set `ok` false when they do not. Reject an append that fails the same check. Add the lying entry above as a vector in `test/vectors/verdict-log.json` so both SDKs fail it.
-
-### N27 — A null entry makes the verifier throw instead of returning a failed check
-
-**Severity:** Low
+**Status:** Closed
 **Blocks 0.4.0 release:** No
 
-**Where:** `xrpl-escrow/src/verdict-log.ts` 154–158. `anchorProblem` reads `entries[anchor.seq].hash` after the length check. `checkChain` already rejects a null entry, but `verifyVerdictLog` still calls `anchorProblem` (`sdk/index.ts` 186–188). Python `anchor_problem` (`verdict_log.py` 100–102) raises `AttributeError` on a non-dict the same way.
+The 1024-eviction test is inside the 112. A separate restart, with the hash then made into a validated payment, kept the same fail and released nothing (`n25-restart`). A 0.3.x `verified_fail` is still 409.
 
-**Repro:** `anchorProblem([null], {v:1, seq:0, hash: <64 hex>, oracle}, oracle)` threw `TypeError: Cannot read properties of null (reading 'hash')`.
+### N26 — The public log can disagree with the verdict the oracle serves
 
-**Impact:** A served or hand-copied log with a null at the anchored index crashes the caller. It does not return `ok: true`. The oracle itself refuses to start on that file.
-
-**Resolution:** If the indexed value is missing or not an object, return a problem string. Add that case next to the existing junk test.
-
-### N28 — TypeScript accepts an odd-length anchor MemoType; Python rejects it
-
-**Severity:** Low
+**Status:** Closed
 **Blocks 0.4.0 release:** No
 
-**Where:** `xrpl-escrow/src/verdict-log.ts` 186. The type check is `/^[0-9A-Fa-f]*$/` and `Buffer.from(hex, "hex")`, which drops a trailing nibble. `xrpl-escrow-py/src/xrpl_escrow/verdict_log.py` 131 requires `len(memo_type) % 2`.
+**Where the fix is:** `xrpl-escrow/src/oracle/verdict-store.ts` 71–79, on the first entry for each job. `xrpl-escrow/src/oracle/server.ts` 199–201, before a stored verdict is served. `docs/THREAT_MODEL.md` 72.
 
-**Repro:** The same memo with one extra nibble on `MemoType` parsed as seq 1 in TypeScript (`typeLen=57`) and as `None` in Python (`parity-output.txt`). The oracle's own `anchorMemos` writes even-length hex, so normal anchors match. Only an AccountSet from the anchor account with a hand-built odd type splits the SDKs: TypeScript can treat it as the newest anchor and Python will skip it and see an older one, or none.
+**Repro** (`n26-startup-refuse`, `n26-other-fields`, `n26-edit-while-running`):
 
-**Also seen, not a current bypass:** Python `anchor_problem` with `seq: -1` returned None, because `entries[-1]` is the last row and the hash matched. `parse_anchor_memo` rejects `seq < 0` (line 144), and both SDKs parse before they compare. TypeScript rejects it too (`verdict-log.ts` 196).
+1. A real pass was served, with a fulfillment present. The oracle was stopped. The public entry was re-signed so it says fail and its check `pass` is false, while `verdictHash` still names the pass.
+2. The next start throws `verdict differs` and `refusing to start`. The anchor list length does not change.
+3. The same shape with only the check `pass` bit flipped, and with `issuedAt` increased by 5, also refuses.
+4. While a consistent oracle is running, rewriting the public file does not change the served verdict (it stays the original pass) and `anchorNow()` does not publish the edited hash (`fileIsAnchored: false`). After that edit, restart refuses.
 
-**Resolution:** Reject an odd-length `MemoType` and `MemoData` in TypeScript the way Python does. Add the odd-nibble memo to the shared vectors.
+The 409 path is in `server.ts` 200–201. This repro never reached it, because startup already refused, which is the stronger gate. A later entry for the same job is a different case (N37).
 
-### N29 — The SDK trusts the newest anchor only, and ordinary re-runs already publish conflicting chains
+The threat-model sentence that a reader who holds no verdict cannot tell whether an entry matches a verdict they have never seen matches the code: `verifyVerdictLog()` without a verdict still checks the chain, the signatures, and the anchors, not the hidden preimage of `verdictHash`.
 
-**Severity:** Medium
+### N27 — A null entry makes the verifier throw
+
+**Status:** Closed
 **Blocks 0.4.0 release:** No
 
-**Where:** `xrpl-escrow/src/sdk/index.ts` 82–102 and `xrpl-escrow-py/src/xrpl_escrow/verdict_log.py` 169–186 return the first matching AccountSet in newest-first order and stop. Nothing walks older anchors. `AnchorSchedule` anchors whatever the local head is (`verdict-store.ts` 145–151) and does not refuse a new genesis when the account has already anchored a different one. `docs/THREAT_MODEL.md` 73 item (4) says a new chain is outside what the log proves and that the anchors then disagree.
+`anchorProblem([null], …)` returned `entry 0 is missing or not an object` and did not throw. The Python test file that covers the same vector passed in the 38.
 
-**Evidence:** Read-only `account_tx` of the anchor account in the supplied demo log (`raK9TiatzKYjNqLW26ne2bvvsYE67672Qc`), oracle `rBTtuCrBKoLB9dVMRnuMiY63aThM7HELAT`. Fifteen successful anchor memos, five different seq-0 hashes. The demo's own anchor is still there: ledger 22144195, seq 2, hash `884f09f5…80f5`, tx `7B8039EE…0EF9`. `latestAnchor` during this review (2026-11-08 CST) returned ledger 22144457, seq 2, hash `e8182658…d491`, tx `2FDFE6A5…67C4`. `matches-claimed-demo-head=false`. Full list: `phase4-repro/anchors-readonly.txt`. The supplied Python demo log uses the same verdict address and the same anchor account, so a second local run is enough to explain new genesis hashes. I did not need a malicious third party.
+### N28 — Odd-length anchor memo hex
 
-**Impact:** `verifyVerdictLog` of the first demo log now fails against the latest anchor, or it passes a later log, with no problem string that another anchored genesis exists. The ledger still has the disagreement. The tool the EDR tells a reader to run does not report it. The threat model describes this as something an operator might do. The demos do it by reusing one faucet anchor wallet across fresh data directories. Lookback is also capped at 400 account transactions (`maxTx = 400`), and every payment to that account counts. This account had 16 transactions, so the cap did not hide an anchor here. Past 400, a missing anchor fails closed (`ok` false), it does not false-pass.
-
-**Resolution:** When verifying, collect anchors inside the lookback and report every genesis hash and every seq whose hash is not the log entry at that seq. `ok` must be false if more than one genesis is anchored for the pinned oracle. On startup, if the account's newest anchored genesis is not this file's genesis, refuse to start or refuse to anchor until the operator points at a new anchor account. Say in the threat model and the setup output that a second demo on the same `ORACLE_ANCHOR_SEED` publishes a second chain.
-
-### N30 — `ok: true` when the caller's verdict is only in the unanchored tail
-
-**Severity:** Low
+**Status:** Closed
 **Blocks 0.4.0 release:** No
 
-**Where:** `sdk/index.ts` 193–201. `unanchored` is reported, and the verdict check does not require `verdictEntry.seq <= anchor.seq`. The unit test locks this in: `test/verdict-log.test.ts` 263–270 expects `ok: true`, `anchor.seq` 2, `unanchored: 1`, and the job's verdict found. Python `tests/test_verdict_log.py` 62–67 expects the same (`verdict_entry` seq 3, `unanchored == 1`). `docs/THREAT_MODEL.md` 73 item (1) says the tail can be rewritten before the next anchor (default 10 minutes, `local-config.ts` 27, and on shutdown).
+An extra nibble on `MemoType` and on `MemoData` both parse as null in this run. The shared vectors passed in pytest.
 
-**Impact:** A holder who treats `ok` as "my verdict is pinned" is wrong for any verdict newer than the anchor. The field `unanchored` is the warning, and it is easy to miss. This matches the written threat model. It is a footgun in the flag, not an undisclosed hole.
+### N29 — One anchor account, every anchor in the window
 
-**Resolution:** Set `verdictAnchored` from `verdictEntry.seq <= anchor.seq`. If the caller passed a verdict, add a problem when it is past the anchor, or document `ok` in the README with that sentence next to the example.
+**Status:** Closed
+**Blocks 0.4.0 release:** No
 
-### N31 — No commit, and no Windows run
+Two seq-0 hashes still produce the "more than one log" problem (`n29-two-genesis`). The unit test that refuses startup on a visible second genesis is in the 112. The cap beyond the window is N32, not a return of the old fail-open.
 
+### N30 — `ok` on an unanchored verdict
+
+**Status:** Closed
+**Blocks 0.4.0 release:** No
+
+The unit test still expects `ok: false` and `verdictAnchored: false` unless `allowUnanchored` is set, and that test passed. The Python suite passed the same vector.
+
+### N31 — Commit and Windows run
+
+**Status:** Open
 **Severity:** Process
-**Blocks 0.4.0 release:** Yes
+**Blocks 0.4.0 release:** Yes, the tag only. It does not fail this verdict.
 
-**Evidence:** This review's `HEAD` is `5986030831720f144ff9849c48f25020973dc9f2`. `git status` was empty. `e80f884` is not an object in this clone. EDR-014 acceptance evidence asks for a Windows run on Christopher's PC with the log kept in `logs/`, and for Gpno's verdict to be recorded in `xrpl-escrow/docs/reviews/VERDICT.md` after the previous one is archived. Neither diff contains a Windows log. The handoff says Windows is not done and that the tree is not committed, and it also mentions a push of `e80f884`. That hash was not reviewed.
+**Where:** `xrpl-escrow/logs/windows-2026-11-12-b5f36bf/`. This tree is not a commit.
 
-**Impact:** There is nothing to tag. A later commit could differ from this diff. The Linux counts above are for this diff. They do not transfer to an unseen commit or to Windows.
+**Evidence:** The 15 sections in the earlier attached Windows log are byte-identical to the same file names in that directory (`SUMMARY.md`, identity, npm ci, typecheck, unit, five finality runs, npm test, demo, pytest, pytest testnet, Python demo). The directory also contains `07a-pytest-install.txt`, `2026-11-12-phase4.txt`, and `2026-11-12-phase4-txs.json`, which that concatenation did not split out. `SUMMARY.md` still describes the `b5f36bf` run (tree `e1f8b8f9`), not this tree. A scan of those files found no seed, fulfillment, or preimage. `00-identity.txt` names `b5f36bf` and `e1f8b8f982d95f1e5e263b20084a69a7952e4b9d`.
 
-**Resolution:** Commit the reviewed tree, or hand Gpno the commit hash and a `git diff 5986030 <hash>` that matches the larger diff's source (the log files may differ). Run the Windows commands in the Phase 4 section of `xrpl-escrow/docs/reviews/REVIEW.md` and keep that log. Do not tag 0.4.0 from a working tree.
+**Impact:** There is still nothing to tag. A Windows run of `b5f36bf` is not a Windows run of this diff. EDR-014 still wants the log for the build that is tagged.
 
-## What held
+**Resolution:** After this tree is committed, run the Phase 4 Windows commands on that commit and put the log in `logs/`. N31 then closes. Until that commit exists, N31 blocks the tag and does not, by itself, reject these fixes.
 
-These were checked and are not findings.
+### N32 — Lookback fails open, and the oracle can anchor a fork
 
-- Chain linkage: sequence must equal the index, `prev` must be the previous entry hash, the hash covers the canonical body plus the signature, and the signature must be from the pinned verdict address. Removing, reordering, editing, or signing with another key fails. Both SDKs agree on `test/vectors/verdict-log.json`.
-- Normal log lines omit deliverable text, check `detail`, the fulfillment, and the secret. The fulfillment is returned on the verify HTTP response only, which the threat model already treats as visible to other local processes.
-- Anchor memos require the exact type, exact key set `hash,oracle,seq,v`, log version 1, a non-negative safe integer sequence, and a lowercase 64-hex hash. Uppercase hashes, extra fields, version 2, and negative sequences are rejected by both parsers (odd length aside, N28).
-- The oracle binds `127.0.0.1` (`http.ts` `listenLocal`, `local-config.ts` `LOCALHOST`). `connectTestnet` aborts unless `network_id === 1`. The read-only session saw network id 1.
-- Payment amount is `meta.delivered_amount`, not `Amount` or `DeliverMax`. That matches the live API v2 payment. EscrowCreate still has `Amount` in the saved escrow transactions, and the code uses `tx.Amount` only for EscrowCreate.
-- Thrown ledger errors do not sign. The unit test "answers 503 with no verdict when the ledger lookup fails, then verifies on a retry" passed in the 94, and this review's `noNetwork` probe returned `CheckUnavailable`.
-- `GET /verdicts` rejects a non-integer `from` and `limit`. Pages are taken from the in-memory array, which only appends, so a slow reader does not see a torn page from the honest process.
+**Status:** Closed
+**Blocks 0.4.0 release:** No
+
+**Where:** `xrpl-escrow/src/anchors.ts` 15 and 42–54 (default 10,000, page size 200, `complete: !marker`). `xrpl-escrow/src/sdk/index.ts` 175–178. `xrpl-escrow/src/oracle/server.ts` 271–280. `xrpl-escrow-py/src/xrpl_escrow/verdict_log.py` 214–240 and 294–296. `docs/THREAT_MODEL.md` 73.
+
+**Repro:**
+
+- Default constant is 10000. Over a 401-row history (matching genesis, 399 payments, then a second genesis), `listAnchors(..., 400)` returns one anchor and `complete: false` after 2 pages. `listAnchors(..., 10000)` returns both anchors and `complete: true` (`n32-maxTx-values`). `floodCases` in the vector file records the same shape: at 400, `complete: false` and `anchorSeqs: [0]`; at 1000, `complete: true`, two seq-0 hashes, and the two-genesis problem. The unit test expects `ok: false` and the lookback problem at `maxTx: 400`. It passed. Pytest's incomplete-lookback test passed.
+- `startOracle` with `complete: false` throws `refusing to start` and the anchor callback is not called (`n32-startup-incomplete`, `anchorCalls: 0`).
+- Python `verify_verdict_log(..., lookback_complete=False)` adds the max-tx problem and sets `ok` false.
+
+**`ANCHOR_LOOKBACK_TX` is not rejected.** It is coerced.
+
+| Value | TypeScript `Number(...)` | What `listAnchors` then does on a multi-page history | Python `int(...)` at import |
+|---|---|---|---|
+| `0`, `-5` | 0, -5 | One page, then stop. A remaining marker makes `complete` false, so startup and `ok` fail closed | 0, -5, same loop |
+| `10.5`, `foo` | 10.5, NaN | Same as 0: one page, then fail closed if a marker remains | `ValueError`. The Python module does not import |
+| `1e4` | 10000 | The normal cap | `ValueError` |
+| `100000000000000` | that number | Reads until the marker ends, so it sees the second genesis and `complete` is true | accepted if it is an integer |
+
+A value that stops early does not false-pass. A huge value reads more, which is the safe direction. There is no separate "this override is invalid" error.
+
+**Payments past 10,000.** The threat model now says anyone can pay the anchor account and push old anchors out of the window, and that this makes the check fail, never pass. That matches the code. For this testnet preview the effect is that the oracle will not start, and `verifyVerdictLog()` returns `ok: false`, until the operator raises `ANCHOR_LOOKBACK_TX` or uses a new anchor wallet. That is an availability limit, not a forged pass. Severity for the preview: Low. It does not block the tag. It is disclosed honestly.
+
+**Markers.** An unvalidated AccountSet is not an anchor (`n32-unvalidated-row`: 0 anchors). It still increments `seen`, so it consumes lookback. The code does not read a response-level `validated` flag. No marker means `complete: true`. A page that has a marker and no transactions does not increment `seen`; the loop keeps requesting. A mock that did that was aborted on the fourth call (`n32-empty-marker`). A normal rippled page is not empty. A server that lies was already outside what the log proves (`docs/THREAT_MODEL.md` 74). This hang is that residual, not a new fail-open.
+
+`latestAnchor` / `latest_anchor` still default to 400 and drop the `complete` flag (`sdk/index.ts` 84–85, `verdict_log.py` 243–246). `verifyVerdictLog` does not use them. The check that sets `ok` is the one that fails closed.
+
+### N33 — A failed public append lets the next verify sign a different verdict
+
+**Status:** Closed
+**Blocks 0.4.0 release:** No
+
+**Where:** `xrpl-escrow/src/oracle/verdict-store.ts` 89–93 and 126–141. The signed line is stored in `#pending` before the public write. `issued()` retries that write and does not return null for a pending job.
+
+**Repro** (`n33-directory`, `n33-eacces`):
+
+- The public path was replaced with a directory. The first `/verify` returned 500. The signed file contained the job. A second `/verify`, after the stand-in lookup would have passed, also returned 500 while the directory was still there.
+- With the log mode `0444`, the first verify returned 500 after one lookup. The next verify, with the file still unwritable and the payment now valid, returned 500 and did not call the lookup again (`lookupsWhileBlocked` stayed 1).
+- After the file was restored, both cases returned `fail`, no fulfillment. Restart returned that same fail and no fulfillment.
+
+### N34 — Merged before the re-review
+
+**Status:** Accepted
+**Blocks 0.4.0 release:** No
+
+Christopher has left the merges in history, has not tagged `b5f36bf`, `b8872321`, or `6cf7d44`, and has kept this fix uncommitted until this verdict. That is the resolution from the previous review. This tree follows it.
+
+### N35 — What had to happen before a tag of those commits
+
+**Status:** Closed
+**Blocks 0.4.0 release:** No
+
+The requirement not to tag those three commits is accepted. The steps that remain before a 0.4.0 tag are the tag gate below. They are not a defect in this diff.
+
+### N36 — A 0.3.x `verified_pass` is verified again
+
+**Status:** Closed
+**Blocks 0.4.0 release:** No
+
+**Where:** `xrpl-escrow/src/oracle/server.ts` 204–206.
+
+**Repro:** A job marked `verified_pass` with nothing in the log returned 409 and was not logged (`n36-verified-pass`).
+
+### N37 — A later entry for the same job is not compared, and a mismatched head can be anchored
+
+**Status:** New
+**Severity:** Medium
+**Blocks 0.4.0 release:** No
+
+**Where:** `xrpl-escrow/src/oracle/verdict-store.ts` 71–75. The loop records every entry, then `continue`s when `#byJob` already has that `jobId`, before `entryMismatch`. `xrpl-escrow/src/verdict-log.ts` 209–214, and the same first-match loop in `xrpl-escrow-py/src/xrpl_escrow/verdict_log.py` 146–151. `findVerdict` stops at the first entry with that `verdictHash`. `docs/THREAT_MODEL.md` 72 says the oracle refuses to start, and so never anchors, when its private copy disagrees with the public entry.
+
+**Repro** (`n26-later-entry`, no testnet write):
+
+1. A job receives a real pass. The oracle is stopped.
+2. A second entry is appended for that same job. It is signed by the verdict key, linked to the previous hash, says `fail`, and its `verdictHash` is the pass. `entryMismatch` on that pair is `"verdict"`.
+3. Restart succeeds. `/verify` returns `pass` and a fulfillment, because the first entry is the one `issued()` returns.
+4. `anchorNow()` publishes that second entry (`anchoredIsLie: true`).
+5. `verifyVerdictLog()` with no verdict returns `ok: true` and no problems. The same call with the pass also returns `ok: true`, because the first entry with that hash is the honest pass.
+
+**Impact:** The original one-entry lie is rejected. This needs a second line. The pass is still a public line in the same chain, so a reader of the whole file can see pass and then fail. What the new sentence overclaims is that the oracle will not anchor any disagreeing entry it can check. It does not check past the first entry for a job, and the SDK does not either. The fulfillment in this repro is the one the honest pass already released. It is not a fail that later becomes a pass.
+
+**Resolution:** On startup, run `entryMismatch` for every verdict entry whose `verdictHash` is in the signed file, including later lines for a job already seen. Refuse to start if any of them disagree. `findVerdict` should not stop at the first match when a later line with the same hash disagrees. Add this two-entry log next to the existing public-fail vector.
+
+## Earlier holds
+
+These were checked again and are not new findings.
+
+- Chain linkage: the live log checks, and the same log fails for a different verdict address (`chain`).
+- Privacy: deliverable text `PRIVACY-TOKEN-deliverable-9f3c` and the check detail are absent from the public log (`privacy`).
+- `delivered_amount`: a payment whose `Amount` is 5,000,000 drops and whose delivered amount is `"1"` fails. A deliverable with a `0x` prefix fails and does not call the lookup (`tx-predicate`).
+- Thrown lookup: HTTP 503, job not logged, status left `delivered` (`503`).
+- Bind: both listeners in `/proc/net/tcp` are `0100007F` (`bind`).
 
 ## Release gating
 
 | Gate | State |
 |---|---|
-| Code on this diff | **Fail.** N25 and N26. |
-| Linux offline tests | Reproduced: typecheck 0, unit 94/94, pytest 34 passed and 1 skipped. |
-| Linux testnet `npm test`, both demos, `pytest --testnet` | Claimed in the supplied logs (98/98 before the fork-splice unit test, demo 27/27, pytest 35, Python demo 16/16). Not re-run here. The public txs in the TypeScript demo log are real. |
-| Windows | Not done. Blocks the tag (N31). |
-| Commit identity | Not established. No Phase 4 commit hash. Blocks the tag (N31). |
-| Phase 3 leftovers | Not re-opened. In this tree `$id`, `$anchor`, and `$dynamicRef` are in `BANNED_KEYWORDS` (`schema-policy.ts` 25–27), so the old N19 ban is present. N20, N21, and N23 were not re-tested. N22 and N24 stay closed as Phase 3 process items; they are not Phase 4 approval. |
+| N26 original pair, N32 incomplete read, N33, N36 | Closed on this tree. Reproduced. |
+| N25, N27, N28, N29, N30 | Closed. Reproduced here or by the 112 / 38. |
+| N37 later entry | Open. Does not block the tag. |
+| N31 | Open. Blocks the tag. Does not fail this verdict. |
+| N34, N35 | Accepted / closed as process items. Do not tag `b5f36bf`, `b8872321`, or `6cf7d44`. |
+| Linux offline tests | Reproduced: typecheck 0, unit 112/112, pytest 38 passed and 1 skipped. |
+| Linux testnet counts and Windows on this tree | Claimed or not done. Not required to accept the diff. Required before the tag. |
+
+### Before the 0.4.0 tag
+
+1. Commit this reviewed tree onto a branch. `git diff 6cf7d44 <hash>` must be this 44-file diff, tree `b7030cd12e6208b47c5d0c3ce457e45c21df6488` if nothing else is added. Do not merge it to main before that commit is the one you intend to tag, and do not tag the three commits named above.
+2. Run the Phase 4 Windows commands from `xrpl-escrow/docs/reviews/REVIEW.md` on that commit. If `data/` is not already the log that anchor wallet published, use a new anchor wallet. Put the log in `logs/`.
+3. The confirmation that remains is that the commit's diff against `6cf7d44` is this diff and that the Windows log is for that commit. N37 can ship as a known limit; it should be fixed or the threat-model sentence narrowed before anyone treats "every entry" as absolute.
 
 ## Limitations
 
-- No source file in the user's checkout was modified. The review tree was a detached archive under `/tmp`.
-- `npm test`, `demo:phase4`, `pytest --testnet`, and the Python demo were not run, because they submit testnet transactions. Partial-payment behavior was executed against a stand-in lookup, not a `tfPartialPayment` transaction on the ledger.
-- The finality repro used the unit-test escrow double. It shows the oracle returning a fulfillment after a logged fail. It does not itself move testnet XRP.
-- One testnet endpoint was used for the read-only lookups. A lying server is the residual the threat model already names.
-- A local clock that is behind network time widens the 10 s "validated before the job" slack (`xrpl-tx.ts` 95–97), because `createdAt` is local `Date.now()` and close time is ledger time. Not exploited here.
-- The anchor book is an unauthenticated cache. Forging "this head is already anchored" suppresses the next AccountSet until the head changes. Readers fail closed against the ledger. Not given its own number.
+- No source file in the user's checkout was modified. The review tree is `/tmp/phase4-r4`. The scratch `git init` there was not committed.
+- `npm test`, both demos, and `pytest --testnet` were not run.
+- The N32 startup refusal used `anchorHistory` returning `complete: false`. It did not submit an AccountSet. The 401-row history was a mock `account_tx`.
+- The `n32-401` object in `bypass-output.json` is the mis-addressed harness described above. Do not read it as the product's answer.
+- One fulfillment was returned to the test process for the original pass and again in the N37 case. It was not printed. The log records `fulfillment: true` only.
+- Python was not executed on the two-entry log. Its `find_verdict` returns on the first hash match, which is the same rule as TypeScript.
+- The empty-page marker loop was aborted in the mock. It was not left running against a live server.
 
 ## Artifacts
 
 - `/opt/cursor/artifacts/VERDICT.md` (this file)
-- `/opt/cursor/artifacts/phase4-repro/repro.ts` and `repro-output.txt` (N25, N26, N27, N28 TypeScript side, privacy, pagination, partial-payment predicate)
-- `/opt/cursor/artifacts/phase4-repro/parity.py` and `parity-output.txt`
-- `/opt/cursor/artifacts/phase4-repro/ledger-readonly.ts` and `ledger-readonly.txt`
-- `/opt/cursor/artifacts/phase4-repro/anchors-readonly.ts` and `anchors-readonly.txt`
+- `/opt/cursor/artifacts/phase4-r4-repro/bypass.ts` and `bypass-output.txt` / `bypass-output.json`
+- `/opt/cursor/artifacts/phase4-r4-repro/test-unit.txt` and `pytest.txt`
+- `/opt/cursor/artifacts/phase4-r4-repro/n32-401-corrected.txt` (the harness error from the follow-up attempt; not a product result)

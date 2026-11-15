@@ -115,3 +115,46 @@ def test_against_the_typescript_oracle(local_services, mark_funded):
                              verdict=res.verdict, require_anchor=False, allow_unanchored=True)
     assert out.ok and out.verdict_entry["jobId"] == job["id"]
     assert not check_chain(entries, Wallet.create().address).ok
+
+
+class _PagedClient:
+    """account_tx in pages, newest first, the way a testnet server answers it."""
+
+    def __init__(self, rows):
+        self.rows = rows
+
+    def request(self, req):
+        start = req.marker or 0
+        page = self.rows[start:start + req.limit]
+        more = start + req.limit < len(self.rows)
+
+        class Res:
+            result = {"transactions": page, **({"marker": start + req.limit} if more else {})}
+
+            @staticmethod
+            def is_successful():
+                return True
+        return Res()
+
+
+def test_an_incomplete_anchor_lookback_fails_closed(vectors):
+    """Gpno N32: past the lookback, older anchors are unread and ok must be False, as in TypeScript."""
+    from xrpl_escrow.verdict_log import list_anchors
+    for case in vectors["floodCases"]:
+        anchors, complete = list_anchors(_PagedClient(vectors["floodTx"]), vectors["anchorAccount"], vectors["oracle"], case["maxTx"])
+        assert complete == case["complete"] and [a["seq"] for a in anchors] == case["anchorSeqs"]
+        assert anchor_history_problems(vectors["entries"], anchors, vectors["oracle"]) == case["problems"]
+        res = verify_verdict_log(vectors["entries"], vectors["oracle"], anchors, anchor_address=vectors["anchorAccount"],
+                                 lookback_complete=complete)
+        assert not res.ok
+        if not complete:
+            assert "more transactions than the lookback reads" in res.problems[0]
+
+
+def test_a_public_fail_naming_a_private_pass_is_caught_by_its_holder(vectors):
+    """Gpno N26, second review: without the pass only the log's integrity is checked; with it, ok is False."""
+    log, pass_v = vectors["publicFailLog"], vectors["verdicts"][0]
+    assert verify_verdict_log(log, vectors["oracle"], None, anchor_address=vectors["anchorAccount"], require_anchor=False).ok
+    res = verify_verdict_log(log, vectors["oracle"], None, anchor_address=vectors["anchorAccount"], verdict=pass_v,
+                             require_anchor=False, allow_unanchored=True)
+    assert not res.ok and "differs" in res.problems[0]

@@ -1,0 +1,8 @@
+$ git rev-parse HEAD
+b5f36bf124e84fbcaa5f0c578278a57ecac917e0
+$ git rev-parse HEAD^{tree}
+e1f8b8f982d95f1e5e263b20084a69a7952e4b9d
+$ git status --porcelain
+node v24.18.0 npm 11.16.0 Python 3.14.6
+Microsoft Windows [Version 10.0.26300.9711]
+Reused from the 2026-11-08 run in this worktree: .env (anchor raU1zQN3PxSGmYh9e14cBVSz3R7PKK9xvG) and xrpl-escrow/data/
