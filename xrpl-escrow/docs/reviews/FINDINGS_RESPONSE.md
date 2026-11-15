@@ -196,6 +196,18 @@ typecheck 0 errors, `npm run test:unit` 112/112, `npm test` 117/117 on testnet, 
 | N34 | accepted | PRs #7 and #8 were merged by Christopher with his approval for each commit, before Gpno's re-review. The merges stay in history. 0.4.0 will not be tagged on `b5f36bf`, `b887232` or `6cf7d44`. The fix commit stays on its branch, unmerged, until Gpno's verdict on it | — |
 | N35 | in progress | Order from the verdict: fix N26 and N32 (done here), N33 (done), Gpno reviews the commit, Windows run on it with the log in `logs/`, archive and record the passing verdict, then tag | — |
 
+## Phase 4 re-review, round r4 (2026-11-15, `VERDICT.md`, on the r4 tree): PASS WITH FINDINGS
+
+Gpno's r4 verdict is now `VERDICT.md`; the r3 FAIL is archived as
+`VERDICT-2026-11-14-phase4-r3-fail.md`. The tree he passed (`b7030cd1`) was committed unchanged as
+`21da0b3` (`git diff 6cf7d44 21da0b3` equals the reviewed 44-file diff). N26, N32, N33 and N36 are
+closed; N34 accepted; N35 closed.
+
+| # | Status | Note |
+|---|---|---|
+| N31 | done, pending Gpno's confirmation | Windows run of `21da0b3` on Christopher's PC (Windows 11, Node 24.18.0, Python 3.14.6; `logs/windows-2026-11-15-21da0b3/`): `test:unit` 112/112, finality 5 of 5 runs, `npm test` 117/117 on testnet, demo:phase4 28/28, `pytest` 38 + 1 skipped, `pytest --testnet` 39/39, Python demo 16/16. No rename retry was needed (0 `[fs]` lines) |
+| N37 | open, non-blocking | Start-up compares only the first log entry for each job, so a later signed entry for the same job that disagrees with its verdict is not caught, and both SDKs stop at the first match. The original entry stays in the chain. Planned fix after 0.4.0: refuse to start on a second verdict entry for a job, and have `findVerdict` report every entry naming the verdict |
+
 ## Still open
 
 - The NOT DEMONSTRATED items from the first review were all run on Christopher's Windows PC on

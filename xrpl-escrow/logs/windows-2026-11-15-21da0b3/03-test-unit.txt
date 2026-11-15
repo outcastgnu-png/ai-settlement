@@ -1,0 +1,17 @@
+$ npm.cmd run test:unit
+start 2026-11-15T01:22:30-06:00
+
+> xrpl-verified-escrow-demo@0.4.0 test:unit
+> vitest run test/condition.test.ts test/registry.test.ts test/oracle.test.ts test/watcher.test.ts test/sdk.test.ts test/verdict-log.test.ts test/xrpl-tx.test.ts test/finality.test.ts test/fs-util.test.ts
+
+
+ RUN  v5.0.5 C:/dev/ai-settlement-f5ee6d2/xrpl-escrow
+
+
+ Test Files  9 passed (9)
+      Tests  112 passed (112)
+   Start at  01:22:30
+   Duration  30.75s (tests 94%, import 5%, transform 1%)
+
+EXIT 0
+elapsed 31 s
