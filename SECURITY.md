@@ -25,3 +25,15 @@ The TypeScript kit (`xrpl-escrow/`) and the Python SDK (`xrpl-escrow-py/`).
 Known limits that are by design for this preview are listed in
 [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md); reports about them are still welcome
 if you see a way to make them worse than described.
+
+## Known dependency advisories
+
+`npm audit` in `xrpl-escrow/` reports GHSA-fc5q-39xc-vjpf (picomatch ReDoS, high)
+through `vitest`, `vite`, `tinyglobby` and `fdir`. These are test tools only:
+`npm audit --omit=dev` reports 0 vulnerabilities, and nothing in them ships with
+the kit or runs in the registry, oracle or watcher. The advisory covers every
+picomatch release up to 4.0.7, the latest as of 2026-11-18, so no version bump
+removes it yet. It needs a crafted glob pattern, and the only patterns these
+tools see are the kit's own test-file globs. We will update when a patched
+picomatch is released. The Python SDK's dependencies had no known advisories
+(`pip-audit`, 2026-11-18).
