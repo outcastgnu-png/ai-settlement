@@ -92,3 +92,55 @@ def ts_services(
                     proc.wait(timeout=10)
                 except subprocess.TimeoutExpired:
                     proc.kill()
+
+
+class TsProcess:
+    """One TypeScript kit service run as a child process, started and stopped by hand (EDR-015 demo:
+    the oracles of a shared set are stopped and restarted between scenarios). Works on Windows."""
+
+    def __init__(self, ts_kit: str | os.PathLike[str], name: str, script: str, env: dict[str, str], health_url: str | None = None,
+                 ready_text: str | None = None, log: Callable[[str], None] = print) -> None:
+        self.kit = Path(ts_kit).resolve()
+        self.name, self.script, self.env, self.health_url, self.ready_text, self.log = name, script, env, health_url, ready_text, log
+        self.proc: subprocess.Popen[str] | None = None
+
+    def start(self, timeout: float = 60) -> "TsProcess":
+        node = shutil.which("node")
+        if node is None or not (self.kit / "node_modules" / "tsx").exists():
+            raise RuntimeError(f"needs Node 22.12+ and `npm install` in {self.kit}")
+        self.proc = subprocess.Popen([node, "--import", "tsx", self.script], cwd=self.kit, text=True, encoding="utf-8",
+                                     env={**os.environ, "NODE_NO_WARNINGS": "1", **self.env},
+                                     stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        lines: list[str] = []
+
+        def pump() -> None:
+            for line in self.proc.stdout:  # type: ignore[union-attr]
+                lines.append(line.rstrip())
+                self.log(f"    {self.name} | {line.rstrip()}")
+
+        threading.Thread(target=pump, daemon=True).start()
+        deadline = time.monotonic() + timeout
+        while True:
+            if self.proc.poll() is not None:
+                raise RuntimeError(f"{self.name} exited during startup")
+            if self.ready_text and any(self.ready_text in line for line in list(lines)):
+                return self
+            if self.health_url:
+                try:
+                    call_json("GET", f"{self.health_url}/health", timeout=2)
+                    return self
+                except Exception:  # noqa: BLE001 - not up yet
+                    pass
+            if time.monotonic() > deadline:
+                self.stop()
+                raise RuntimeError(f"{self.name} did not become ready")
+            time.sleep(0.2)
+
+    def stop(self) -> None:
+        if self.proc and self.proc.poll() is None:
+            self.proc.terminate()
+            try:
+                self.proc.wait(timeout=15)
+            except subprocess.TimeoutExpired:
+                self.proc.kill()
+        self.proc = None

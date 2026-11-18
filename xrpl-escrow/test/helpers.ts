@@ -106,3 +106,74 @@ export async function throwawayOracleEnv(xrpl: import("xrpl").Client, base = ".e
   const anchor = await loadOrFundAnchor(xrpl, envFile);
   return { envFile, anchor };
 }
+
+/**
+ * A local registry and `n` oracles of a shared set (EDR-015), each with its own
+ * verdict key, vault, share key, verdict log and stand-in anchor account, and no
+ * ledger. `kitAnchors` is the stand-in `listAnchors` for an EscrowKit.
+ */
+export async function startSharedLocal(n = 3, faults: ("fail" | undefined)[] = []) {
+  const { generateShareKey } = await import("../src/share-box.js");
+  const dir = tempDir();
+  const registry = await startRegistry({ dbPath: join(dir, "jobs.db"), port: 0, tokens: TOKENS });
+  const ledger = { problem: null as string | null };
+  const oracles = Array.from({ length: n }, (_, i) => {
+    const od = join(dir, `oracle-${i + 1}`);
+    const verdictKey = Wallet.generate("ed25519" as ECDSA);
+    const anchorWallet = Wallet.generate();
+    const onLedger: Anchor[] = [];
+    const state = {
+      i, dir: od, verdictKey, anchorAddress: anchorWallet.address, vaultKey: randomBytes(32), shareKey: generateShareKey(), onLedger,
+      fault: faults[i], txs: new Map<string, TxLookupResult | Error>(),
+      server: null as Awaited<ReturnType<typeof startOracle>> | null, port: 0,
+    };
+    return state;
+  });
+  const launch = async (o: (typeof oracles)[number]) => {
+    const anchorer: Anchorer = async (head) => {
+      const anchor = { ...fakeAnchor(head, o.verdictKey.address), account: o.anchorAddress };
+      o.onLedger.unshift(anchor);
+      return anchor;
+    };
+    o.server = await startOracle({
+      port: o.port, verdictKey: o.verdictKey, vault: new SecretVault(join(o.dir, "vault.json"), o.vaultKey), registryUrl: registry.url,
+      verdictLog: join(o.dir, "verdicts.jsonl"), serviceToken: TOKENS.oracle, escrowCheck: async () => ledger.problem,
+      replay: new ReplayGuard(join(o.dir, "replay.json")), verdictChain: join(o.dir, "verdict-log.jsonl"),
+      anchorFile: join(o.dir, "anchors.jsonl"), anchorer, anchorAddress: o.anchorAddress, anchorIntervalMs: 0,
+      lookupTx: async (hash) => {
+        const r = o.txs.get(hash) ?? { found: false };
+        if (r instanceof Error) throw r;
+        return r;
+      },
+      anchorHistory: async () => ({ anchors: [...o.onLedger], complete: true }),
+      shareKey: o.shareKey, fault: o.fault,
+    });
+    o.port = o.server.port;
+    return o.server;
+  };
+  for (const o of oracles) await launch(o);
+  const set = () => oracles.map((o) => ({ address: o.verdictKey.address, anchor: o.anchorAddress, url: `http://127.0.0.1:${o.port}` }));
+  const kitAnchors = async (anchorAddress: string) => ({
+    anchors: [...(oracles.find((o) => o.anchorAddress === anchorAddress)?.onLedger ?? [])], complete: true,
+  });
+  return {
+    dir, registry, oracles, ledger, set, kitAnchors,
+    async stop(i: number) {
+      await oracles[i].server?.close();
+      oracles[i].server = null;
+    },
+    async restart(i: number, fault?: "fail") {
+      await oracles[i].server?.close();
+      oracles[i].fault = fault;
+      return launch(oracles[i]);
+    },
+    /** Anchor every running oracle's current head on the stand-in ledger. */
+    async anchorAll() {
+      for (const o of oracles) await o.server?.anchorNow();
+    },
+    async close() {
+      for (const o of oracles) await o.server?.close();
+      await registry.close();
+    },
+  };
+}

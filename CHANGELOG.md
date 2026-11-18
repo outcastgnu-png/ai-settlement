@@ -1,6 +1,42 @@
 # Changelog
 
-## Unreleased
+## 0.5.0 (Phase 5 shared verification, EDR-015) - unreleased
+
+Still testnet only, and every service listens on 127.0.0.1 only.
+
+### Added
+- Shared jobs, k of n oracles (default 2 of 3). `createSharedJob()` / `create_shared_job()`:
+  the client makes the secret, splits it with Shamir's scheme over GF(256) (`src/shamir.ts`,
+  `xrpl_escrow/shamir.py`), seals each share to one oracle (`src/share-box.ts`,
+  `xrpl_escrow/share_box.py`: X25519, HKDF-SHA256, AES-256-GCM, bound to the job, the oracle and
+  the share index) and registers the job, signed by the client, with its oracle set, threshold
+  and condition. The secret is never stored or logged; the registry never sees a share.
+- Each oracle has an X25519 share key (`ORACLE_SHARE_KEY`), shown on `/health` with a signature
+  by its verdict key. New oracle route `POST /jobs/:jobId/share`, which takes only the client's
+  share sealed to this oracle at its own index, while the job is a draft. On its own signed pass
+  the oracle returns its share (`share`) instead of a fulfillment. Shared verdicts carry
+  `shareIndex` and `threshold`.
+- `deliverShared()` / `requestSharedVerification()` (Python: `deliver_shared()`,
+  `request_shared_verification()`): asks every oracle of the set, checks each signed verdict
+  against its pinned address and that oracle's own verdict log, and combines k shares into the
+  fulfillment (`combineForCondition` / `combine_for_condition`, which never uses a share from
+  outside the set). It reports which oracles passed, failed, were rejected or unreachable.
+  `requireAnchored` / `require_anchored` uses only anchored verdicts.
+- Registry: shared jobs, `POST /jobs/:id/verdicts` (a signed verdict from an oracle of the set;
+  verified_pass after k passes, verified_fail once k passes can no longer happen),
+  `GET /jobs/:id/verdicts`, and `GET /splits` with `npm run splits` (jobs where the set disagreed).
+- `npm run setup` makes local oracles B and C (`.env.oracle-b`, `.env.oracle-c`,
+  `data/oracle-b`, `data/oracle-c`, each with its own keys and faucet-funded anchor wallet);
+  `npm run oracle:b` and `npm run oracle:c` start them on ports 8803 and 8804.
+- `ORACLE_FAULT=fail` starts a dissenting oracle that signs fail on every job (demos and tests).
+- `npm run demo:phase5`, the Python demo `python -m xrpl_escrow.demo_phase5`, `test/shared.test.ts`,
+  `tests/test_shared_vectors.py`, `tests/test_shared_local.py`, and shared vectors
+  `test/vectors/shamir.json` and `share-box.json` (`make-shared-vectors.ts`).
+
+### Changed
+- An oracle's service token can no longer set a shared job's condition or status.
+- The Python SDK depends on `pycryptodome` directly (xrpl-py already needed it).
+- Single-oracle jobs work as before.
 
 ### Fixed
 - Gpno N37: the oracle now checks every entry of its log on start, not only the first for each job.
