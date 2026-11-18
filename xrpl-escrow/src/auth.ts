@@ -121,6 +121,12 @@ export function canonicalJson(value: unknown): string {
   return JSON.stringify(value);
 }
 
+/** What a client signs to create a shared job (EDR-015): sha256 of the canonical JSON of the job body without `auth`. */
+export const newJobHash = (body: Record<string, unknown>) => {
+  const { auth: _auth, ...rest } = body;
+  return sha256Hex(canonicalJson(rest));
+};
+
 export function signPayload(payload: unknown, wallet: Wallet): string {
   return sign(hexOf(canonicalJson(payload)), wallet.privateKey);
 }

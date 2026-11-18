@@ -24,6 +24,22 @@ export interface JobSpec {
   checks: CheckSpec[];
 }
 
+/** One oracle of a shared job's set (EDR-015). The order is the share order: oracle i holds share x = i + 1. */
+export interface OracleRef {
+  address: string; // verdict signing address, pinned
+  anchor: string; // anchor account of its verdict log, pinned
+  url: string; // http://127.0.0.1:<port>
+}
+
+/** A shared job's oracle verdict as the registry recorded it, after checking its signature. */
+export interface OracleVerdictRecord {
+  jobId: string;
+  oracle: string;
+  verdict: "pass" | "fail";
+  at: number;
+  signed: Record<string, unknown>; // the full signed verdict
+}
+
 export interface Job {
   id: string;
   client: string;
@@ -31,6 +47,9 @@ export interface Job {
   priceDrops: string;
   slaSeconds: number;
   spec: JobSpec;
+  /** Shared jobs only (EDR-015): the oracle set and how many passes release the funds. Null for single-oracle jobs. */
+  oracles: OracleRef[] | null;
+  threshold: number | null;
   condition: string | null;
   offerSequence: number | null;
   cancelAfter: number | null; // Ripple epoch seconds
@@ -69,6 +88,8 @@ export interface NewJob {
   priceDrops: string;
   slaSeconds: number;
   spec: JobSpec;
+  /** Shared jobs: the set, threshold and the client's condition, all set at creation. */
+  shared?: { oracles: OracleRef[]; threshold: number; condition: string };
 }
 
 /** Which status a non-ledger source may move a job to, from which status. */
@@ -92,7 +113,11 @@ const COLUMNS = `
   sla_seconds INTEGER NOT NULL, spec TEXT NOT NULL, condition TEXT, offer_sequence INTEGER,
   cancel_after INTEGER, status TEXT NOT NULL, verdict TEXT, expiring_soon INTEGER NOT NULL DEFAULT 0,
   create_tx TEXT, finish_tx TEXT, cancel_tx TEXT, created_at INTEGER NOT NULL, funded_at INTEGER,
-  delivered_at INTEGER, verified_at INTEGER, closed_at INTEGER, updated_at INTEGER NOT NULL`;
+  delivered_at INTEGER, verified_at INTEGER, closed_at INTEGER, updated_at INTEGER NOT NULL,
+  oracles TEXT, threshold INTEGER`;
+
+/** Columns added after a database may already exist; added on open if missing. */
+const ADDED_COLUMNS: [string, string][] = [["oracles", "TEXT"], ["threshold", "INTEGER"]];
 
 type Row = Record<string, unknown>;
 
@@ -104,6 +129,8 @@ function toJob(r: Row): Job {
     priceDrops: r.price_drops as string,
     slaSeconds: r.sla_seconds as number,
     spec: JSON.parse(r.spec as string),
+    oracles: r.oracles ? JSON.parse(r.oracles as string) : null,
+    threshold: (r.threshold as number) ?? null,
     condition: (r.condition as string) ?? null,
     offerSequence: (r.offer_sequence as number) ?? null,
     cancelAfter: (r.cancel_after as number) ?? null,
@@ -148,7 +175,12 @@ export class JobStore {
       CREATE TABLE IF NOT EXISTS events (
         job_id TEXT NOT NULL REFERENCES jobs(id), at INTEGER NOT NULL, source TEXT NOT NULL,
         status TEXT, detail TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS oracle_verdicts (
+        job_id TEXT NOT NULL REFERENCES jobs(id), oracle TEXT NOT NULL, verdict TEXT NOT NULL, at INTEGER NOT NULL,
+        signed TEXT NOT NULL, PRIMARY KEY (job_id, oracle));
     `);
+    const have = new Set((this.db.prepare("PRAGMA table_info(jobs)").all() as { name: string }[]).map((c) => c.name));
+    for (const [name, type] of ADDED_COLUMNS) if (!have.has(name)) this.db.exec(`ALTER TABLE jobs ADD COLUMN ${name} ${type}`);
   }
 
   close() {
@@ -158,10 +190,16 @@ export class JobStore {
   create(input: NewJob): Job {
     const now = Date.now();
     const id = randomUUID();
-    this.db.prepare(`INSERT INTO jobs (id, client, provider, price_drops, sla_seconds, spec, status, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, 'draft', ?, ?)`)
-      .run(id, input.client, input.provider, input.priceDrops, input.slaSeconds, JSON.stringify(input.spec), now, now);
-    this.addEvent({ jobId: id, at: now, source: "registry", status: "draft", detail: "job created" });
+    const shared = input.shared;
+    this.db.prepare(`INSERT INTO jobs (id, client, provider, price_drops, sla_seconds, spec, status, created_at, updated_at,
+        oracles, threshold, condition)
+      VALUES (?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?)`)
+      .run(id, input.client, input.provider, input.priceDrops, input.slaSeconds, JSON.stringify(input.spec), now, now,
+        shared ? JSON.stringify(shared.oracles) : null, shared?.threshold ?? null, shared?.condition ?? null);
+    this.addEvent({
+      jobId: id, at: now, source: "registry", status: "draft",
+      detail: shared ? `shared job created: ${shared.threshold} of ${shared.oracles.length} oracles, condition set by the client` : "job created",
+    });
     return this.get(id)!;
   }
 
@@ -196,6 +234,38 @@ export class JobStore {
     args.push(Date.now(), id);
     this.db.prepare(`UPDATE jobs SET ${sets.join(", ")} WHERE id = ?`).run(...args);
     return this.get(id)!;
+  }
+
+  /** The job using `condition`, if any: a condition belongs to one job only. */
+  byCondition(condition: string): Job | null {
+    const row = this.db.prepare("SELECT * FROM jobs WHERE condition = ?").get(condition) as Row | undefined;
+    return row ? toJob(row) : null;
+  }
+
+  /** Record an oracle's verdict for a shared job. False if that oracle already has one (the first is kept). */
+  putOracleVerdict(v: OracleVerdictRecord): boolean {
+    const r = this.db.prepare("INSERT OR IGNORE INTO oracle_verdicts (job_id, oracle, verdict, at, signed) VALUES (?, ?, ?, ?, ?)")
+      .run(v.jobId, v.oracle, v.verdict, v.at, JSON.stringify(v.signed));
+    return r.changes === 1;
+  }
+
+  oracleVerdicts(jobId: string): OracleVerdictRecord[] {
+    return (this.db.prepare("SELECT * FROM oracle_verdicts WHERE job_id = ? ORDER BY at, oracle").all(jobId) as Row[]).map((r) => ({
+      jobId, oracle: r.oracle as string, verdict: r.verdict as "pass" | "fail", at: r.at as number, signed: JSON.parse(r.signed as string),
+    }));
+  }
+
+  /** Shared jobs whose oracles disagreed: at least one pass and one fail. */
+  splitJobs(): { job: Job; passed: string[]; failed: string[] }[] {
+    const ids = (this.db.prepare(`SELECT job_id FROM oracle_verdicts GROUP BY job_id
+      HAVING SUM(verdict = 'pass') > 0 AND SUM(verdict = 'fail') > 0 ORDER BY MIN(at)`).all() as { job_id: string }[]).map((r) => r.job_id);
+    return ids.map((id) => {
+      const vs = this.oracleVerdicts(id);
+      return {
+        job: this.get(id)!, passed: vs.filter((v) => v.verdict === "pass").map((v) => v.oracle),
+        failed: vs.filter((v) => v.verdict === "fail").map((v) => v.oracle),
+      };
+    });
   }
 
   putDeliverable(d: Deliverable) {

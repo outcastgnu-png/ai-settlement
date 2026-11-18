@@ -1,0 +1,76 @@
+connected to wss://testnet.xrpl-labs.com (network_id checked = 1)
+    registry | registry listening on http://127.0.0.1:8831 (db /home/user/ai-settlement/xrpl-escrow/data/jobs.db)
+    watcher | [watcher] connected to wss://testnet.xrpl-labs.com (testnet), watching jobs in http://127.0.0.1:8831
+    oracle A | oracle (verdict key r9ghGMTutZhob4kzTVuESKpeSshGcG7pjK, anchor account rKF6N5LXHwtt5oJ9Pp1iERHh7sqzXBQxFP) listening on http://127.0.0.1:8832
+    oracle B | oracle (verdict key rnk7esDcnTopQQw29jn1puhQ348uNjUDEs, anchor account rpuXj4Y419FMo7aJMA1bjJ6dejF2AUeL2F) listening on http://127.0.0.1:8833
+    oracle C | [oracle] ORACLE_FAULT=fail: this oracle signs FAIL on every job (a dissenting oracle, for demos and tests)
+    oracle C | oracle (verdict key r4ncVq7bDop2RabtcsmXx4nhGLyfxDuwjY, anchor account rUP8taT899MsW7f2KEy34eFZ87Nh5nUWuD) listening on http://127.0.0.1:8834
+
+2. Two pass, one fails: oracle C dissents (ORACLE_FAULT=fail)
+  PASS  client split the secret 2 of 3; every oracle took its sealed share (job 73b96eb2-7e0c-4528-ab78-bd5acda527e4)
+    watcher | [watcher] subscribed to rDgH2oNLZ8XVHqA6JEdDG6uyWh4iPb6wmt, raWyNdf78mfck3avf2f5UmBHUaevS5d5eR
+    watcher | [watcher] job 73b96eb2-7e0c-4528-ab78-bd5acda527e4: status funded (EscrowCreate 4B583B23EA55F4F0B220BF7290421BDED8AA7928AEC324867F4397F0D3273175)
+  PASS  EscrowCreate -> tesSUCCESS, watcher -> funded (tesSUCCESS https://testnet.xrpl.org/transactions/4B583B23EA55F4F0B220BF7290421BDED8AA7928AEC324867F4397F0D3273175)
+    oracle A r9ghGMTutZhob4kzTVuESKpeSshGcG7pjK: pass, share used; log head entry 17, last anchor entry 16 https://testnet.xrpl.org/transactions/6A72C03C43CDCD91BBA1CB597D8E363FA9D821B5EA940B0E827ADBA115AF2FEF
+    oracle B rnk7esDcnTopQQw29jn1puhQ348uNjUDEs: pass, share used; log head entry 17, last anchor entry 16 https://testnet.xrpl.org/transactions/C737744745B431191ED789749F3C194159165C2C56F6C426804F16D4B1DEC86D
+    oracle C r4ncVq7bDop2RabtcsmXx4nhGLyfxDuwjY: fail; log head entry 13, last anchor entry 12 https://testnet.xrpl.org/transactions/7D7D186A5CF735662975CC55BD63D79246A1D7608CBAB74ACF583A63088CDBA7
+  PASS  A and B pass, C fails; registry -> verified_pass
+  PASS  fulfillment combined from two shares (shares of A and B)
+    watcher | [watcher] job 73b96eb2-7e0c-4528-ab78-bd5acda527e4: status paid (EscrowFinish 86ACDAD523B06BB6237EBEF2A9504508D66FC2FCC7C4858166C93D4E9BA91DC0)
+  PASS  EscrowFinish -> tesSUCCESS, watcher -> paid (tesSUCCESS https://testnet.xrpl.org/transactions/86ACDAD523B06BB6237EBEF2A9504508D66FC2FCC7C4858166C93D4E9BA91DC0)
+  PASS  provider gains the price minus the finish fee (+4.999625 XRP)
+    oracle B | [oracle] stopping: anchoring the verdict log head
+    oracle B | [oracle] ORACLE_FAULT=fail: this oracle signs FAIL on every job (a dissenting oracle, for demos and tests)
+    oracle B | oracle (verdict key rnk7esDcnTopQQw29jn1puhQ348uNjUDEs, anchor account rpuXj4Y419FMo7aJMA1bjJ6dejF2AUeL2F) listening on http://127.0.0.1:8833
+
+3. One passes, two fail: oracles B and C dissent
+  PASS  client split the secret 2 of 3; every oracle took its sealed share (job b1ad4d3e-5643-4efd-98bf-b1167223842d)
+    watcher | [watcher] job b1ad4d3e-5643-4efd-98bf-b1167223842d: status funded (EscrowCreate F56F8D688253C35CC99D8C08ED7872A760979FFE2D74C8843CD44465A3A19AEA)
+  PASS  EscrowCreate -> tesSUCCESS, watcher -> funded (tesSUCCESS https://testnet.xrpl.org/transactions/F56F8D688253C35CC99D8C08ED7872A760979FFE2D74C8843CD44465A3A19AEA)
+    oracle A r9ghGMTutZhob4kzTVuESKpeSshGcG7pjK: pass; log head entry 18, last anchor entry 17 https://testnet.xrpl.org/transactions/46ADEFDF52431D5AA676B0B830D21278E15091FE0F9238F620AC5E9616FF73A9
+    oracle B rnk7esDcnTopQQw29jn1puhQ348uNjUDEs: fail; log head entry 18, last anchor entry 17 https://testnet.xrpl.org/transactions/49F6D57E2A524553C911BF444D85CC63A0F165ADEB779216027A16237A1099F8
+    oracle C r4ncVq7bDop2RabtcsmXx4nhGLyfxDuwjY: fail; log head entry 14, last anchor entry 13 https://testnet.xrpl.org/transactions/1B7FCA29FAFE24B8A34E79F04E25E89FF51BA97F4DC5A415537B2B877B936D10
+  PASS  only A passes: no fulfillment, registry -> verified_fail
+    oracle B | [oracle] stopping: anchoring the verdict log head
+    oracle B | oracle (verdict key rnk7esDcnTopQQw29jn1puhQ348uNjUDEs, anchor account rpuXj4Y419FMo7aJMA1bjJ6dejF2AUeL2F) listening on http://127.0.0.1:8833
+    oracle C | [oracle] stopping: anchoring the verdict log head
+    oracle C | oracle (verdict key r4ncVq7bDop2RabtcsmXx4nhGLyfxDuwjY, anchor account rUP8taT899MsW7f2KEy34eFZ87Nh5nUWuD) listening on http://127.0.0.1:8834
+
+1. All three pass
+  PASS  client split the secret 2 of 3; every oracle took its sealed share (job 6e353b11-13e4-41cb-a782-2f64d15bcc1d)
+    watcher | [watcher] job 6e353b11-13e4-41cb-a782-2f64d15bcc1d: status funded (EscrowCreate ECAE618A90C5A6C170ABB628332E5EB54B23A46BBE096F15D2ABDB9C0C0C3CB2)
+  PASS  EscrowCreate -> tesSUCCESS, watcher -> funded (tesSUCCESS https://testnet.xrpl.org/transactions/ECAE618A90C5A6C170ABB628332E5EB54B23A46BBE096F15D2ABDB9C0C0C3CB2)
+    oracle A r9ghGMTutZhob4kzTVuESKpeSshGcG7pjK: pass, share used; log head entry 19, last anchor entry 18 https://testnet.xrpl.org/transactions/E25EFD75A2B18C621E2AA3EBCA943730A1A68F990B0D57A1B03D82E4F1C6F542
+    oracle B rnk7esDcnTopQQw29jn1puhQ348uNjUDEs: pass, share used; log head entry 19, last anchor entry 18 https://testnet.xrpl.org/transactions/5384E27BADC25013AFFD998DE1D68611F2091549A572506CC296C0FD5A057020
+    oracle C r4ncVq7bDop2RabtcsmXx4nhGLyfxDuwjY: pass; log head entry 15, last anchor entry 14 https://testnet.xrpl.org/transactions/4EFD43892C195F8D06A9EFA5278B446D383263B9BFA81BFC54519F809FB74A4A
+  PASS  all three pass and every verdict log checks
+  PASS  fulfillment combined from two shares (shares of A and B)
+    watcher | [watcher] job 6e353b11-13e4-41cb-a782-2f64d15bcc1d: status paid (EscrowFinish D4FEF16A2796FDD324F470EAD0CD6027D44E5D8657AF0C1941CF8F7EBCEE47EA)
+  PASS  EscrowFinish -> tesSUCCESS, watcher -> paid (tesSUCCESS https://testnet.xrpl.org/transactions/D4FEF16A2796FDD324F470EAD0CD6027D44E5D8657AF0C1941CF8F7EBCEE47EA)
+  PASS  provider gains the price minus the finish fee (+4.999625 XRP)
+
+4. One oracle stopped: oracle C is stopped after it took its share
+  PASS  client split the secret 2 of 3; every oracle took its sealed share (job 2c562bec-a89d-46ef-ab28-8aa3f46ff46a)
+    watcher | [watcher] job b1ad4d3e-5643-4efd-98bf-b1167223842d: flagged (23 s left before CancelAfter)
+    watcher | [watcher] job 2c562bec-a89d-46ef-ab28-8aa3f46ff46a: status funded (EscrowCreate 18D46990CED302D84A7A57BC5B7A058C44902DC3C71B1359F458249C16D1E284)
+  PASS  EscrowCreate -> tesSUCCESS, watcher -> funded (tesSUCCESS https://testnet.xrpl.org/transactions/18D46990CED302D84A7A57BC5B7A058C44902DC3C71B1359F458249C16D1E284)
+    oracle C | [oracle] stopping: anchoring the verdict log head
+    oracle A r9ghGMTutZhob4kzTVuESKpeSshGcG7pjK: pass, share used; log head entry 20, last anchor entry 19 https://testnet.xrpl.org/transactions/C564248701AF68BC8CC3EB595D8F074A8B2BD6DB336647A2C0D563D883ACA6CD
+    oracle B rnk7esDcnTopQQw29jn1puhQ348uNjUDEs: pass, share used; log head entry 20, last anchor entry 19 https://testnet.xrpl.org/transactions/40F58DBA2A67BE3501EEE4CE3DCB22A179867EA7A957566643334F079D42E92F
+    oracle C r4ncVq7bDop2RabtcsmXx4nhGLyfxDuwjY: unreachable; <urlopen error [Errno 111] Connection refused>
+  PASS  C unreachable, A and B pass
+  PASS  fulfillment combined from two shares (shares of A and B)
+    watcher | [watcher] job 2c562bec-a89d-46ef-ab28-8aa3f46ff46a: status paid (EscrowFinish 7AE89EF05B9D37536586E77622D86E85462CD5C55585DF03D686966C181AEAA4)
+  PASS  EscrowFinish -> tesSUCCESS, watcher -> paid (tesSUCCESS https://testnet.xrpl.org/transactions/7AE89EF05B9D37536586E77622D86E85462CD5C55585DF03D686966C181AEAA4)
+  PASS  provider gains the price minus the finish fee (+4.999625 XRP)
+
+3. One passes, two fail (after the deadline)
+    watcher | [watcher] job b1ad4d3e-5643-4efd-98bf-b1167223842d: status refunded (EscrowCancel 8BE613317746AB861494666D89BA1650D2C76067D31100FE205C91931868A4A8)
+  PASS  EscrowCancel -> tesSUCCESS, watcher -> refunded (tesSUCCESS https://testnet.xrpl.org/transactions/8BE613317746AB861494666D89BA1650D2C76067D31100FE205C91931868A4A8)
+  PASS  client gets the price back minus the cancel fee (+4.999990 XRP)
+  PASS  the splits list has jobs 2 and 3, not job 1
+    oracle A | [oracle] stopping: anchoring the verdict log head
+    oracle B | [oracle] stopping: anchoring the verdict log head
+
+24/24 checks passed
+exit 0
