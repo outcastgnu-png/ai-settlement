@@ -1,0 +1,4 @@
+$ python -m venv .venv
+start 2026-11-18T02:45:49-06:00
+EXIT 0
+elapsed 3 s

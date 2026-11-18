@@ -1,0 +1,22 @@
+$ .venv/Scripts/python.exe -m pytest
+start 2026-11-18T02:46:00-06:00
+============================= test session starts =============================
+platform win32 -- Python 3.14.6, pytest-9.2.0, pluggy-1.7.0
+rootdir: C:\dev\ai-settlement-5657699\xrpl-escrow-py
+configfile: pyproject.toml
+testpaths: tests
+plugins: anyio-4.16.0
+collected 57 items
+
+tests\test_condition.py .....                                            [  8%]
+tests\test_demo_testnet.py ss                                            [ 12%]
+tests\test_kit_local.py ...........                                      [ 31%]
+tests\test_parity.py ........                                            [ 45%]
+tests\test_retry.py ..                                                   [ 49%]
+tests\test_shared_local.py ....                                          [ 56%]
+tests\test_shared_vectors.py ............                                [ 77%]
+tests\test_verdict_log.py .............                                  [100%]
+
+======================= 55 passed, 2 skipped in 12.67s ========================
+EXIT 0
+elapsed 13 s
