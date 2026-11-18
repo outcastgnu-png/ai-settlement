@@ -84,13 +84,6 @@ finished.
 5. The provider finished the escrow and was paid. On a mismatch, the client cancels
    after the deadline and gets the XRP back.
 
-## Next: no single oracle (0.5.0)
-
-`npm run setup` also made oracles B and C. `npm run demo:phase5` runs jobs where the
-client splits the secret between three oracles and any two passing oracles release
-the payment, one alone never can. See "Phase 5" in
-[`xrpl-escrow/README.md`](xrpl-escrow/README.md).
-
 ## Stuck?
 
 | Problem | Fix |
@@ -100,7 +93,6 @@ the payment, one alone never can. See "Phase 5" in
 | `ORACLE_VERDICT_SEED is missing from .env` | Run `npm run setup` in `xrpl-escrow`. |
 | `ORACLE_ANCHOR_SEED is missing from .env` | Your `.env` is from 0.3.x. Run `npm run setup` in `xrpl-escrow` once more. |
 | `no oracle at http://127.0.0.1:8802` | Start the services (step 3), or run the Python demo with `--start-services`. |
-| `oracles B and C are not set up` or `.env.oracle-b has no ORACLE_VERDICT_ADDRESS` | Your `.env` is from 0.4.x. Run `npm run setup` once more. |
 | The faucet is slow or refuses | Wait a minute and rerun `npm run setup`; it only funds wallets below 60 XRP. |
 
 More detail: [`xrpl-escrow/README.md`](xrpl-escrow/README.md) and

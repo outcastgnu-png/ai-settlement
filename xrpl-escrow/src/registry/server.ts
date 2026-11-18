@@ -10,16 +10,6 @@
 //   POST /jobs/:id/events               status changes from the watcher (watcher token) or the oracle (oracle token)
 //   GET  /jobs/:id/events
 //   GET  /providers/:address/reputation
-//   POST /jobs/:id/verdicts             a shared job's signed oracle verdict {verdict} (EDR-015); checked, no token
-//   GET  /jobs/:id/verdicts             the signed oracle verdicts recorded for a shared job
-//   GET  /splits                        shared jobs whose oracles disagreed (at least one pass and one fail)
-//
-// A shared job (EDR-015) is created by its client, signed, with its oracle set,
-// threshold k and the condition of a secret the client made and split. The
-// registry never sees a share. Its status follows the signed verdicts: it is
-// verified_pass once k oracles of the set passed it, and verified_fail once so
-// many failed it that k passes can no longer happen. Any party may post a
-// verdict, since the signature by a pinned oracle of the set is what counts.
 //
 // Job specs and deliverables are stored as data and never interpreted here.
 // The two internal write endpoints need a bearer token from .env, so only the
@@ -27,42 +17,12 @@
 // happened on the ledger.
 import { pathToFileURL } from "node:url";
 import { isValidClassicAddress } from "xrpl";
-import { canonicalJson, checkBearer, checkRequest, newJobHash, sha256Hex, verifyPayload } from "../auth.js";
+import { checkBearer, checkRequest, sha256Hex } from "../auth.js";
 import { HttpError, jsonServer, listenLocal, type Route } from "../http.js";
 import { JOBS_DB, REGISTRY_PORT, readEnvFile, requireEnv } from "../local-config.js";
 import { TX_TYPES } from "../oracle/checks/xrpl-tx.js";
 import { schemaProblem } from "../schema-policy.js";
-import { JobStore, TERMINAL, canMove, type CheckSpec, type Job, type JobPatch, type JobStatus, type NewJob, type OracleRef } from "./db.js";
-import type { SignedVerdict } from "../oracle/server.js";
-
-/** A shared job has at most this many oracles. */
-export const MAX_ORACLES = 7;
-const LOCAL_URL = /^http:\/\/127\.0\.0\.1:[0-9]{1,5}$/;
-const CONDITION = /^A0258020[0-9A-F]{64}810120$/;
-
-export { newJobHash };
-
-function parseOracleSet(body: Record<string, unknown>): { oracles: OracleRef[]; threshold: number; condition: string } {
-  const { oracles, threshold, condition } = body;
-  if (!Array.isArray(oracles) || oracles.length < 2 || oracles.length > MAX_ORACLES) {
-    throw new HttpError(400, `oracles must list 2 to ${MAX_ORACLES} oracles`);
-  }
-  const set: OracleRef[] = oracles.map((o, i) => {
-    if (!isObject(o) || !Object.keys(o).every((k) => ["address", "anchor", "url"].includes(k))) throw new HttpError(400, `oracle ${i + 1} must be {address, anchor, url}`);
-    if (typeof o.address !== "string" || !isValidClassicAddress(o.address)) throw new HttpError(400, `oracle ${i + 1}: address must be an XRPL address`);
-    if (typeof o.anchor !== "string" || !isValidClassicAddress(o.anchor)) throw new HttpError(400, `oracle ${i + 1}: anchor must be an XRPL address`);
-    if (typeof o.url !== "string" || !LOCAL_URL.test(o.url)) throw new HttpError(400, `oracle ${i + 1}: url must be http://127.0.0.1:<port> (local only)`);
-    return { address: o.address, anchor: o.anchor, url: o.url };
-  });
-  for (const key of ["address", "anchor", "url"] as const) {
-    if (new Set(set.map((o) => o[key])).size !== set.length) throw new HttpError(400, `each oracle needs its own ${key}`);
-  }
-  if (!Number.isInteger(threshold) || (threshold as number) < 2 || (threshold as number) > set.length) {
-    throw new HttpError(400, "threshold must be a whole number from 2 to the number of oracles");
-  }
-  if (typeof condition !== "string" || !CONDITION.test(condition)) throw new HttpError(400, "condition must be an uppercase PREIMAGE-SHA-256 condition");
-  return { oracles: set, threshold: threshold as number, condition };
-}
+import { JobStore, TERMINAL, canMove, type CheckSpec, type Job, type JobPatch, type JobStatus, type NewJob } from "./db.js";
 
 const FORBIDDEN_KEYS = ["secret", "fulfillment", "preimage"];
 const CHECK_TYPES = ["sha256-match", "json-schema", "max-latency", "xrpl-tx-validated"];
@@ -126,56 +86,7 @@ export function parseNewJob(body: unknown): NewJob {
     throw new HttpError(400, `spec.checks must be a non-empty list of: ${CHECK_TYPES.join(", ")}`);
   }
   const title = typeof spec.title === "string" ? spec.title : undefined;
-  const job: NewJob = { client, provider, priceDrops, slaSeconds: slaSeconds as number, spec: { title, checks: spec.checks } };
-  if (body.oracles !== undefined || body.threshold !== undefined || body.condition !== undefined) {
-    job.shared = parseOracleSet(body);
-    // Only the client may create its shared job, since it names the condition the client will fund.
-    checkRequest(body.auth, "create", "", newJobHash(body), client);
-  }
-  return job;
-}
-
-/** Check a posted verdict for a shared job and record it; then move the job's status if the set has decided. */
-function applyOracleVerdict(store: JobStore, job: Job, body: unknown): Job {
-  if (!job.oracles || !job.threshold) throw new HttpError(409, "not a shared job; its oracle reports with its service token");
-  const v = (isObject(body) ? body.verdict : undefined) as SignedVerdict | undefined;
-  if (!isObject(v) || typeof v.signature !== "string" || typeof v.oracle !== "string" || typeof v.publicKey !== "string") {
-    throw new HttpError(400, "verdict must be a signed oracle verdict");
-  }
-  const index = job.oracles.findIndex((o) => o.address === v.oracle);
-  if (index < 0) throw new HttpError(403, `${v.oracle} is not in this job's oracle set`);
-  const { signature, ...unsigned } = v;
-  if (!verifyPayload(unsigned, signature, v.publicKey, v.oracle)) throw new HttpError(400, "verdict signature does not check");
-  if (v.jobId !== job.id || v.condition !== job.condition || v.provider !== job.provider) {
-    throw new HttpError(400, "verdict is for another job, condition or provider");
-  }
-  if (v.verdict !== "pass" && v.verdict !== "fail") throw new HttpError(400, "verdict must be pass or fail");
-  if (v.shareIndex !== index + 1 || v.threshold !== job.threshold) throw new HttpError(400, "verdict names the wrong share index or threshold");
-  const deliverable = store.getDeliverable(job.id);
-  if (!deliverable || deliverable.sha256 !== v.evidenceHash) throw new HttpError(400, "verdict is not for the delivered work");
-
-  const now = Date.now();
-  const prior = store.oracleVerdicts(job.id).find((r) => r.oracle === v.oracle);
-  if (prior) {
-    if (canonicalJson(prior.signed) === canonicalJson(v)) return job;
-    // Two different signed verdicts from one oracle for one job: keep the first, record that it happened.
-    store.addEvent({ jobId: job.id, at: now, source: "oracle", status: null, detail: `oracle ${v.oracle} signed a second, different verdict (${v.verdict}); the first (${prior.verdict}) stands` });
-    throw new HttpError(409, `oracle ${v.oracle} already has a verdict for this job (${prior.verdict}); the first stands`);
-  }
-  store.putOracleVerdict({ jobId: job.id, oracle: v.oracle, verdict: v.verdict, at: now, signed: v as unknown as Record<string, unknown> });
-  const all = store.oracleVerdicts(job.id);
-  const passes = all.filter((r) => r.verdict === "pass").length;
-  const fails = all.filter((r) => r.verdict === "fail").length;
-  const n = job.oracles.length;
-  store.addEvent({ jobId: job.id, at: now, source: "oracle", status: null, detail: `oracle ${index + 1} (${v.oracle}): ${v.verdict}; ${passes} pass, ${fails} fail of ${n}, ${job.threshold} needed` });
-  let status: JobStatus | null = null;
-  if (passes >= job.threshold) status = "verified_pass";
-  else if (fails > n - job.threshold) status = "verified_fail";
-  if (status && job.status === "delivered") {
-    store.addEvent({ jobId: job.id, at: now, source: "oracle", status, detail: `${passes} of ${n} oracles passed, ${job.threshold} needed` });
-    return store.update(job.id, { status, verdict: status === "verified_pass" ? "pass" : "fail", verifiedAt: now });
-  }
-  return store.get(job.id)!;
+  return { client, provider, priceDrops, slaSeconds: slaSeconds as number, spec: { title, checks: spec.checks } };
 }
 
 const LEDGER_STATUSES: JobStatus[] = ["funded", "paid", "refunded", "expired_unclaimed"];
@@ -196,21 +107,7 @@ export function registryRoutes(store: JobStore, tokens: ServiceTokens): Route[] 
   return [
     { method: "GET", path: "/health", handler: () => ({ ok: true, service: "registry" }) },
 
-    {
-      method: "POST", path: "/jobs",
-      handler: (_p, body) => {
-        const input = parseNewJob(body);
-        if (input.shared && store.byCondition(input.shared.condition)) throw new HttpError(409, "a job with this condition already exists");
-        return store.create(input);
-      },
-    },
-
-    {
-      method: "GET", path: "/splits",
-      handler: () => store.splitJobs().map(({ job, passed, failed }) => ({
-        jobId: job.id, status: job.status, threshold: job.threshold, oracles: job.oracles?.map((o) => o.address) ?? [], passed, failed,
-      })),
-    },
+    { method: "POST", path: "/jobs", handler: (_p, body) => store.create(parseNewJob(body)) },
 
     {
       method: "GET", path: "/jobs",
@@ -230,7 +127,6 @@ export function registryRoutes(store: JobStore, tokens: ServiceTokens): Route[] 
         if (typeof condition !== "string" || !/^A0258020[0-9A-F]{64}810120$/.test(condition)) {
           throw new HttpError(400, "condition must be an uppercase PREIMAGE-SHA-256 condition");
         }
-        if (job.oracles) throw new HttpError(409, "a shared job's condition is set by its client at creation");
         if (job.condition === condition) return job;
         if (job.condition || job.status !== "draft") throw new HttpError(409, "condition is already set");
         store.addEvent({ jobId: id, at: Date.now(), source: "oracle", status: null, detail: "condition set" });
@@ -277,19 +173,6 @@ export function registryRoutes(store: JobStore, tokens: ServiceTokens): Route[] 
     { method: "GET", path: "/jobs/:id/events", handler: ({ id }) => (mustGet(id), store.events(id)) },
 
     {
-      method: "POST", path: "/jobs/:id/verdicts",
-      handler: ({ id }, body) => {
-        const job = mustGet(id);
-        if (!["delivered", "verified_pass", "verified_fail", "paid", "refunded", "expired_unclaimed"].includes(job.status)) {
-          throw new HttpError(409, `job is ${job.status}; nothing was delivered to verify`);
-        }
-        return applyOracleVerdict(store, job, body);
-      },
-    },
-
-    { method: "GET", path: "/jobs/:id/verdicts", handler: ({ id }) => (mustGet(id), store.oracleVerdicts(id).map((r) => r.signed)) },
-
-    {
       method: "GET", path: "/providers/:address/reputation",
       handler: ({ address }) => {
         if (!isValidClassicAddress(address)) throw new HttpError(400, "not an XRPL address");
@@ -320,8 +203,6 @@ function applyEvent(store: JobStore, job: Job, body: unknown): Job {
   const status = body.status as JobStatus | undefined;
   if (status === undefined) return job;
   if (status === job.status) return job; // already applied
-  // One oracle's token never decides a shared job; its signed verdicts do, k of n (EDR-015).
-  if (source === "oracle" && job.oracles) throw new HttpError(409, "a shared job's status follows its signed oracle verdicts (POST /jobs/:id/verdicts)");
   const allowed = source === "ledger" ? LEDGER_STATUSES : ORACLE_STATUSES;
   if (!allowed.includes(status)) throw new HttpError(400, `${source} may not set status ${status}`);
 

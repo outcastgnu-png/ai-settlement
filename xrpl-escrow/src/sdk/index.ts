@@ -9,37 +9,22 @@
 //   verifyVerdictLog()  fetch the oracle's public verdict log and check its chain, signatures and
 //                       latest testnet anchor (EDR-014); optionally that your own verdict is in it
 //
-// Shared verification, k of n oracles (EDR-015):
-//
-//   createSharedJob()  the client makes the secret, splits it k of n, seals each share to one oracle of
-//                      the set and registers the job with the condition; the secret itself is dropped
-//   deliverShared()    provider posts the work and asks every oracle of the set; each signed verdict is
-//                      checked against its pinned address and its own verdict log, and k shares from
-//                      passing oracles of the set are combined into the fulfillment
-//   splitJobs()        shared jobs where the oracles of the set disagreed
-//
 // Every transaction is signed locally by the wallet that sends it.
 import type { Client, Wallet } from "xrpl";
-import { canonicalJson, newJobHash, signRequest, sha256Hex, verifyPayload } from "../auth.js";
-import { makeSecret, toCondition, toFulfillment } from "../condition.js";
-import { choose, combine, decodeShare, encodeShare, split, type Share } from "../shamir.js";
-import { seal, verifyShareKey } from "../share-box.js";
-import type { AnchorHistory } from "../anchors.js";
+import { signRequest, sha256Hex, verifyPayload } from "../auth.js";
 import { cancelEscrow, createEscrow, finishEscrow, sleep, waitPastCancelAfter, type EscrowRef, type TxResult } from "../escrow.js";
 import { HttpError, callJson } from "../http.js";
 import { ORACLE_URL, REGISTRY_URL, readEnvFile } from "../local-config.js";
-import type { Job, JobEvent, JobSpec, JobStatus, OracleRef } from "../registry/db.js";
+import type { Job, JobEvent, JobSpec, JobStatus } from "../registry/db.js";
 import type { SignedVerdict, VerdictBody } from "../oracle/server.js";
 import { listAnchors } from "../anchors.js";
 import { anchorHistoryProblems, checkChain, duplicateJobProblems, findVerdict, type Anchor, type LogEntry, type LogHead } from "../verdict-log.js";
 
-export type { Job, JobSpec, JobStatus, OracleRef } from "../registry/db.js";
-export { choose, combine, decodeShare, encodeShare, split } from "../shamir.js";
+export type { Job, JobSpec, JobStatus } from "../registry/db.js";
 export type { SignedVerdict } from "../oracle/server.js";
 export type { Anchor, LogEntry, LogHead } from "../verdict-log.js";
 export { ANCHOR_MEMO_TYPE, anchorHistoryProblems, anchorProblem, checkChain, duplicateJobProblems, entryMismatch, findVerdict, verdictInLog } from "../verdict-log.js";
 export { listAnchors } from "../anchors.js";
-export { localOracleSet } from "../local-config.js";
 
 export interface KitOptions {
   xrpl?: Client; // needed for fundJob, claim and refund
@@ -58,90 +43,6 @@ export interface KitOptions {
   anchorAddress?: string;
   /** How long to wait for the watcher to reflect a validated transaction. */
   statusTimeoutMs?: number;
-  /** Reads an anchor account's anchors from the ledger. Defaults to `listAnchors` on the xrpl Client; tests pass a stand-in. */
-  listAnchors?: (anchorAddress: string, verdictAddress: string, maxTx?: number) => Promise<AnchorHistory>;
-}
-
-export interface SharedJobInput extends NewJobInput {
-  /** The pinned oracle set, in share order: oracle i gets share x = i + 1. */
-  oracles: OracleRef[];
-  /** How many passes release the funds (k). */
-  threshold: number;
-}
-
-/** What one oracle of a shared job's set answered, and what the provider's SDK made of it. */
-export interface OracleReport {
-  oracle: OracleRef;
-  index: number; // share x
-  /**
-   * pass / fail: a verdict that checked. rejected: a verdict came back but did not check
-   * (signature, fields, share or verdict log), so it is not used. unreachable: no verdict.
-   */
-  status: "pass" | "fail" | "rejected" | "unreachable";
-  verdict?: SignedVerdict;
-  problems: string[];
-  log?: LogVerification;
-  /** True when this oracle's share went into the fulfillment. */
-  used: boolean;
-}
-
-export interface SharedVerification {
-  job: Job;
-  reports: OracleReport[];
-  passed: string[];
-  failed: string[];
-  rejected: string[];
-  unreachable: string[];
-  /** The fulfillment from k shares of passing oracles, or null with fewer than k usable passes. */
-  fulfillment: string | null;
-}
-
-export interface SharedVerifyOptions {
-  /** The set you pinned. When given it must equal the job's set in the registry; otherwise the job's set is used. */
-  oracles?: OracleRef[];
-  /**
-   * Only use a share whose verdict is at or before its oracle's newest anchor (and so only from an oracle with an anchor).
-   * Default false (owner's choice, 2026-11-18): a verdict not yet anchored counts when its signature and chain check
-   * and every anchor already on the ledger agrees with the log.
-   */
-  requireAnchored?: boolean;
-  /** How often to ask an oracle that answers 503 (busy). */
-  attempts?: number;
-}
-
-/** A share from an oracle of the set, as `combineForCondition` takes it. */
-export interface OracleShare {
-  oracle: string; // verdict address
-  share: string; // hex as encodeShare writes it
-}
-
-/**
- * Combine shares into the fulfillment for `condition`. Only shares from oracles of
- * `set`, each at its own position (x = index + 1), are used; a share from outside
- * the set or at the wrong position throws. With fewer than `threshold` shares the
- * answer is null. Every set of `threshold` shares is tried until one rebuilds a
- * secret that matches the condition, so one wrong share among k+1 does no harm.
- */
-export function combineForCondition(shares: OracleShare[], set: OracleRef[], threshold: number, condition: string): { fulfillment: string; used: string[] } | null {
-  const parsed: { oracle: string; share: Share }[] = [];
-  for (const s of shares) {
-    const i = set.findIndex((o) => o.address === s.oracle);
-    if (i < 0) throw new Error(`${s.oracle} is not in the job's oracle set; its share is never used`);
-    const share = decodeShare(s.share);
-    if (share.x !== i + 1) throw new Error(`${s.oracle} holds share ${i + 1}, but sent share ${share.x}`);
-    if (parsed.some((p) => p.oracle === s.oracle)) throw new Error(`${s.oracle} sent two shares`);
-    parsed.push({ oracle: s.oracle, share });
-  }
-  if (threshold < 2 || parsed.length < threshold) return null;
-  for (const pick of choose(parsed, threshold)) {
-    const secret = combine(pick.map((p) => p.share));
-    try {
-      if (toCondition(secret) === condition) return { fulfillment: toFulfillment(secret), used: pick.map((p) => p.oracle) };
-    } finally {
-      secret.fill(0);
-    }
-  }
-  return null;
 }
 
 export interface NewJobInput {
@@ -205,14 +106,12 @@ export class EscrowKit {
   readonly oracleAddress: string | null;
   readonly anchorAddress: string | null;
   readonly #timeout: number;
-  readonly #listAnchors?: KitOptions["listAnchors"];
 
   constructor(opts: KitOptions = {}) {
     this.registryUrl = opts.registryUrl ?? REGISTRY_URL;
     this.oracleUrl = opts.oracleUrl ?? ORACLE_URL;
     this.#xrpl = opts.xrpl;
     this.#timeout = opts.statusTimeoutMs ?? 60_000;
-    this.#listAnchors = opts.listAnchors;
     const env = opts.oracleAddress && opts.anchorAddress ? {} : readEnvFile();
     this.oracleAddress = opts.oracleAddress ?? env.ORACLE_VERDICT_ADDRESS ?? null;
     this.anchorAddress = opts.anchorAddress ?? env.ORACLE_ANCHOR_ADDRESS ?? null;
@@ -274,9 +173,7 @@ export class EscrowKit {
     let history = { anchors: [] as Anchor[], complete: true };
     if (!this.anchorAddress) problems.push("no pinned anchor account (ORACLE_ANCHOR_ADDRESS)");
     else if (this.oracleAddress) {
-      history = this.#listAnchors
-        ? await this.#listAnchors(this.anchorAddress, this.oracleAddress, opts.maxTx)
-        : await listAnchors(this.#ledger(), this.anchorAddress, this.oracleAddress, opts.maxTx);
+      history = await listAnchors(this.#ledger(), this.anchorAddress, this.oracleAddress, opts.maxTx);
       if (!history.complete) {
         problems.push(`${this.anchorAddress} has more transactions than the lookback reads (maxTx); older anchors were not checked`);
       }
@@ -339,14 +236,10 @@ export class EscrowKit {
    * A busy oracle can stay busy for longer than that (Gpno N21). If this still throws a 503, the work stays
    * delivered; call requestVerification again, until shortly before the job's deadline (`cancelAfter`).
    */
-  requestVerification(jobId: string, wallet: Wallet, attempts = 4): Promise<{ verdict: SignedVerdict; fulfillment?: string }> {
-    return this.#verifyAt(this.oracleUrl, jobId, wallet, "", attempts);
-  }
-
-  async #verifyAt<T>(url: string, jobId: string, wallet: Wallet, payloadHash: string, attempts: number): Promise<T> {
+  async requestVerification(jobId: string, wallet: Wallet, attempts = 4): Promise<{ verdict: SignedVerdict; fulfillment?: string }> {
     for (let attempt = 1; ; attempt++) {
       try {
-        return await callJson<T>("POST", `${url}/verify/${jobId}`, { auth: signRequest(wallet, "verify", jobId, payloadHash) });
+        return await callJson("POST", `${this.oracleUrl}/verify/${jobId}`, { auth: signRequest(wallet, "verify", jobId) });
       } catch (err) {
         if (!(err instanceof HttpError && err.status === 503) || attempt >= attempts) throw err;
         await sleep(1000 * attempt);
@@ -367,152 +260,6 @@ export class EscrowKit {
         && verdict.evidenceHash === sha256Hex(content),
       fulfillment: fulfillment ?? null,
     };
-  }
-
-  /** The signed oracle verdicts the registry recorded for a shared job. */
-  jobVerdicts(jobId: string): Promise<SignedVerdict[]> {
-    return callJson("GET", `${this.registryUrl}/jobs/${encodeURIComponent(jobId)}/verdicts`);
-  }
-
-  /** Shared jobs whose oracles disagreed: at least one signed pass and one signed fail. */
-  splitJobs(): Promise<{ jobId: string; status: JobStatus; threshold: number; oracles: string[]; passed: string[]; failed: string[] }[]> {
-    return callJson("GET", `${this.registryUrl}/splits`);
-  }
-
-  /**
-   * Client side of a shared job (EDR-015). Checks each oracle of the pinned set (its
-   * verdict address, anchor account and share key, which its verdict key must have
-   * signed), makes the job's secret, splits it `threshold` of n, registers the job
-   * with the condition, signed by the client, and seals each share to its oracle.
-   * The secret and the shares are wiped from memory afterwards and never stored.
-   * Throws if any oracle could not take its share; then don't fund the job.
-   */
-  async createSharedJob(input: SharedJobInput, clientWallet: Wallet): Promise<Job> {
-    if (clientWallet.address !== input.client) throw new Error("only the job's client can create its shared job");
-    const n = input.oracles.length;
-    if (!Number.isInteger(input.threshold) || input.threshold < 2 || input.threshold > n) throw new Error("threshold must be from 2 to the number of oracles");
-    const keys = await Promise.all(input.oracles.map(async (ref, i) => {
-      const h = await callJson<{ oracle: string; publicKey: string; anchorAccount: string | null; shareKey: string | null; shareKeySignature: string | null }>(
-        "GET", `${ref.url}/health`);
-      if (h.oracle !== ref.address) throw new Error(`oracle ${i + 1} at ${ref.url} signs as ${h.oracle}, not the pinned ${ref.address}`);
-      if (h.anchorAccount !== ref.anchor) throw new Error(`oracle ${i + 1} anchors from ${h.anchorAccount}, not the pinned ${ref.anchor}`);
-      if (!h.shareKey || !h.shareKeySignature || !verifyShareKey(ref.address, h.publicKey, h.shareKey, h.shareKeySignature)) {
-        throw new Error(`oracle ${i + 1} (${ref.address}) has no share key signed by its verdict key`);
-      }
-      return h.shareKey;
-    }));
-    const secret = makeSecret();
-    const condition = toCondition(secret);
-    const shares = split(secret, input.threshold, n);
-    secret.fill(0);
-    try {
-      const body = {
-        client: input.client, provider: input.provider, priceDrops: input.priceDrops, slaSeconds: input.slaSeconds, spec: input.spec,
-        oracles: input.oracles, threshold: input.threshold, condition,
-      };
-      const job = await callJson<Job>("POST", `${this.registryUrl}/jobs`, { ...body, auth: signRequest(clientWallet, "create", "", newJobHash(body)) });
-      const failures: string[] = [];
-      await Promise.all(input.oracles.map(async (ref, i) => {
-        const raw = Buffer.from(encodeShare(shares[i]), "hex");
-        const box = seal(raw, keys[i], { jobId: job.id, oracle: ref.address, index: i + 1 });
-        raw.fill(0);
-        try {
-          await callJson("POST", `${ref.url}/jobs/${job.id}/share`, {
-            index: i + 1, box, auth: signRequest(clientWallet, "share", job.id, sha256Hex(canonicalJson(box))),
-          });
-        } catch (err) {
-          failures.push(`oracle ${i + 1} (${ref.address}): ${err instanceof Error ? err.message : String(err)}`);
-        }
-      }));
-      if (failures.length) throw new Error(`job ${job.id} is registered, but not every oracle took its share; do not fund it: ${failures.join("; ")}`);
-      return this.getJob(job.id);
-    } finally {
-      for (const s of shares) s.y.fill(0);
-    }
-  }
-
-  /**
-   * Provider side of a shared job (EDR-015): ask every oracle of the set to verify the
-   * delivered work. Each verdict is used only when it is signed by that oracle's pinned
-   * address, names this job, its condition, provider, deliverable, share index and k,
-   * and that oracle's own verdict log checks (`verifyVerdictLog` with its pinned anchor
-   * account). k shares from such passes are combined into the fulfillment. Every
-   * verdict that checks is also posted to the registry, which counts them toward k.
-   */
-  async requestSharedVerification(jobId: string, wallet: Wallet, content: string, opts: SharedVerifyOptions = {}): Promise<SharedVerification> {
-    const job = await this.getJob(jobId);
-    if (!job.oracles || !job.threshold || !job.condition) throw new Error(`job ${jobId} is not a shared job`);
-    if (opts.oracles && canonicalJson(opts.oracles) !== canonicalJson(job.oracles)) {
-      throw new Error("the registry's oracle set for this job is not the set you pinned");
-    }
-    const set = opts.oracles ?? job.oracles;
-    const evidenceHash = sha256Hex(content);
-    const reports = await Promise.all(set.map(async (ref, i): Promise<OracleReport & { share?: string }> => {
-      const report: OracleReport & { share?: string } = { oracle: ref, index: i + 1, status: "unreachable", problems: [], used: false };
-      let answer: { verdict: SignedVerdict; share?: string };
-      try {
-        answer = await this.#verifyAt(ref.url, jobId, wallet, ref.address, opts.attempts ?? 4);
-      } catch (err) {
-        report.problems.push(err instanceof Error ? err.message : String(err));
-        return report;
-      }
-      const v = answer.verdict;
-      report.verdict = v;
-      const p = report.problems;
-      if (!verifyVerdict(v, ref.address)) p.push(`verdict is not signed by the pinned oracle ${ref.address}`);
-      if (v.jobId !== jobId || v.condition !== job.condition || v.provider !== job.provider) p.push("verdict is for another job, condition or provider");
-      if (v.evidenceHash !== evidenceHash) p.push("verdict is not for this deliverable");
-      if (v.shareIndex !== i + 1 || v.threshold !== job.threshold) p.push("verdict names the wrong share index or threshold");
-      if (v.verdict === "fail" && answer.share !== undefined) p.push("oracle sent a share with a fail verdict; it is not used");
-      if (v.verdict === "pass") {
-        try {
-          if (decodeShare(answer.share ?? "").x !== i + 1) p.push(`share is not share ${i + 1}`);
-        } catch (err) {
-          p.push(`pass without a usable share: ${err instanceof Error ? err.message : String(err)}`);
-        }
-      }
-      if (p.length === 0) {
-        const kit = new EscrowKit({ xrpl: this.#xrpl, oracleUrl: ref.url, registryUrl: this.registryUrl, oracleAddress: ref.address, anchorAddress: ref.anchor, listAnchors: this.#listAnchors });
-        try {
-          report.log = await kit.verifyVerdictLog({ verdict: v, allowUnanchored: !opts.requireAnchored, requireAnchor: !!opts.requireAnchored });
-          if (!report.log.ok) p.push(...report.log.problems.map((x) => `verdict log: ${x}`));
-        } catch (err) {
-          p.push(`verdict log could not be checked: ${err instanceof Error ? err.message : String(err)}`);
-        }
-      }
-      report.status = p.length ? "rejected" : v.verdict;
-      if (report.status === "pass") report.share = answer.share;
-      return report;
-    }));
-    // The registry counts signed verdicts toward k; the oracles post their own too.
-    for (const r of reports) {
-      if (r.status === "pass" || r.status === "fail") {
-        try {
-          await callJson("POST", `${this.registryUrl}/jobs/${encodeURIComponent(jobId)}/verdicts`, { verdict: r.verdict });
-        } catch {
-          // already recorded, or the registry is down: the fulfillment does not depend on it
-        }
-      }
-    }
-    const passes = reports.filter((r) => r.status === "pass").map((r) => ({ oracle: r.oracle.address, share: r.share! }));
-    const combined = combineForCondition(passes, set, job.threshold, job.condition);
-    for (const r of reports) {
-      r.used = !!combined?.used.includes(r.oracle.address);
-      delete r.share;
-    }
-    const by = (s: OracleReport["status"]) => reports.filter((r) => r.status === s).map((r) => r.oracle.address);
-    return {
-      job: await this.getJob(jobId), reports, passed: by("pass"), failed: by("fail"), rejected: by("rejected"), unreachable: by("unreachable"),
-      fulfillment: combined?.fulfillment ?? null,
-    };
-  }
-
-  /** Provider posts the work for a shared job, then asks every oracle of the set (`requestSharedVerification`). */
-  async deliverShared(jobId: string, providerWallet: Wallet, content: string, opts: SharedVerifyOptions = {}): Promise<SharedVerification> {
-    await callJson("POST", `${this.registryUrl}/jobs/${jobId}/deliverable`, {
-      content, auth: signRequest(providerWallet, "deliver", jobId, sha256Hex(content)),
-    });
-    return this.requestSharedVerification(jobId, providerWallet, content, opts);
   }
 
   /** Provider finishes the escrow with the oracle's fulfillment. Resolves when the watcher marks the job paid. */

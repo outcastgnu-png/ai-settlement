@@ -4,7 +4,6 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { parse } from "dotenv";
 import { Client, Wallet } from "xrpl";
 import { FAUCET_HOST } from "./config.js";
-import { ENV_FILE, ensureLocalSecrets, localOracleProfile, readEnvFile } from "./local-config.js";
 
 export type Role = "client" | "provider" | "oracle";
 export const ROLES: Role[] = ["client", "provider", "oracle"];
@@ -74,21 +73,4 @@ export async function loadOrFundAnchor(client: Client, envPath = ".env"): Promis
     await client.fundWallet(wallet, { faucetHost: FAUCET_HOST });
   }
   return wallet;
-}
-
-/**
- * Make the env files of local oracles b and c (EDR-015) if missing, each with its own
- * verdict key, vault key, share key and faucet-funded anchor wallet, and the registry's
- * oracle service token copied from the main .env. Returns their anchor wallets.
- */
-export async function setupOtherOracles(client: Client, envPath = ENV_FILE): Promise<[string, Wallet][]> {
-  const token = readEnvFile(envPath).ORACLE_SERVICE_TOKEN;
-  if (!token) throw new Error("ORACLE_SERVICE_TOKEN is missing from .env; run ensureLocalSecrets first");
-  const out: [string, Wallet][] = [];
-  for (const name of ["b", "c"]) {
-    const profile = localOracleProfile(name, { envFile: envPath });
-    ensureLocalSecrets(profile.envFile, { oracleOnly: true, serviceToken: token });
-    out.push([`anchor-${name}`, await loadOrFundAnchor(client, profile.envFile)]);
-  }
-  return out;
 }

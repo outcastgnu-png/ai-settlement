@@ -52,21 +52,3 @@ def test_pass_claim_and_fail_refund_on_testnet():
         xrpl.close()
     assert [f"{c.scenario}: {c.label} {c.detail}" for c in checks if not c.ok] == []
     assert len(checks) == 16
-
-
-@pytest.mark.testnet
-def test_shared_verification_demo_on_testnet():
-    """The Python Phase 5 demo (EDR-015): three local oracles, 2 of 3, through the kit's own data
-    folders (one anchor account anchors one log, so each oracle keeps its own)."""
-    base_env = TS_KIT / ".env"
-    if not Path(f"{base_env}.oracle-c").exists():
-        pytest.skip("run `npm run setup` in xrpl-escrow first (it makes oracles B and C)")
-    from xrpl_escrow.demo_phase5 import run as run_phase5
-    xrpl = connect_testnet()
-    try:
-        wallets = load_or_fund_wallets(xrpl, base_env)
-        checks = run_phase5(xrpl, wallets, TS_KIT, base_env, TS_KIT / "data", registry_port=18831, oracle_port=18832, log=lambda _l: None)
-    finally:
-        xrpl.close()
-    assert [f"{c.scenario}: {c.label} {c.detail}" for c in checks if not c.ok] == []
-    assert len(checks) == 24

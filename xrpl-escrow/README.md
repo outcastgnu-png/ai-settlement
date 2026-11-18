@@ -279,63 +279,6 @@ npm run demo:phase4   # tx check pass/claim, tec* fail/refund, unvalidated, malf
 The run log goes to `logs/<date>-phase4.txt`; `test/phase4-flow.test.ts` runs the
 same scenarios in `npm test`.
 
-## Phase 5: shared verification, 2 of 3 oracles (EDR-015)
-
-No single oracle can release the funds any more. For a shared job, **the client
-makes the secret** and splits it into three shares (Shamir's scheme): any two
-rebuild it, and one alone says nothing about it. Each share is sealed to one
-oracle's own share key, so only that oracle can open it, and only for this job and
-its own place in the set. The registry gets the condition and the oracle set, never
-a share. The client forgets the secret once the shares are out.
-
-Each oracle then works on its own: it checks the delivered work, signs its own
-verdict, writes it to its own log and anchors that log from its own anchor wallet.
-On its own pass it releases its own share, and nothing on a fail. The provider's SDK
-asks all three, checks each verdict against that oracle's pinned address and its
-log, and combines two shares from passing oracles into the fulfillment. With fewer
-than two passes there is no fulfillment and the client is refunded after the
-deadline, as before. The registry counts the signed verdicts: the job is
-`verified_pass` after two passes and `verified_fail` after two fails.
-
-```ts
-const set = localOracleSet();                       // [{ address, anchor, url }] for oracles A, B, C
-const job = await kit.createSharedJob({ client, provider, priceDrops, slaSeconds, spec, oracles: set, threshold: 2 }, clientWallet);
-await kit.fundJob(job.id, clientWallet);            // EscrowCreate, as before
-const res = await kit.deliverShared(job.id, providerWallet, work);
-// res.passed / failed / rejected / unreachable, res.reports (each oracle's verdict and log check)
-if (res.fulfillment) await kit.claim(job.id, providerWallet, res.fulfillment);
-```
-
-By default a verdict that is not anchored yet counts when its signature and log
-check and every anchor already on the ledger agrees. `deliverShared(..., { requireAnchored: true })`
-uses only anchored verdicts, which can mean waiting for the next anchor.
-
-**Three local oracles.** Oracle A is the oracle you already had (`.env`, `data/`,
-port 8802). `npm run setup` adds oracles B and C with their own `.env.oracle-b` /
-`.env.oracle-c`, data folders `data/oracle-b` / `data/oracle-c`, keys and
-faucet-funded anchor wallets. Run each in its own window:
-
-```
-npm run registry
-npm run oracle        # A, 8802
-npm run oracle:b      # B, 8803
-npm run oracle:c      # C, 8804
-npm run watcher
-npm run splits        # jobs where the oracles disagreed
-```
-
-Three oracles on one machine show the mechanism, not independence: for that,
-other people have to run the other oracles. `ORACLE_FAULT=fail` starts an oracle
-that fails every job and says so in its verdict, to show a dissenting oracle.
-
-```
-npm run demo:phase5   # 2 pass 1 fail, 1 pass 2 fail then refund, 3 pass, one oracle stopped,
-                      # then every oracle's log checked against its own anchors (about 4 minutes)
-```
-
-The run log goes to `logs/<date>-phase5.txt`; `test/shared.test.ts` covers the
-same rules without the ledger.
-
 ## Safety rails
 
 - Testnet only. On connect the code reads `network_id` from the server and
@@ -366,14 +309,10 @@ same rules without the ledger.
 | `src/oracle/` | `server.ts` (HTTP on 8802), `vault.ts` (AES-256-GCM secrets), `verdict-store.ts` (the chained log file and its testnet anchors), `checks/` (`sha256-match`, `json-schema`, `max-latency`, `xrpl-tx-validated`) |
 | `src/verdict-log.ts` | Verdict log rules shared by the oracle and the SDK: entries, chain check, anchor memos |
 | `src/watcher.ts` | Ledger subscription that drives job status from validated transactions |
-| `src/sdk/index.ts` | `createJob`, `fundJob`, `deliver`, `claim`, `refund`, `verifyVerdict`, `verifyVerdictLog`, `latestAnchor`; shared jobs: `createSharedJob`, `deliverShared`, `requestSharedVerification`, `combineForCondition`, `splitJobs` |
+| `src/sdk/index.ts` | `createJob`, `fundJob`, `deliver`, `claim`, `refund`, `verifyVerdict`, `verifyVerdictLog`, `latestAnchor` |
 | `src/services.ts`, `src/setup.ts` | Start services as child processes; one-time wallet and key setup |
 | `src/demo-phase2.ts` | The four Phase 2 scenarios |
 | `src/demo-phase4.ts` | The Phase 4 scenarios: transaction check and verdict log |
-| `src/shamir.ts`, `src/share-box.ts` | Phase 5: Shamir split and combine over GF(256); sealing a share to one oracle's X25519 share key |
-| `src/demo-phase5.ts`, `src/splits.ts` | The Phase 5 scenarios with three local oracles; the list of jobs where the set split |
-| `test/shared.test.ts` | Phase 5 unit tests: shares, boxes, the registry's counting, the oracles and the SDK, no network needed |
-| `test/py-shared-harness.ts` | Throwaway registry and three oracles for the Python SDK's shared tests |
 | `test/registry.test.ts`, `oracle.test.ts`, `watcher.test.ts`, `sdk.test.ts` | Phase 2 unit tests, no network needed |
 | `test/phase2-flow.test.ts` | All Phase 2 scenarios through the services on the live testnet |
 | `test/phase3-flow.test.ts` | `expired_unclaimed` then refund, and watcher reconnect, on the live testnet |
@@ -384,19 +323,18 @@ same rules without the ledger.
 
 ## Not in these phases
 
-RLUSD, the AI judge, disputes and multisig, the x402 bridge, payments,
+RLUSD, the AI judge, multiple oracles, disputes and multisig, the x402 bridge, payments,
 mainnet, a UI, and any hosted or non-localhost deployment. The governing
 records are `CLAUDE.md` (Phase 1), `CLAUDE_PHASE2.md`,
 `../edr/EDR-012_ESCROW_PHASE2_ORACLE_REGISTRY.md`,
 `../edr/EDR-013_ESCROW_PHASE3_DEVELOPER_PREVIEW.md` and
-`../edr/EDR-014_ESCROW_PHASE4_AUDITABLE_VERIFIER.md` and
-`../edr/EDR-015_ESCROW_PHASE5_SHARED_VERIFIERS.md`. What the kit does not
+`../edr/EDR-014_ESCROW_PHASE4_AUDITABLE_VERIFIER.md`. What the kit does not
 protect against is in [`../docs/THREAT_MODEL.md`](../docs/THREAT_MODEL.md).
 
 ## Review
 
 Gpno is the single final reviewer for each phase (Phase 1 and 2 together, then
-Phase 3, then Phase 4, then Phase 5). The handoff is
+Phase 3, then Phase 4). The handoff is
 [`REVIEW_HANDOFF.md`](REVIEW_HANDOFF.md), the review brief is
 [`docs/reviews/REVIEW.md`](docs/reviews/REVIEW.md), and the verdict goes in
 [`docs/reviews/VERDICT.md`](docs/reviews/VERDICT.md).

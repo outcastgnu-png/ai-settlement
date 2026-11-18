@@ -13,7 +13,7 @@ const PROVIDER = Wallet.generate().address;
 const COND = "A0258020" + "11".repeat(32) + "810120";
 
 const job = (over: Partial<Job> = {}): Job => ({
-  id: "j1", client: CLIENT, provider: PROVIDER, priceDrops: "10000000", slaSeconds: 120, spec: { checks: [] }, oracles: null, threshold: null,
+  id: "j1", client: CLIENT, provider: PROVIDER, priceDrops: "10000000", slaSeconds: 120, spec: { checks: [] },
   condition: COND, offerSequence: null, cancelAfter: null, status: "draft", verdict: null, expiringSoon: false,
   createTx: null, finishTx: null, cancelTx: null, createdAt: 0, fundedAt: null, deliveredAt: null, verifiedAt: null,
   closedAt: null, updatedAt: 0, ...over,

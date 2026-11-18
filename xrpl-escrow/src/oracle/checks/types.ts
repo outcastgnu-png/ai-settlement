@@ -13,8 +13,7 @@ export interface CheckContext {
 }
 
 export interface CheckResult {
-  /** "oracle-fault": not a check of the work; an oracle started with ORACLE_FAULT=fail adds it, failing every verdict (demos of a dissenting oracle). */
-  type: CheckSpec["type"] | "oracle-fault";
+  type: CheckSpec["type"];
   pass: boolean;
   detail: string;
 }

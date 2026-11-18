@@ -115,30 +115,6 @@ Jobs are plain dicts with the registry's field names (`id`, `status`,
 | `verdict_signature_valid` | True only if the verdict is signed by the pinned `ORACLE_VERDICT_ADDRESS` and its `evidenceHash` matches the work you sent |
 | `fulfillment` | The secret that opens the escrow, on a pass; `None` on a fail |
 
-## Shared verification, 2 of 3 oracles (0.5.0, EDR-015)
-
-```python
-oracles = [{"address": "r...", "anchor": "r...", "url": "http://127.0.0.1:8802"}, ...]   # the pinned set, A, B, C
-job = kit.create_shared_job(client=..., provider=..., price_drops="5000000", sla_seconds=300, spec=spec,
-                            oracles=oracles, threshold=2, client_wallet=w["client"])
-kit.fund_job(job["id"], w["client"])
-res = kit.deliver_shared(job["id"], w["provider"], work)       # asks all three oracles
-if res.fulfillment:                                              # two passing oracles' shares, combined
-    kit.claim(job["id"], w["provider"], res.fulfillment)
-```
-
-The client makes the secret, splits it and seals one share to each oracle; the provider
-uses a share only when that oracle's verdict is signed by its pinned address and its own
-verdict log checks. `res.reports` has each oracle's status (`pass`, `fail`, `rejected`,
-`unreachable`), verdict, problems and log check; `res.passed`, `res.failed`, `res.rejected`
-and `res.unreachable` list the addresses. `require_anchored=True` uses only anchored
-verdicts. `kit.split_jobs()` lists jobs where the oracles disagreed. The demo, after
-`npm run setup` in `../xrpl-escrow` (it makes oracles B and C):
-
-```
-python -m xrpl_escrow.demo_phase5
-```
-
 ## Tests
 
 ```
@@ -159,10 +135,6 @@ python -m pytest --testnet    # also runs both demo scenarios on testnet (about 
   TypeScript kit on the same chain, broken copies, anchor memos and ledger rows
   (`../xrpl-escrow/test/vectors/verdict-log.json`, made by
   `npx tsx test/vectors/make-verdict-log-vectors.ts`), and on the real oracle's log.
-- `tests/test_shared_vectors.py`: Shamir splits and share boxes, byte for byte the same as
-  the TypeScript kit (`../xrpl-escrow/test/vectors/shamir.json`, `share-box.json`).
-- `tests/test_shared_local.py`: a Python client and provider against the real TypeScript
-  registry and three oracles, one of them dissenting (`../xrpl-escrow/test/py-shared-harness.ts`).
 - `tests/test_demo_testnet.py`: the demo scenarios on testnet, with the services on
   spare ports and throwaway data.
 
@@ -182,5 +154,3 @@ services through a proxy.
 | `src/xrpl_escrow/verdict_log.py` | Verdict log checks: chain, anchors read from the ledger, `verify_verdict_log` |
 | `src/xrpl_escrow/services.py` | Starts the TypeScript services as child processes |
 | `src/xrpl_escrow/demo.py` | The demo scenarios: pass and claim, fail and refund, verdict log |
-| `src/xrpl_escrow/shamir.py`, `share_box.py` | Shamir split and combine; sealing a share to an oracle (EDR-015) |
-| `src/xrpl_escrow/demo_phase5.py` | The shared-verification scenarios with three local oracles |

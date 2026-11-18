@@ -6,13 +6,6 @@
 //   GET  /verdicts?from=&limit=    the public verdict log, a page of entries (EDR-014)
 //   GET  /verdicts/head            the log's latest sequence number and hash
 //   GET  /verdicts/anchors         the latest anchors of the head on the testnet ledger
-//   POST /jobs/:jobId/share        a shared job's client sends this oracle its sealed share {index, box, auth} (EDR-015)
-//
-// Shared jobs (EDR-015): the client makes the secret and splits it k of n; this
-// oracle gets only its own share, sealed to its X25519 share key, and keeps it
-// in the vault. It runs the job's checks like any other job, signs and logs its
-// own verdict, posts it to the registry, and releases its share only with its
-// own signed pass. It never sees the secret or another oracle's share.
 //
 // The oracle is the only process that holds secrets. It reads the job spec and
 // deliverable from the registry and only hashes, parses or validates them; it
@@ -35,7 +28,6 @@
 // the testnet from its own anchor wallet, so a copy of the log can be compared
 // with the ledger. The older unchained data/verdicts.jsonl is no longer
 // written; the log's genesis entry names its hash.
-import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { Wallet, type Client } from "xrpl";
 import { ReplayGuard, checkRequest, sha256Hex, signPayload } from "../auth.js";
@@ -44,15 +36,12 @@ import { connectTestnet } from "../config.js";
 import { getEscrow } from "../escrow.js";
 import { HttpError, callJson, jsonServer, listenLocal, type Route } from "../http.js";
 import {
-  ANCHOR_FILE, ANCHOR_INTERVAL_MS, localOracleProfile, ORACLE_PORT, REGISTRY_URL, REPLAY_FILE, VAULT_FILE, VERDICT_CHAIN, VERDICT_LOG, readEnvFile, requireEnv,
+  ANCHOR_FILE, ANCHOR_INTERVAL_MS, ORACLE_PORT, REGISTRY_URL, REPLAY_FILE, VAULT_FILE, VERDICT_CHAIN, VERDICT_LOG, readEnvFile, requireEnv,
 } from "../local-config.js";
 import type { Deliverable, Job } from "../registry/db.js";
 import { CheckUnavailable, runChecks, stopSchemaWorker, type CheckResult } from "./checks/index.js";
 import { ledgerTxLookup, type TxLookup } from "./checks/xrpl-tx.js";
 import { SecretVault, parseVaultKey } from "./vault.js";
-import { canonicalJson } from "../auth.js";
-import { decodeShare, encodeShare } from "../shamir.js";
-import { open as openBox, shareKeyPublic, signShareKey } from "../share-box.js";
 import { AnchorBook, AnchorSchedule, MAX_PAGE, VerdictStore, ledgerAnchorer, type Anchorer } from "./verdict-store.js";
 import { listAnchors, type AnchorHistory } from "../anchors.js";
 import { anchorHistoryProblems, entryMismatch } from "../verdict-log.js";
@@ -67,9 +56,6 @@ export interface VerdictBody {
   oracle: string; // address of the verdict signing key
   publicKey: string;
   issuedAt: number;
-  /** Shared jobs only (EDR-015): which share of the job's secret this oracle holds (x = 1..n), and the job's k. */
-  shareIndex?: number;
-  threshold?: number;
 }
 
 export interface SignedVerdict extends VerdictBody {
@@ -101,18 +87,6 @@ export interface OracleOptions {
   lookupTx?: TxLookup;
   /** The anchors already on the ledger for this verdict key, newest first. Defaults to account_tx of the anchor account. */
   anchorHistory?: () => Promise<AnchorHistory>;
-  /** X25519 private key (hex) that shared jobs' shares are sealed to (ORACLE_SHARE_KEY). Without it, shared jobs are refused. */
-  shareKey?: string;
-  /** Read .env from here instead of ENV_FILE (another local oracle of a set). */
-  envFile?: string;
-  /** Keep the vault, logs, anchors and replay file here instead of DATA_DIR. */
-  dataDir?: string;
-  /**
-   * "fail" (ORACLE_FAULT=fail): sign fail on every job, whatever the work, with an
-   * "oracle-fault" result in the verdict saying so. For demos and tests of a
-   * dissenting oracle in a shared set. It can only withhold a share, never release one.
-   */
-  fault?: "fail";
 }
 
 export interface OracleRoutesOptions extends OracleOptions {
@@ -142,14 +116,6 @@ export function oracleRoutes(opts: OracleRoutesOptions): Route[] {
   // waits for that run instead of starting another one.
   const running = new Map<string, Promise<{ pass: boolean; results: CheckResult[] }>>();
   const replay = opts.replay ?? new ReplayGuard();
-  const me = opts.verdictKey.address;
-  const shareKeyInfo = opts.shareKey ? signShareKey(opts.verdictKey, shareKeyPublic(opts.shareKey)) : null;
-  /** This oracle's place in a shared job's set: share x = position + 1. */
-  const shareIndex = (job: Job): number => {
-    const i = job.oracles?.findIndex((o) => o.address === me) ?? -1;
-    if (i < 0) throw new HttpError(403, `this oracle (${me}) is not in the job's oracle set`);
-    return i + 1;
-  };
   const getJob = async (id: string) => {
     try {
       return await callJson<Job>("GET", `${registry}/jobs/${encodeURIComponent(id)}`);
@@ -165,7 +131,6 @@ export function oracleRoutes(opts: OracleRoutesOptions): Route[] {
       handler: () => ({
         ok: true, service: "oracle", oracle: opts.verdictKey.address, publicKey: opts.verdictKey.publicKey,
         anchorAccount: opts.anchorAddress ?? null,
-        shareKey: shareKeyInfo?.shareKey ?? null, shareKeySignature: shareKeyInfo?.shareKeySignature ?? null,
       }),
     },
 
@@ -195,7 +160,6 @@ export function oracleRoutes(opts: OracleRoutesOptions): Route[] {
       method: "POST", path: "/jobs/:jobId/condition",
       handler: async ({ jobId }) => {
         const job = await getJob(jobId);
-        if (job.oracles) throw new HttpError(409, "a shared job's secret is made and split by its client, not by an oracle");
         let secret = opts.vault.get(jobId);
         if (!secret) {
           if (job.status !== "draft" || job.condition) throw new HttpError(409, "job already has a condition from elsewhere");
@@ -209,62 +173,15 @@ export function oracleRoutes(opts: OracleRoutesOptions): Route[] {
     },
 
     {
-      method: "POST", path: "/jobs/:jobId/share",
-      handler: async ({ jobId }, body) => {
-        if (!opts.shareKey) throw new HttpError(409, "this oracle has no share key (ORACLE_SHARE_KEY); run npm run setup");
-        const job = await getJob(jobId);
-        if (!job.oracles || !job.threshold || !job.condition) throw new HttpError(409, "not a shared job");
-        const index = shareIndex(job);
-        const b = body as { index?: unknown; box?: unknown; auth?: unknown } | undefined;
-        if (b?.index !== index) throw new HttpError(400, `this oracle holds share ${index} of this job`);
-        // Only the job's client hands out its shares, so nobody can get in first with a share of their own.
-        checkRequest(b.auth, "share", jobId, sha256Hex(canonicalJson(b.box ?? null)), job.client, replay);
-        let raw: Buffer;
-        try {
-          raw = openBox(b.box, opts.shareKey, { jobId, oracle: me, index });
-        } catch (err) {
-          throw new HttpError(400, err instanceof Error ? err.message : "bad share box");
-        }
-        let share;
-        try {
-          share = decodeShare(raw.toString("hex"));
-        } catch (err) {
-          throw new HttpError(400, err instanceof Error ? err.message : "bad share");
-        }
-        if (share.x !== index) throw new HttpError(400, `the box holds share ${share.x}, not share ${index}`);
-        const held = opts.vault.get(jobId);
-        if (held) {
-          if (held.equals(raw)) return { jobId, index, stored: true };
-          throw new HttpError(409, "this oracle already holds a different share for the job");
-        }
-        if (job.status !== "draft") throw new HttpError(409, `job is ${job.status}; shares are accepted while it is a draft`);
-        opts.vault.put(jobId, raw);
-        raw.fill(0);
-        return { jobId, index, stored: true };
-      },
-    },
-
-    {
       method: "POST", path: "/verify/:jobId",
       handler: async ({ jobId }, body) => {
         const job = await getJob(jobId);
-        const shared = job.oracles !== null;
-        const index = shared ? shareIndex(job) : undefined;
-        // A shared job's request names this oracle, so one signed request can't be replayed at another oracle of the set.
-        checkRequest((body as { auth?: unknown } | undefined)?.auth, "verify", jobId, shared ? me : "", job.provider, replay);
+        checkRequest((body as { auth?: unknown } | undefined)?.auth, "verify", jobId, "", job.provider, replay);
         if (!["delivered", "verified_pass", "verified_fail"].includes(job.status)) {
           throw new HttpError(409, `job is ${job.status}; nothing to verify`);
         }
         const secret = opts.vault.get(jobId);
-        if (shared) {
-          let ok = false;
-          try {
-            ok = !!secret && !!job.condition && decodeShare(secret.toString("hex")).x === index;
-          } catch {
-            ok = false;
-          }
-          if (!ok) throw new HttpError(409, "this oracle holds no share for this job");
-        } else if (!secret || !job.condition || toCondition(secret) !== job.condition) {
+        if (!secret || !job.condition || toCondition(secret) !== job.condition) {
           throw new HttpError(409, "this oracle does not hold the secret for the job's condition");
         }
         const escrowProblem = await opts.escrowCheck(job);
@@ -285,8 +202,7 @@ export function oracleRoutes(opts: OracleRoutesOptions): Route[] {
           verdict = prior.verdict;
         } else {
           // A verdict from before the chained log (0.3.x) is final too, pass or fail (Gpno N36).
-          // A shared job's status is the set's, not this oracle's, and shared jobs came after the chained log.
-          if (!shared && (job.status === "verified_fail" || job.status === "verified_pass")) {
+          if (job.status === "verified_fail" || job.status === "verified_pass") {
             throw new HttpError(409, `this job was already verified (${job.status}) before the chained verdict log; it is final`);
           }
           let run = running.get(jobId);
@@ -304,12 +220,6 @@ export function oracleRoutes(opts: OracleRoutesOptions): Route[] {
             if (err instanceof CheckUnavailable) throw new HttpError(503, err.message);
             throw err;
           }
-          if (opts.fault === "fail") {
-            outcome = {
-              pass: false,
-              results: [...outcome.results, { type: "oracle-fault", pass: false, detail: "this oracle was started with ORACLE_FAULT=fail and fails every job" }],
-            };
-          }
           // Two calls that waited on the same run: the first one back signs and logs.
           const now = opts.store.issued(jobId);
           if (now?.verdict) {
@@ -317,9 +227,8 @@ export function oracleRoutes(opts: OracleRoutesOptions): Route[] {
           } else {
             const unsigned: VerdictBody = {
               jobId, verdict: outcome.pass ? "pass" : "fail", checks: outcome.results, evidenceHash,
-              condition: job.condition!, provider: job.provider, oracle: opts.verdictKey.address,
+              condition: job.condition, provider: job.provider, oracle: opts.verdictKey.address,
               publicKey: opts.verdictKey.publicKey, issuedAt: Date.now(),
-              ...(shared ? { shareIndex: index, threshold: job.threshold! } : {}),
             };
             verdict = { ...unsigned, signature: signPayload(unsigned, opts.verdictKey) };
             opts.store.append(verdict);
@@ -329,42 +238,26 @@ export function oracleRoutes(opts: OracleRoutesOptions): Route[] {
         const pass = verdict.verdict === "pass";
         const results = verdict.checks;
 
-        if (shared) {
-          // The registry checks the signature against the job's set and counts it toward k.
-          try {
-            await callJson("POST", `${registry}/jobs/${encodeURIComponent(jobId)}/verdicts`, { verdict });
-          } catch (err) {
-            // The verdict is signed and logged; the provider's SDK posts it as well.
-            console.error(`[oracle] could not post the verdict for ${jobId} to the registry: ${err instanceof Error ? err.message : err}`);
-          }
-          return pass ? { verdict, share: encodeShare(decodeShare(secret!.toString("hex"))) } : { verdict };
-        }
         if (job.status === "delivered") {
           await callJson("POST", `${registry}/jobs/${encodeURIComponent(jobId)}/events`, {
             source: "oracle", status: pass ? "verified_pass" : "verified_fail",
             detail: results.map((r) => `${r.type}: ${r.pass ? "pass" : "fail"}`).join(", "),
           }, opts.serviceToken);
         }
-        return pass ? { verdict, fulfillment: toFulfillment(secret!) } : { verdict };
+        return pass ? { verdict, fulfillment: toFulfillment(secret) } : { verdict };
       },
     },
   ];
 }
 
 export async function startOracle(opts: Partial<OracleOptions> & { port?: number } = {}) {
-  const env = readEnvFile(opts.envFile);
-  const at = (name: string, fallback: string) => (opts.dataDir ? resolve(opts.dataDir, name) : fallback);
+  const env = readEnvFile();
   const verdictKey = opts.verdictKey ?? Wallet.fromSeed(requireEnv(env, "ORACLE_VERDICT_SEED"));
-  const vault = opts.vault ?? new SecretVault(at("oracle-vault.json", VAULT_FILE), parseVaultKey(env.ORACLE_VAULT_KEY));
+  const vault = opts.vault ?? new SecretVault(VAULT_FILE, parseVaultKey(env.ORACLE_VAULT_KEY));
   const serviceToken = opts.serviceToken ?? requireEnv(env, "ORACLE_SERVICE_TOKEN");
-  const shareKey = opts.shareKey ?? env.ORACLE_SHARE_KEY;
-  const faultSetting = opts.fault ?? process.env.ORACLE_FAULT;
-  if (faultSetting !== undefined && faultSetting !== "" && faultSetting !== "fail") throw new Error("ORACLE_FAULT may only be fail");
-  const fault = faultSetting === "fail" ? "fail" as const : undefined;
-  if (fault) console.error("[oracle] ORACLE_FAULT=fail: this oracle signs FAIL on every job (a dissenting oracle, for demos and tests)");
   // Read and check the log before touching the network: a broken log stops the oracle here.
-  const store = new VerdictStore(opts.verdictChain ?? at("verdict-log.jsonl", VERDICT_CHAIN), verdictKey, opts.verdictLog ?? at("verdicts.jsonl", VERDICT_LOG));
-  const anchors = new AnchorBook(opts.anchorFile ?? at("verdict-anchors.jsonl", ANCHOR_FILE));
+  const store = new VerdictStore(opts.verdictChain ?? VERDICT_CHAIN, verdictKey, opts.verdictLog ?? VERDICT_LOG);
+  const anchors = new AnchorBook(opts.anchorFile ?? ANCHOR_FILE);
   let ledger: Client | null = null;
   const needsLedger = !opts.escrowCheck || !opts.anchorer || !opts.lookupTx;
   const anchorWallet = opts.anchorer ? null : Wallet.fromSeed(requireEnv(env, "ORACLE_ANCHOR_SEED"));
@@ -393,9 +286,9 @@ export async function startOracle(opts: Partial<OracleOptions> & { port?: number
       + "needs a fresh anchor wallet (remove ORACLE_ANCHOR_SEED and ORACLE_ANCHOR_ADDRESS from .env and run npm run setup).");
   }
   const schedule = new AnchorSchedule(store, anchors, anchorer, opts.anchorIntervalMs ?? ANCHOR_INTERVAL_MS, undefined, onLedger[0] ?? null);
-  const replay = opts.replay ?? new ReplayGuard(at("oracle-replay.json", REPLAY_FILE));
+  const replay = opts.replay ?? new ReplayGuard(REPLAY_FILE);
   const server = jsonServer(oracleRoutes({
-    ...opts, verdictKey, vault, serviceToken, escrowCheck, replay, store, anchors, lookupTx, anchorAddress, shareKey, fault,
+    ...opts, verdictKey, vault, serviceToken, escrowCheck, replay, store, anchors, lookupTx, anchorAddress,
   }));
   const port = await listenLocal(server, opts.port ?? ORACLE_PORT);
   schedule.start();
@@ -420,11 +313,7 @@ export async function startOracle(opts: Partial<OracleOptions> & { port?: number
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
-  // `npm run oracle:b` / `oracle:c` start the other two local oracles of a shared set (EDR-015).
-  const flag = process.argv.indexOf("--oracle");
-  const name = flag >= 0 ? process.argv[flag + 1] : undefined;
-  const profile = name ? localOracleProfile(name) : undefined;
-  startOracle(profile ? { envFile: profile.envFile, dataDir: profile.dataDir, port: profile.port } : {}).then((oracle) => {
+  startOracle().then((oracle) => {
     console.log(`oracle (verdict key ${oracle.address}, anchor account ${oracle.anchorAddress}) listening on ${oracle.url}`);
     // Ctrl+C (and SIGTERM where the platform delivers it) anchors the head once more before exiting.
     const stop = () => {

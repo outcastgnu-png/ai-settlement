@@ -1,21 +1,17 @@
 {
   "name": "xrpl-verified-escrow-demo",
-  "version": "0.5.0",
+  "version": "0.4.0",
   "description": "Verified-delivery escrow for agent jobs on the XRP Ledger testnet: local registry, oracle and watcher",
   "scripts": {
     "demo": "tsx src/demo.ts",
     "demo:phase2": "tsx src/demo-phase2.ts",
     "demo:phase4": "tsx src/demo-phase4.ts",
-    "demo:phase5": "tsx src/demo-phase5.ts",
     "registry": "tsx src/registry/server.ts",
     "oracle": "tsx src/oracle/server.ts",
-    "oracle:b": "tsx src/oracle/server.ts --oracle b",
-    "oracle:c": "tsx src/oracle/server.ts --oracle c",
-    "splits": "tsx src/splits.ts",
     "watcher": "tsx src/watcher.ts",
     "setup": "tsx src/setup.ts",
     "test": "vitest run",
-    "test:unit": "vitest run test/condition.test.ts test/registry.test.ts test/oracle.test.ts test/watcher.test.ts test/sdk.test.ts test/verdict-log.test.ts test/xrpl-tx.test.ts test/finality.test.ts test/fs-util.test.ts test/shared.test.ts",
+    "test:unit": "vitest run test/condition.test.ts test/registry.test.ts test/oracle.test.ts test/watcher.test.ts test/sdk.test.ts test/verdict-log.test.ts test/xrpl-tx.test.ts test/finality.test.ts test/fs-util.test.ts",
     "typecheck": "tsc"
   },
   "license": "Apache-2.0",

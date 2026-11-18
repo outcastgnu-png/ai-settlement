@@ -1,7 +1,5 @@
 node_modules
 .env
-# the other local oracles of a shared set (EDR-015)
-.env.*
 data/
 # verdict log location before the fixes for Gpno's first review
 src/oracle/verdicts.jsonl
