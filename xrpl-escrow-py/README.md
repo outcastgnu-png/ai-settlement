@@ -132,7 +132,8 @@ uses a share only when that oracle's verdict is signed by its pinned address and
 verdict log checks. `res.reports` has each oracle's status (`pass`, `fail`, `rejected`,
 `unreachable`), verdict, problems and log check; `res.passed`, `res.failed`, `res.rejected`
 and `res.unreachable` list the addresses. `require_anchored=True` uses only anchored
-verdicts. `kit.split_jobs()` lists jobs where the oracles disagreed. The demo, after
+verdicts. `kit.split_jobs()` lists jobs where the oracles disagreed. Unlike the TypeScript SDK, the Python SDK can't wipe the secret or the shares from memory
+(Python `bytes` can't be overwritten in place), so a copy can stay in your process until the memory is reused. The demo, after
 `npm run setup` in `../xrpl-escrow` (it makes oracles B and C):
 
 ```
