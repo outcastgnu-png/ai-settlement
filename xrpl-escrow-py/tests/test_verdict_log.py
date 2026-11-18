@@ -8,7 +8,7 @@ from xrpl.constants import CryptoAlgorithm
 from xrpl.wallet import Wallet
 
 from xrpl_escrow import (
-    EscrowKit, anchor_history_problems, check_chain, find_verdict, parse_anchor_memo, sha256_hex, verdict_in_log,
+    EscrowKit, anchor_history_problems, check_chain, duplicate_job_problems, find_verdict, parse_anchor_memo, sha256_hex, verdict_in_log,
     verify_verdict_log,
 )
 from xrpl_escrow.verdict_log import anchor_from_account_tx, anchor_problem, entry_hash, verdict_hash
@@ -158,3 +158,17 @@ def test_a_public_fail_naming_a_private_pass_is_caught_by_its_holder(vectors):
     res = verify_verdict_log(log, vectors["oracle"], None, anchor_address=vectors["anchorAccount"], verdict=pass_v,
                              require_anchor=False, allow_unanchored=True)
     assert not res.ok and "differs" in res.problems[0]
+
+
+def test_a_later_entry_for_a_job_is_caught(vectors):
+    """Gpno N37: a second entry for a job that names its pass but says fail. Every entry naming the verdict is
+    compared, and two entries for one job are a problem even for a reader without the verdict."""
+    for case in vectors["duplicateCases"]:
+        assert duplicate_job_problems(case["entries"]) == case["expected"], case["name"]
+    log, pass_v = vectors["laterEntryLog"], vectors["verdicts"][0]
+    assert check_chain(log, vectors["oracle"]).ok
+    without = verify_verdict_log(log, vectors["oracle"], None, anchor_address=vectors["anchorAccount"], require_anchor=False)
+    assert not without.ok and without.problems == vectors["duplicateCases"][1]["expected"]
+    res = verify_verdict_log(log, vectors["oracle"], None, anchor_address=vectors["anchorAccount"], verdict=pass_v,
+                             require_anchor=False, allow_unanchored=True)
+    assert not res.ok and any("entry 2 names this verdict but its verdict differs" in p for p in res.problems)

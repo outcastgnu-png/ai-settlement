@@ -206,7 +206,15 @@ closed; N34 accepted; N35 closed.
 | # | Status | Note |
 |---|---|---|
 | N31 | done, pending Gpno's confirmation | Windows run of `21da0b3` on Christopher's PC (Windows 11, Node 24.18.0, Python 3.14.6; `logs/windows-2026-11-15-21da0b3/`): `test:unit` 112/112, finality 5 of 5 runs, `npm test` 117/117 on testnet, demo:phase4 28/28, `pytest` 38 + 1 skipped, `pytest --testnet` 39/39, Python demo 16/16. No rename retry was needed (0 `[fs]` lines) |
-| N37 | open, non-blocking | Start-up compares only the first log entry for each job, so a later signed entry for the same job that disagrees with its verdict is not caught, and both SDKs stop at the first match. The original entry stays in the chain. Planned fix after 0.4.0: refuse to start on a second verdict entry for a job, and have `findVerdict` report every entry naming the verdict |
+| N37 | fixed after 0.4.0, see below | Start-up compares only the first log entry for each job, so a later signed entry for the same job that disagrees with its verdict is not caught, and both SDKs stop at the first match |
+
+## After 0.4.0: N37 (fix for Gpno to review before it is merged)
+
+| # | Status | Note |
+|---|---|---|
+| N37 | fixed | `src/oracle/verdict-store.ts`: on start, every verdict entry is checked. A second entry for a job the log already has makes the oracle refuse to start, whatever it says, since a job has one verdict and the oracle writes one entry for it (N25); every entry whose `verdictHash` is in the private signed file is compared with it (`entryMismatch`). `findVerdict` / `find_verdict` compare every entry that names the verdict, and return the first mismatch. New `duplicateJobProblems` / `duplicate_job_problems`: `verifyVerdictLog` / `verify_verdict_log` add a problem for every job with more than one entry, with or without a verdict, so Gpno's repro is `ok: false` for every reader. Tests: `test/finality.test.ts` "refuses to start, and anchors nothing, when a later entry for a job says something else" (Gpno's two-entry repro, plus a second entry with an unknown `verdictHash`; anchors unchanged); `test/verdict-log.test.ts` "...a later entry for a job that names its verdict but says something else (Gpno N37)"; Python `test_a_later_entry_for_a_job_is_caught`. Shared vectors: `laterEntryLog`, a new `findCases` entry next to the public-fail one, and `duplicateCases`. Each test fails when its fix is reverted. The cloud oracle's real log (9 entries) has no duplicate job, so existing logs still start |
+
+Linux, 2026-11-15 (logs `logs/2026-11-15-n37-*`, `xrpl-escrow-py/logs/2026-11-15-n37-*`): `tsc` 0 errors, `test:unit` 114/114, `npm test` 119/119 on testnet (a first run was 118/119: `phase2-flow` could not open its testnet WebSocket, kept as `2026-11-15-n37-npm-test-run1.txt`), `demo:phase4` 28/28, `pytest` 39 + 1 skipped, `pytest --testnet` 40/40, Python demo 16/16. Not run on Windows yet.
 
 ## Still open
 

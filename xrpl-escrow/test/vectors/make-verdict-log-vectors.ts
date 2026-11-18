@@ -10,7 +10,7 @@ import { canonicalJson, sha256Hex, signPayload } from "../../src/auth.js";
 import type { SignedVerdict } from "../../src/oracle/server.js";
 import {
   ANCHOR_MEMO_TYPE, anchorHistoryProblems, anchorMemos, anchorProblem, checkChain, findVerdict, genesisEntry, parseAnchorMemo,
-  sealEntry, verdictEntry, verdictHash, verdictInLog, type LogEntry, type VerdictEntryBody,
+  duplicateJobProblems, sealEntry, verdictEntry, verdictHash, verdictInLog, type LogEntry, type VerdictEntryBody,
 } from "../../src/verdict-log.js";
 
 const key = Wallet.fromEntropy(Buffer.from("00".repeat(16), "hex"), { algorithm: "ed25519" as ECDSA });
@@ -101,12 +101,23 @@ const passV = verdicts[0];
 const { signature: _s0, hash: _h0, ...body1 } = entries[1] as LogEntry & VerdictEntryBody;
 const publicFail = sealEntry({ ...body1, verdict: "fail", checks: [{ type: "sha256-match", pass: false }] } as VerdictEntryBody, key);
 const publicFailLog = [entries[0], publicFail];
+// Gpno N37: the honest pass for a job, then a second, signed and chained entry for the same job that says fail and names the pass.
+const laterFail = sealEntry({
+  ...body1, seq: 2, prev: entries[1].hash, at: (entries[1].at as number) + 1, verdict: "fail", checks: [{ type: "sha256-match", pass: false }],
+} as VerdictEntryBody, key);
+const laterEntryLog = [entries[0], entries[1], laterFail];
 const findCases = [
   { name: "honest log", entries, verdict: failV },
   { name: "public summary lies (Gpno N26)", entries: lyingLog, verdict: failV },
   { name: "public fail names a private pass (Gpno N26, second review)", entries: publicFailLog, verdict: passV },
+  { name: "a later entry for the job names the pass but says fail (Gpno N37)", entries: laterEntryLog, verdict: passV },
   { name: "verdict not logged", entries, verdict: { ...failV, issuedAt: 1 } },
 ].map((c) => ({ ...c, expected: { seq: findVerdict(c.entries, c.verdict).entry?.seq ?? null, mismatch: findVerdict(c.entries, c.verdict).mismatch } }));
+
+const duplicateCases = [
+  { name: "honest log", entries },
+  { name: "second entry for a job (Gpno N37)", entries: laterEntryLog },
+].map((c) => ({ ...c, expected: duplicateJobProblems(c.entries) }));
 
 // Gpno N29: every anchor must agree with the log, and only one genesis may be anchored.
 const memo = (seq: number, hash: string) => ({ v: 1, seq, hash, oracle: key.address });
@@ -139,7 +150,7 @@ const out = {
   verdictInLog: verdicts.map((v) => verdictInLog(entries, v)?.seq ?? null).concat(verdictInLog(entries, { ...verdicts[0], issuedAt: 1 })?.seq ?? null),
   chainCases, anchorCases, memoCases, accountTx, expectedLatestAnchorRow: 5,
   expectedAnchorRows: accountTx.map((_r, i) => i).filter((i) => i >= 5), findCases, historyCases, floodTx, floodCases,
-  publicFailLog,
+  publicFailLog, laterEntryLog, duplicateCases,
 };
 writeFileSync(new URL("./verdict-log.json", import.meta.url), `${JSON.stringify(out, null, 2)}\n`);
 console.log(`wrote a ${entries.length}-entry chain, ${chainCases.length} chain cases, ${anchorCases.length} anchor cases, ${memoCases.length} memo cases`);

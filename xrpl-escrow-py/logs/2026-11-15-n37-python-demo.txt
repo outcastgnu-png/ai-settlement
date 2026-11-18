@@ -1,0 +1,42 @@
+connected to wss://testnet.xrpl-labs.com (network_id checked = 1)
+    | registry listening on http://127.0.0.1:8801 (db /home/user/ai-settlement/xrpl-escrow/data/jobs.db)
+    | oracle (verdict key rBTtuCrBKoLB9dVMRnuMiY63aThM7HELAT, anchor account raF1wA1c73q9jkZZoqdhtvkUkc4hNhDUBC) listening on http://127.0.0.1:8802
+    | [watcher] connected to wss://testnet.xrpl-labs.com (testnet), watching jobs in http://127.0.0.1:8801
+oracle verdict key pinned to rBTtuCrBKoLB9dVMRnuMiY63aThM7HELAT, anchor account pinned to raF1wA1c73q9jkZZoqdhtvkUkc4hNhDUBC
+
+1. Pass and claim: the work passes the oracle's checks and the provider claims 10 XRP
+  before: client 129.998160 XRP, provider 439.978100 XRP
+  PASS  job registered as draft with the oracle's condition (job af234618-c31b-446b-95a5-ec97d8c8809e)
+    | [watcher] subscribed to r9pqcQRBEj8QzQcWPMkEccb584MfK7H9SY, rUEixRE46mx8VV5BK9CiTLfmnXdMKF3EtG
+    | [watcher] job af234618-c31b-446b-95a5-ec97d8c8809e: status funded (EscrowCreate 1394CD5D6A4460E74C393DD1B6C333855C076EC17123570B010A254CE4D02E9A)
+  PASS  EscrowCreate -> tesSUCCESS, watcher -> funded (tesSUCCESS https://testnet.xrpl.org/transactions/1394CD5D6A4460E74C393DD1B6C333855C076EC17123570B010A254CE4D02E9A)
+  PASS  oracle verdict is pass, signed by the pinned oracle address (oracle rBTtuCrBKoLB9dVMRnuMiY63aThM7HELAT)
+  PASS  fulfillment released to the provider
+    | [watcher] job af234618-c31b-446b-95a5-ec97d8c8809e: status paid (EscrowFinish F029147C6C10791865B15753444A4B0B0B27D8EF40BB1BC4220BE6618A1F0A2D)
+  PASS  EscrowFinish -> tesSUCCESS, watcher -> paid (tesSUCCESS https://testnet.xrpl.org/transactions/F029147C6C10791865B15753444A4B0B0B27D8EF40BB1BC4220BE6618A1F0A2D)
+  PASS  escrow object is gone from the ledger
+  PASS  provider gains the price minus the finish fee (+9.999625 XRP)
+  after: client 119.998150 XRP, provider 449.977725 XRP
+
+2. Fail and refund: the work fails the checks; the client is refunded after the deadline
+  before: client 119.998150 XRP, provider 449.977725 XRP
+    | [watcher] job 65e4d9a9-44f2-4182-b31d-f707588cdf20: status funded (EscrowCreate 10D9C40E5D046D0526EAAC083F12B57C3967A30E0C2CA7016C1314F4AA9A00AC)
+  PASS  EscrowCreate -> tesSUCCESS, watcher -> funded (tesSUCCESS https://testnet.xrpl.org/transactions/10D9C40E5D046D0526EAAC083F12B57C3967A30E0C2CA7016C1314F4AA9A00AC)
+  PASS  oracle verdict is fail, signed, and no fulfillment (sha256 135abd55cf3be6f74eaceae432a4b21f653b8e82640bc2c90e2fc9cf156fcb65 does not match the spec)
+  PASS  the client cannot get a verdict or fulfillment for the provider's job (403)
+  waiting for a validated ledger past CancelAfter ...
+    | [watcher] job 65e4d9a9-44f2-4182-b31d-f707588cdf20: flagged (24 s left before CancelAfter)
+    | [watcher] job 65e4d9a9-44f2-4182-b31d-f707588cdf20: status refunded (EscrowCancel 9F2A3AC1002776C726619AD33D393CFC4453447BB3E5E3505D4CF44F7BCA84B0)
+  PASS  EscrowCancel -> tesSUCCESS, watcher -> refunded (tesSUCCESS https://testnet.xrpl.org/transactions/9F2A3AC1002776C726619AD33D393CFC4453447BB3E5E3505D4CF44F7BCA84B0)
+  PASS  client gets the price back minus the cancel fee (+9.999990 XRP)
+  after: client 119.998130 XRP, provider 449.977725 XRP
+
+3. Verdict log: the oracle anchors its log head on the testnet; the SDK checks the log against the ledger
+  log head: entry 12, hash e18ea7ba5c335d5f2e95f43091a38fef99bd9e2c88614bcd8dfa3bde71101917 (13 entries)
+  PASS  the log head is anchored on a validated testnet ledger (entry 12 in ledger 22341184, https://testnet.xrpl.org/transactions/E4BCB2BC56278F9F2583282FF59C2366F112706B133BCAA1E3603C3BA41B57A7)
+  PASS  Python SDK verified the log: signatures, chain, and the anchor read from the ledger (13 entries, 0 after the anchor)
+  PASS  job 1's own signed verdict is in the log (entry 11)
+  PASS  an edited copy of the log fails the check (entry 2: signature does not verify)
+    | [oracle] stopping: anchoring the verdict log head
+
+16/16 checks passed

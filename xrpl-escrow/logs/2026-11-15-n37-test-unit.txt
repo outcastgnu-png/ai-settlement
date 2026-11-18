@@ -1,0 +1,9 @@
+
+ RUN  v5.0.5 /home/user/ai-settlement/xrpl-escrow
+
+
+ Test Files  9 passed (9)
+      Tests  114 passed (114)
+   Start at  08:36:44
+   Duration  46.53s (tests 95%, import 4%)
+

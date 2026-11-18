@@ -10,7 +10,7 @@ import type { SignedVerdict } from "../src/oracle/server.js";
 import { VerdictStore } from "../src/oracle/verdict-store.js";
 import { EscrowKit, latestAnchor } from "../src/sdk/index.js";
 import {
-  ANCHOR_MEMO_TYPE, anchorHistoryProblems, anchorMemos, anchorProblem, checkChain, entryHash, entryMismatch, genesisEntry,
+  ANCHOR_MEMO_TYPE, anchorHistoryProblems, anchorMemos, anchorProblem, checkChain, duplicateJobProblems, entryHash, entryMismatch, findVerdict, genesisEntry,
   parseAnchorMemo, sealEntry, verdictEntry, verdictHash, verdictInLog, type LogEntry, type VerdictEntryBody,
 } from "../src/verdict-log.js";
 import { markFunded, startLocal, tempDir } from "./helpers.js";
@@ -349,6 +349,36 @@ describe("oracle verdict log routes, anchoring and EscrowKit.verifyVerdictLog", 
     const res = await k.verifyVerdictLog({ entries: forged, verdict: failVerdict });
     expect(res.ok).toBe(false);
     expect(res.problems.join()).toMatch(/entry 1 names this verdict but its verdict differs/);
+  });
+
+  it("verifyVerdictLog fails on a later entry for a job that names its verdict but says something else (Gpno N37)", async () => {
+    const entries = await kit.fetchVerdictLog();
+    const passVerdict = jobs[0].verdict;
+    expect(passVerdict.verdict).toBe("pass");
+    const first = entries.find((e) => e.kind === "verdict" && e.jobId === passVerdict.jobId)!;
+    const head = entries[entries.length - 1];
+    const { signature: _s, hash: _h, ...body } = first as LogEntry & VerdictEntryBody;
+    const later = sealEntry({
+      ...body, seq: head.seq + 1, prev: head.hash, at: head.at + 1, verdict: "fail", checks: [{ type: "sha256-match", pass: false }],
+    } as VerdictEntryBody, local.verdictKey);
+    const forged = [...entries, later];
+    expect(checkChain(forged, local.verdictKey.address).ok).toBe(true);
+    expect(findVerdict(forged, passVerdict).mismatch).toMatch(new RegExp(`entry ${later.seq} names this verdict but its verdict differs`));
+    expect(duplicateJobProblems(forged)).toEqual([
+      `job ${passVerdict.jobId} has 2 verdict entries (${first.seq}, ${later.seq}); a job has one verdict`]);
+    const anchorAccount = Wallet.generate().address;
+    const k = new EscrowKit({
+      xrpl: fakeLedger(anchorAccount, [{ memos: anchorMemos({ seq: later.seq, hash: later.hash }, local.verdictKey.address) }]),
+      oracleUrl: local.oracle.url, oracleAddress: local.verdictKey.address, anchorAddress: anchorAccount,
+    });
+    const without = await k.verifyVerdictLog({ entries: forged });
+    expect(without.ok).toBe(false);
+    expect(without.problems).toEqual([`job ${passVerdict.jobId} has 2 verdict entries (${first.seq}, ${later.seq}); a job has one verdict`]);
+    const withIt = await k.verifyVerdictLog({ entries: forged, verdict: passVerdict });
+    expect(withIt.ok).toBe(false);
+    expect(withIt.problems.join()).toMatch(/names this verdict but its verdict differs/);
+    // The honest log still checks.
+    expect(duplicateJobProblems(entries)).toEqual([]);
   });
 
   it("verifyVerdictLog fails when the anchor on the ledger doesn't match, when there is none, or when a verdict is missing", async () => {
