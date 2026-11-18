@@ -35,7 +35,8 @@ export interface Issued {
  * from then on, and is appended to the log on start or on the next ask (Gpno
  * N33). A private copy whose fields disagree with the public entry it is linked
  * to makes the oracle refuse to start, so it never serves or anchors a verdict
- * the public log contradicts (Gpno N26).
+ * the public log contradicts (Gpno N26). That holds for every entry in the log,
+ * and a second entry for a job the log already has makes it refuse too (Gpno N37).
  */
 export class VerdictStore {
   readonly #entries: LogEntry[] = [];
@@ -68,9 +69,15 @@ export class VerdictStore {
       }
       const check = checkChain(parsed, key.address);
       if (!check.ok) throw new Error(`verdict log ${path} does not check (${check.problem}); refusing to start`);
+      // Every verdict entry is checked, not only the first for each job (Gpno N37).
       for (const e of parsed as LogEntry[]) {
         this.#entries.push(e);
-        if (e.kind !== "verdict" || this.#byJob.has(e.jobId)) continue;
+        if (e.kind !== "verdict") continue;
+        const first = this.#byJob.get(e.jobId);
+        if (first) {
+          throw new Error(`verdict log entry ${e.seq} is a second verdict for job ${e.jobId} (the first is entry ${first.entry.seq}); `
+            + "a job has one verdict, so refusing to start rather than serve or anchor a log that says otherwise");
+        }
         const signed = this.#signed.get(e.verdictHash) ?? null;
         const mismatch = signed ? entryMismatch(e, signed) : null;
         if (mismatch) {

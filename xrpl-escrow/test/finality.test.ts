@@ -182,6 +182,48 @@ describe("the oracle never serves or anchors a verdict its public log contradict
   });
 });
 
+describe("every entry is checked, not only a job's first (Gpno N37)", () => {
+  it("refuses to start, and anchors nothing, when a later entry for a job says something else", async () => {
+    const local = await startLocal();
+    try {
+      const job = await callJson<Job>("POST", `${local.registry.url}/jobs`, {
+        client: client.address, provider: provider.address, priceDrops: "1000000", slaSeconds: 60,
+        spec: { checks: [{ type: "sha256-match", sha256: sha256Hex("good") }] },
+      });
+      await callJson("POST", `${local.oracle.url}/jobs/${job.id}/condition`);
+      await markFunded(local.registry.url, job.id, 9);
+      await callJson("POST", `${local.registry.url}/jobs/${job.id}/deliverable`, {
+        content: "good", auth: signRequest(provider, "deliver", job.id, sha256Hex("good")),
+      });
+      const { verdict } = await callJson<{ verdict: SignedVerdict }>("POST", `${local.oracle.url}/verify/${job.id}`,
+        { auth: signRequest(provider, "verify", job.id, "") });
+      expect(verdict.verdict).toBe("pass");
+      await local.oracle.close();
+      const lines = readFileSync(local.verdictChain, "utf8").trim().split("\n");
+      const honest = JSON.parse(lines[lines.length - 1]);
+      const { signature: _s, hash: _h, ...body } = honest;
+      const anchorsBefore = local.onLedger.length;
+      // Gpno's repro: a second signed, chained entry for the same job that says fail and names the pass.
+      const later = sealEntry({
+        ...body, seq: honest.seq + 1, prev: honest.hash, at: honest.at + 1, verdict: "fail", checks: [{ type: "sha256-match", pass: false }],
+      } as VerdictEntryBody, local.verdictKey);
+      writeFileSync(local.verdictChain, `${[...lines, JSON.stringify(later)].join("\n")}\n`);
+      await expect(local.launchOracle()).rejects.toThrow(/second verdict for job .*refusing to start/);
+      expect(local.onLedger.length).toBe(anchorsBefore);
+      // A second entry that agrees with nothing the oracle signed (an unknown verdictHash) is refused too.
+      const unknown = sealEntry({ ...body, seq: honest.seq + 1, prev: honest.hash, at: honest.at + 1, verdictHash: "ab".repeat(32) } as VerdictEntryBody,
+        local.verdictKey);
+      writeFileSync(local.verdictChain, `${[...lines, JSON.stringify(unknown)].join("\n")}\n`);
+      await expect(local.launchOracle()).rejects.toThrow(/second verdict for job/);
+      expect(local.onLedger.length).toBe(anchorsBefore);
+      writeFileSync(local.verdictChain, `${lines.join("\n")}\n`);
+      await expect(local.restartOracle()).resolves.toBeTruthy();
+    } finally {
+      await local.close();
+    }
+  });
+});
+
 describe("a signed verdict sticks even when its public entry fails to write (Gpno N33)", () => {
   it("answers later verifies with the same fail, without running the checks again", async () => {
     const local = await startLocal();

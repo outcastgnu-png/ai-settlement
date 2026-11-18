@@ -218,7 +218,8 @@ id, condition, provider, each check's type and pass/fail, the evidence hash, and
 the hash of the full signed verdict the provider got. No deliverables, check
 details, secrets or fulfillments. The older `data/verdicts.jsonl` is kept as it
 was and no longer written; the new log's first (genesis) entry names its hash.
-An oracle whose own log does not check refuses to start.
+An oracle whose own log does not check refuses to start. A job has one verdict and one
+entry; a log with two entries for the same job fails the check.
 
 **Anchors on the testnet.** Every 10 minutes when the head has moved
 (`ANCHOR_INTERVAL_MS`), and when the oracle stops with Ctrl+C, it sends the head
@@ -242,7 +243,7 @@ transactions (`maxTx`, or `ANCHOR_LOOKBACK_TX` for the oracle); if the account
 has more, the older anchors can't be checked and `ok` is false, and the oracle
 refuses to start until it gets a fresh anchor wallet or a larger lookback. Pass your own signed verdict to also
 check that it is in the log, with the same outcome, checks, evidence hash,
-condition, provider and time. It returns `ok`, a list of `problems`, the head,
+condition, provider and time, in every entry that names it. It returns `ok`, a list of `problems`, the head,
 the anchor and how many entries came after it.
 
 With a `verdict`, `ok` means your verdict is in the log *and* pinned by an

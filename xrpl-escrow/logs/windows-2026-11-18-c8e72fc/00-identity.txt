@@ -1,0 +1,8 @@
+$ git rev-parse HEAD HEAD^{tree} HEAD^
+c8e72fc253e18641059a3c334d6ad538483b56c7
+373baa5e879722159be2ebce30512ce2c58df7b4
+abd8b5248df1a8edeada79b38b72fe09c2ee1bd1
+$ git status --porcelain
+node v24.18.0 npm 11.16.0 Python 3.14.6
+Microsoft Windows [Version 10.0.26300.9974]
+New clean worktree C:\dev\ai-settlement-c8e72fc. Copied from the 21da0b3 run (C:\dev\ai-settlement-f5ee6d2): xrpl-escrow/.env (anchor raU1zQN3PxSGmYh9e14cBVSz3R7PKK9xvG) and xrpl-escrow/data/. Fresh .venv.

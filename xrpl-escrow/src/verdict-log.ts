@@ -203,15 +203,38 @@ export function entryMismatch(entry: LogEntry, verdict: SignedVerdict): string |
 
 /**
  * The log entry for this signed verdict, if the log has it with every public
- * field matching the verdict. An entry that carries the verdict's hash but says
- * something else in public is returned as `mismatch`.
+ * field matching the verdict. Every entry that carries the verdict's hash is
+ * compared, not just the first: a later line that names it but says something
+ * else in public is returned as `mismatch` (Gpno N37).
  */
 export function findVerdict(entries: LogEntry[], verdict: SignedVerdict): { entry: LogEntry | null; mismatch: string | null } {
   const want = verdictHash(verdict);
-  const candidate = entries.find((e) => e && e.kind === "verdict" && e.verdictHash === want) ?? null;
-  if (!candidate) return { entry: null, mismatch: null };
-  const mismatch = entryMismatch(candidate, verdict);
-  return mismatch ? { entry: null, mismatch: `entry ${candidate.seq} names this verdict but its ${mismatch} differs from it` } : { entry: candidate, mismatch: null };
+  let found: LogEntry | null = null;
+  for (const e of entries) {
+    if (!e || e.kind !== "verdict" || e.verdictHash !== want) continue;
+    const mismatch = entryMismatch(e, verdict);
+    if (mismatch) return { entry: null, mismatch: `entry ${e.seq} names this verdict but its ${mismatch} differs from it` };
+    found ??= e;
+  }
+  return { entry: found, mismatch: null };
+}
+
+/**
+ * A job has one verdict, and the oracle writes one entry for it (Gpno N25), so
+ * a log with two verdict entries for the same job is wrong whatever they say
+ * (Gpno N37). One problem per job, naming its entries.
+ */
+export function duplicateJobProblems(entries: readonly unknown[]): string[] {
+  const seqs = new Map<string, number[]>();
+  for (const e of entries) {
+    const v = e as Partial<VerdictLogEntry> | null;
+    if (!v || typeof v !== "object" || v.kind !== "verdict" || typeof v.jobId !== "string") continue;
+    const list = seqs.get(v.jobId) ?? [];
+    list.push(v.seq as number);
+    seqs.set(v.jobId, list);
+  }
+  return [...seqs].filter(([, s]) => s.length > 1)
+    .map(([jobId, s]) => `job ${jobId} has ${s.length} verdict entries (${s.join(", ")}); a job has one verdict`);
 }
 
 /** The log entry for this signed verdict, only if every public field matches it. */

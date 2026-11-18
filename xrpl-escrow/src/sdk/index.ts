@@ -18,12 +18,12 @@ import { ORACLE_URL, REGISTRY_URL, readEnvFile } from "../local-config.js";
 import type { Job, JobEvent, JobSpec, JobStatus } from "../registry/db.js";
 import type { SignedVerdict, VerdictBody } from "../oracle/server.js";
 import { listAnchors } from "../anchors.js";
-import { anchorHistoryProblems, checkChain, findVerdict, type Anchor, type LogEntry, type LogHead } from "../verdict-log.js";
+import { anchorHistoryProblems, checkChain, duplicateJobProblems, findVerdict, type Anchor, type LogEntry, type LogHead } from "../verdict-log.js";
 
 export type { Job, JobSpec, JobStatus } from "../registry/db.js";
 export type { SignedVerdict } from "../oracle/server.js";
 export type { Anchor, LogEntry, LogHead } from "../verdict-log.js";
-export { ANCHOR_MEMO_TYPE, anchorHistoryProblems, anchorProblem, checkChain, entryMismatch, findVerdict, verdictInLog } from "../verdict-log.js";
+export { ANCHOR_MEMO_TYPE, anchorHistoryProblems, anchorProblem, checkChain, duplicateJobProblems, entryMismatch, findVerdict, verdictInLog } from "../verdict-log.js";
 export { listAnchors } from "../anchors.js";
 
 export interface KitOptions {
@@ -153,8 +153,8 @@ export class EscrowKit {
    * Fetch the public verdict log and check it: every entry is signed by the pinned
    * oracle address, the chain is unbroken from the genesis entry, and every anchor
    * on a validated ledger from the pinned anchor account agrees with the log (one
-   * genesis only). Pass `verdict` to also check that your own signed verdict is in
-   * the log, with every public field matching it, and at or before the newest
+   * genesis only), and no job has more than one verdict entry. Pass `verdict` to also check that your own signed verdict is in
+   * the log, with every entry that names it matching it, and at or before the newest
    * anchor; `allowUnanchored: true` accepts it in the not-yet-anchored tail
    * (`verdictAnchored` then says false). With `requireAnchor: false`, a log with
    * no anchor yet is not a problem. If the anchor account has more transactions
@@ -169,6 +169,7 @@ export class EscrowKit {
     const entries = opts.entries ?? await this.fetchVerdictLog();
     const chain = checkChain(entries, this.oracleAddress ?? "");
     if (this.oracleAddress && !chain.ok) problems.push(chain.problem!);
+    problems.push(...duplicateJobProblems(entries));
     let history = { anchors: [] as Anchor[], complete: true };
     if (!this.anchorAddress) problems.push("no pinned anchor account (ORACLE_ANCHOR_ADDRESS)");
     else if (this.oracleAddress) {

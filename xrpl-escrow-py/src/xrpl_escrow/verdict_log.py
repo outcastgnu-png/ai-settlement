@@ -142,15 +142,28 @@ def entry_mismatch(entry: Entry, verdict: dict[str, Any]) -> str | None:
 
 def find_verdict(entries: list[Entry], verdict: dict[str, Any]) -> tuple[Entry | None, str | None]:
     """(entry, None) when the log has this verdict with every public field matching; (None, why) when an entry
-    names its hash but says something else; (None, None) when it is not there."""
+    names its hash but says something else; (None, None) when it is not there. Every entry naming the hash is
+    compared, not just the first (Gpno N37)."""
     want = verdict_hash(verdict)
+    found: Entry | None = None
     for e in entries:
         if isinstance(e, dict) and e.get("kind") == "verdict" and e.get("verdictHash") == want:
             mismatch = entry_mismatch(e, verdict)
             if mismatch:
                 return None, f"entry {e.get('seq')} names this verdict but its {mismatch} differs from it"
-            return e, None
-    return None, None
+            if found is None:
+                found = e
+    return found, None
+
+
+def duplicate_job_problems(entries: list[Any]) -> list[str]:
+    """A job has one verdict and one entry (Gpno N25), so two verdict entries for one job are a problem (Gpno N37)."""
+    seqs: dict[str, list[Any]] = {}
+    for e in entries:
+        if isinstance(e, dict) and e.get("kind") == "verdict" and isinstance(e.get("jobId"), str):
+            seqs.setdefault(e["jobId"], []).append(e.get("seq"))
+    return [f"job {job} has {len(s)} verdict entries ({', '.join('' if x is None else str(x) for x in s)}); a job has one verdict"
+            for job, s in seqs.items() if len(s) > 1]
 
 
 def verdict_in_log(entries: list[Entry], verdict: dict[str, Any]) -> Entry | None:
@@ -288,6 +301,7 @@ def verify_verdict_log(
     chain = check_chain(entries, oracle_address)
     if oracle_address and not chain.ok:
         problems.append(str(chain.problem))
+    problems.extend(duplicate_job_problems(entries))
     if not anchor_address:
         problems.append("no pinned anchor account (ORACLE_ANCHOR_ADDRESS)")
     elif oracle_address:

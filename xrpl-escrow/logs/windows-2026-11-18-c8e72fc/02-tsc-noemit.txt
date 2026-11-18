@@ -1,0 +1,4 @@
+$ npx.cmd tsc --noEmit
+start 2026-11-18T01:02:29-06:00
+EXIT 0
+elapsed 2 s

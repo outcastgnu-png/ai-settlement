@@ -1769,6 +1769,96 @@
       }
     },
     {
+      "name": "a later entry for the job names the pass but says fail (Gpno N37)",
+      "entries": [
+        {
+          "v": 1,
+          "seq": 0,
+          "prev": "0000000000000000000000000000000000000000000000000000000000000000",
+          "at": 1762500000000,
+          "oracle": "r9zRhGr7b6xPekLvT6wP4qNdWMryaumZS7",
+          "publicKey": "ED1A7C082846CFF58FF9A892BA4BA2593151CCF1DBA59F37714CC9ED39824AF85F",
+          "kind": "genesis",
+          "legacyLog": {
+            "sha256": "9fe200693a36ab3895efbf81b51cb9970b68d7e64b59fdb73586fca86940ebdf",
+            "bytes": 8
+          },
+          "signature": "CEA761D6E84EFE1CEFD05E78FACD08E592B3DEE2079EC3A174642D19456670D3AD32C623EC3765B4332CDC8C38FDCCDDB33B03D05229A10C7CEAF65716294E01",
+          "hash": "e397fb7ce879a121a39f9af5f88c9115930ffa4f0f0e778605abe7e4df8d4191"
+        },
+        {
+          "v": 1,
+          "seq": 1,
+          "prev": "e397fb7ce879a121a39f9af5f88c9115930ffa4f0f0e778605abe7e4df8d4191",
+          "at": 1762500001001,
+          "oracle": "r9zRhGr7b6xPekLvT6wP4qNdWMryaumZS7",
+          "publicKey": "ED1A7C082846CFF58FF9A892BA4BA2593151CCF1DBA59F37714CC9ED39824AF85F",
+          "kind": "verdict",
+          "jobId": "6f7c1e9a-0000-4000-8000-000000000001",
+          "verdict": "pass",
+          "checks": [
+            {
+              "type": "sha256-match",
+              "pass": true
+            }
+          ],
+          "evidenceHash": "1fff4179f6947418eba511afeb2c3115d09f0dd5a8ab4b72af0efacd2de014d9",
+          "condition": "A0258020D0F631CA1DDBA8DB3BCFCB9E057CDC98D0379F1BEE00E75A545147A27DADD982810120",
+          "provider": "r3MDUP3dVq93U8ZZo9FB35jozyeoqQBg6X",
+          "issuedAt": 1762500001000,
+          "verdictHash": "3e557791aa60ce2d52ff6f79798cec1bb70c42f3a343beae348a9b38cd7e4b08",
+          "signature": "31FC3865F468FE8E661DCC7093FA72CC613E74041C14C6EF77D6527CAF2609DFA195D8E4CCE4CC424577107641D779091C4F6B2AB8174B906A4C2A2993965A06",
+          "hash": "bf0dab02b2a6837ba6e8b0f94f9fa8e0c2fe9d10c041e0c51df411bc489b2086"
+        },
+        {
+          "v": 1,
+          "seq": 2,
+          "prev": "bf0dab02b2a6837ba6e8b0f94f9fa8e0c2fe9d10c041e0c51df411bc489b2086",
+          "at": 1762500001002,
+          "oracle": "r9zRhGr7b6xPekLvT6wP4qNdWMryaumZS7",
+          "publicKey": "ED1A7C082846CFF58FF9A892BA4BA2593151CCF1DBA59F37714CC9ED39824AF85F",
+          "kind": "verdict",
+          "jobId": "6f7c1e9a-0000-4000-8000-000000000001",
+          "verdict": "fail",
+          "checks": [
+            {
+              "type": "sha256-match",
+              "pass": false
+            }
+          ],
+          "evidenceHash": "1fff4179f6947418eba511afeb2c3115d09f0dd5a8ab4b72af0efacd2de014d9",
+          "condition": "A0258020D0F631CA1DDBA8DB3BCFCB9E057CDC98D0379F1BEE00E75A545147A27DADD982810120",
+          "provider": "r3MDUP3dVq93U8ZZo9FB35jozyeoqQBg6X",
+          "issuedAt": 1762500001000,
+          "verdictHash": "3e557791aa60ce2d52ff6f79798cec1bb70c42f3a343beae348a9b38cd7e4b08",
+          "signature": "2B016CF6076EA656DA30BC5F9E2C1C1FE65A37A1CC4C5B6F41E2FAF547906EE8B4C35DBF803CE783D38F64296F3997B4D822BA2EA12F42AD31BC2D976F6E880A",
+          "hash": "0ced908b3d8f845071d146b013e0b8248d7189c33faf9db3d3ebff61296e76ce"
+        }
+      ],
+      "verdict": {
+        "jobId": "6f7c1e9a-0000-4000-8000-000000000001",
+        "verdict": "pass",
+        "checks": [
+          {
+            "type": "sha256-match",
+            "pass": true,
+            "detail": "sha256 matches the spec"
+          }
+        ],
+        "evidenceHash": "1fff4179f6947418eba511afeb2c3115d09f0dd5a8ab4b72af0efacd2de014d9",
+        "condition": "A0258020D0F631CA1DDBA8DB3BCFCB9E057CDC98D0379F1BEE00E75A545147A27DADD982810120",
+        "provider": "r3MDUP3dVq93U8ZZo9FB35jozyeoqQBg6X",
+        "oracle": "r9zRhGr7b6xPekLvT6wP4qNdWMryaumZS7",
+        "publicKey": "ED1A7C082846CFF58FF9A892BA4BA2593151CCF1DBA59F37714CC9ED39824AF85F",
+        "issuedAt": 1762500001000,
+        "signature": "5F1FE8673071D26CCF5CEF63441039684D1BA70233A9A9B19EECA9FAC057EA63A16582F4D97F3C59C79F3386CA85F7DA449AA4F863EFEF9EAF1AE472425C1006"
+      },
+      "expected": {
+        "seq": null,
+        "mismatch": "entry 2 names this verdict but its verdict differs from it"
+      }
+    },
+    {
       "name": "verdict not logged",
       "entries": [
         {
@@ -10460,6 +10550,237 @@
       "verdictHash": "3e557791aa60ce2d52ff6f79798cec1bb70c42f3a343beae348a9b38cd7e4b08",
       "signature": "EFF5D2F05C0EA980B09AEF3312E77987DB7EB6F5424D6041EA326704D8D74D497F2CCEFCBD22D1B1D158A462DF12E79612F8BB4A045AB72ACB3D785CD1954505",
       "hash": "a88700e1b2243fac679d9273b750f36f05adfe68efc4fcfe967df006b5819163"
+    }
+  ],
+  "laterEntryLog": [
+    {
+      "v": 1,
+      "seq": 0,
+      "prev": "0000000000000000000000000000000000000000000000000000000000000000",
+      "at": 1762500000000,
+      "oracle": "r9zRhGr7b6xPekLvT6wP4qNdWMryaumZS7",
+      "publicKey": "ED1A7C082846CFF58FF9A892BA4BA2593151CCF1DBA59F37714CC9ED39824AF85F",
+      "kind": "genesis",
+      "legacyLog": {
+        "sha256": "9fe200693a36ab3895efbf81b51cb9970b68d7e64b59fdb73586fca86940ebdf",
+        "bytes": 8
+      },
+      "signature": "CEA761D6E84EFE1CEFD05E78FACD08E592B3DEE2079EC3A174642D19456670D3AD32C623EC3765B4332CDC8C38FDCCDDB33B03D05229A10C7CEAF65716294E01",
+      "hash": "e397fb7ce879a121a39f9af5f88c9115930ffa4f0f0e778605abe7e4df8d4191"
+    },
+    {
+      "v": 1,
+      "seq": 1,
+      "prev": "e397fb7ce879a121a39f9af5f88c9115930ffa4f0f0e778605abe7e4df8d4191",
+      "at": 1762500001001,
+      "oracle": "r9zRhGr7b6xPekLvT6wP4qNdWMryaumZS7",
+      "publicKey": "ED1A7C082846CFF58FF9A892BA4BA2593151CCF1DBA59F37714CC9ED39824AF85F",
+      "kind": "verdict",
+      "jobId": "6f7c1e9a-0000-4000-8000-000000000001",
+      "verdict": "pass",
+      "checks": [
+        {
+          "type": "sha256-match",
+          "pass": true
+        }
+      ],
+      "evidenceHash": "1fff4179f6947418eba511afeb2c3115d09f0dd5a8ab4b72af0efacd2de014d9",
+      "condition": "A0258020D0F631CA1DDBA8DB3BCFCB9E057CDC98D0379F1BEE00E75A545147A27DADD982810120",
+      "provider": "r3MDUP3dVq93U8ZZo9FB35jozyeoqQBg6X",
+      "issuedAt": 1762500001000,
+      "verdictHash": "3e557791aa60ce2d52ff6f79798cec1bb70c42f3a343beae348a9b38cd7e4b08",
+      "signature": "31FC3865F468FE8E661DCC7093FA72CC613E74041C14C6EF77D6527CAF2609DFA195D8E4CCE4CC424577107641D779091C4F6B2AB8174B906A4C2A2993965A06",
+      "hash": "bf0dab02b2a6837ba6e8b0f94f9fa8e0c2fe9d10c041e0c51df411bc489b2086"
+    },
+    {
+      "v": 1,
+      "seq": 2,
+      "prev": "bf0dab02b2a6837ba6e8b0f94f9fa8e0c2fe9d10c041e0c51df411bc489b2086",
+      "at": 1762500001002,
+      "oracle": "r9zRhGr7b6xPekLvT6wP4qNdWMryaumZS7",
+      "publicKey": "ED1A7C082846CFF58FF9A892BA4BA2593151CCF1DBA59F37714CC9ED39824AF85F",
+      "kind": "verdict",
+      "jobId": "6f7c1e9a-0000-4000-8000-000000000001",
+      "verdict": "fail",
+      "checks": [
+        {
+          "type": "sha256-match",
+          "pass": false
+        }
+      ],
+      "evidenceHash": "1fff4179f6947418eba511afeb2c3115d09f0dd5a8ab4b72af0efacd2de014d9",
+      "condition": "A0258020D0F631CA1DDBA8DB3BCFCB9E057CDC98D0379F1BEE00E75A545147A27DADD982810120",
+      "provider": "r3MDUP3dVq93U8ZZo9FB35jozyeoqQBg6X",
+      "issuedAt": 1762500001000,
+      "verdictHash": "3e557791aa60ce2d52ff6f79798cec1bb70c42f3a343beae348a9b38cd7e4b08",
+      "signature": "2B016CF6076EA656DA30BC5F9E2C1C1FE65A37A1CC4C5B6F41E2FAF547906EE8B4C35DBF803CE783D38F64296F3997B4D822BA2EA12F42AD31BC2D976F6E880A",
+      "hash": "0ced908b3d8f845071d146b013e0b8248d7189c33faf9db3d3ebff61296e76ce"
+    }
+  ],
+  "duplicateCases": [
+    {
+      "name": "honest log",
+      "entries": [
+        {
+          "v": 1,
+          "seq": 0,
+          "prev": "0000000000000000000000000000000000000000000000000000000000000000",
+          "at": 1762500000000,
+          "oracle": "r9zRhGr7b6xPekLvT6wP4qNdWMryaumZS7",
+          "publicKey": "ED1A7C082846CFF58FF9A892BA4BA2593151CCF1DBA59F37714CC9ED39824AF85F",
+          "kind": "genesis",
+          "legacyLog": {
+            "sha256": "9fe200693a36ab3895efbf81b51cb9970b68d7e64b59fdb73586fca86940ebdf",
+            "bytes": 8
+          },
+          "signature": "CEA761D6E84EFE1CEFD05E78FACD08E592B3DEE2079EC3A174642D19456670D3AD32C623EC3765B4332CDC8C38FDCCDDB33B03D05229A10C7CEAF65716294E01",
+          "hash": "e397fb7ce879a121a39f9af5f88c9115930ffa4f0f0e778605abe7e4df8d4191"
+        },
+        {
+          "v": 1,
+          "seq": 1,
+          "prev": "e397fb7ce879a121a39f9af5f88c9115930ffa4f0f0e778605abe7e4df8d4191",
+          "at": 1762500001001,
+          "oracle": "r9zRhGr7b6xPekLvT6wP4qNdWMryaumZS7",
+          "publicKey": "ED1A7C082846CFF58FF9A892BA4BA2593151CCF1DBA59F37714CC9ED39824AF85F",
+          "kind": "verdict",
+          "jobId": "6f7c1e9a-0000-4000-8000-000000000001",
+          "verdict": "pass",
+          "checks": [
+            {
+              "type": "sha256-match",
+              "pass": true
+            }
+          ],
+          "evidenceHash": "1fff4179f6947418eba511afeb2c3115d09f0dd5a8ab4b72af0efacd2de014d9",
+          "condition": "A0258020D0F631CA1DDBA8DB3BCFCB9E057CDC98D0379F1BEE00E75A545147A27DADD982810120",
+          "provider": "r3MDUP3dVq93U8ZZo9FB35jozyeoqQBg6X",
+          "issuedAt": 1762500001000,
+          "verdictHash": "3e557791aa60ce2d52ff6f79798cec1bb70c42f3a343beae348a9b38cd7e4b08",
+          "signature": "31FC3865F468FE8E661DCC7093FA72CC613E74041C14C6EF77D6527CAF2609DFA195D8E4CCE4CC424577107641D779091C4F6B2AB8174B906A4C2A2993965A06",
+          "hash": "bf0dab02b2a6837ba6e8b0f94f9fa8e0c2fe9d10c041e0c51df411bc489b2086"
+        },
+        {
+          "v": 1,
+          "seq": 2,
+          "prev": "bf0dab02b2a6837ba6e8b0f94f9fa8e0c2fe9d10c041e0c51df411bc489b2086",
+          "at": 1762500002001,
+          "oracle": "r9zRhGr7b6xPekLvT6wP4qNdWMryaumZS7",
+          "publicKey": "ED1A7C082846CFF58FF9A892BA4BA2593151CCF1DBA59F37714CC9ED39824AF85F",
+          "kind": "verdict",
+          "jobId": "6f7c1e9a-0000-4000-8000-000000000002",
+          "verdict": "fail",
+          "checks": [
+            {
+              "type": "sha256-match",
+              "pass": false
+            }
+          ],
+          "evidenceHash": "25a2749fbf0628666634bf9235db05b01c443d6849f6dd69f848eefdc79666de",
+          "condition": "A02580209C0ABE51C6E6655D81DE2D044D4FB194931F058C0426C67C7285D8F5657ED64A810120",
+          "provider": "r3MDUP3dVq93U8ZZo9FB35jozyeoqQBg6X",
+          "issuedAt": 1762500002000,
+          "verdictHash": "133e1e79145b15c18314322d31a6329fd5311124f2768e5e16f8fd9c24790af9",
+          "signature": "690E139FD0F8E6C0CFF7A7E8A54FCB5B8994C74E7FE5F54B736B83130919E29753B85A048A7D3CFF58E2148A3DC0C148F7DABB8F898D66E42D7387A0DD9FF004",
+          "hash": "7bb85eae0980909c6846f9c4481681cf60ee7e03124e5b721a96d18f7b7e9d44"
+        },
+        {
+          "v": 1,
+          "seq": 3,
+          "prev": "7bb85eae0980909c6846f9c4481681cf60ee7e03124e5b721a96d18f7b7e9d44",
+          "at": 1762500003001,
+          "oracle": "r9zRhGr7b6xPekLvT6wP4qNdWMryaumZS7",
+          "publicKey": "ED1A7C082846CFF58FF9A892BA4BA2593151CCF1DBA59F37714CC9ED39824AF85F",
+          "kind": "verdict",
+          "jobId": "6f7c1e9a-0000-4000-8000-000000000003",
+          "verdict": "pass",
+          "checks": [
+            {
+              "type": "sha256-match",
+              "pass": true
+            }
+          ],
+          "evidenceHash": "e6106f09fbf05d97961e75ba0280bdd239dab758cc6125ce7510414abf7a812f",
+          "condition": "A02580207C1C97DF17C066924822B0AF09A65251554962C61E23329AED04CD19020DC3B8810120",
+          "provider": "r3MDUP3dVq93U8ZZo9FB35jozyeoqQBg6X",
+          "issuedAt": 1762500003000,
+          "verdictHash": "2458e64a5b538e352df2848b9ff14e51250f7a570690a78d5b6949d93faecffc",
+          "signature": "06B20A860086EBF762B5CD83C03A6D948A2A454C4D0FDFF44E72EEA865CFA2D0E5AD0FAF3D675AECB75A0938F8ED9A0B65F1210A8D843E91B6A7B662D4331400",
+          "hash": "9f9eedbfc75c07b52a112f8c8a3778f56dff4e4889d01406613e8cdf31148033"
+        }
+      ],
+      "expected": []
+    },
+    {
+      "name": "second entry for a job (Gpno N37)",
+      "entries": [
+        {
+          "v": 1,
+          "seq": 0,
+          "prev": "0000000000000000000000000000000000000000000000000000000000000000",
+          "at": 1762500000000,
+          "oracle": "r9zRhGr7b6xPekLvT6wP4qNdWMryaumZS7",
+          "publicKey": "ED1A7C082846CFF58FF9A892BA4BA2593151CCF1DBA59F37714CC9ED39824AF85F",
+          "kind": "genesis",
+          "legacyLog": {
+            "sha256": "9fe200693a36ab3895efbf81b51cb9970b68d7e64b59fdb73586fca86940ebdf",
+            "bytes": 8
+          },
+          "signature": "CEA761D6E84EFE1CEFD05E78FACD08E592B3DEE2079EC3A174642D19456670D3AD32C623EC3765B4332CDC8C38FDCCDDB33B03D05229A10C7CEAF65716294E01",
+          "hash": "e397fb7ce879a121a39f9af5f88c9115930ffa4f0f0e778605abe7e4df8d4191"
+        },
+        {
+          "v": 1,
+          "seq": 1,
+          "prev": "e397fb7ce879a121a39f9af5f88c9115930ffa4f0f0e778605abe7e4df8d4191",
+          "at": 1762500001001,
+          "oracle": "r9zRhGr7b6xPekLvT6wP4qNdWMryaumZS7",
+          "publicKey": "ED1A7C082846CFF58FF9A892BA4BA2593151CCF1DBA59F37714CC9ED39824AF85F",
+          "kind": "verdict",
+          "jobId": "6f7c1e9a-0000-4000-8000-000000000001",
+          "verdict": "pass",
+          "checks": [
+            {
+              "type": "sha256-match",
+              "pass": true
+            }
+          ],
+          "evidenceHash": "1fff4179f6947418eba511afeb2c3115d09f0dd5a8ab4b72af0efacd2de014d9",
+          "condition": "A0258020D0F631CA1DDBA8DB3BCFCB9E057CDC98D0379F1BEE00E75A545147A27DADD982810120",
+          "provider": "r3MDUP3dVq93U8ZZo9FB35jozyeoqQBg6X",
+          "issuedAt": 1762500001000,
+          "verdictHash": "3e557791aa60ce2d52ff6f79798cec1bb70c42f3a343beae348a9b38cd7e4b08",
+          "signature": "31FC3865F468FE8E661DCC7093FA72CC613E74041C14C6EF77D6527CAF2609DFA195D8E4CCE4CC424577107641D779091C4F6B2AB8174B906A4C2A2993965A06",
+          "hash": "bf0dab02b2a6837ba6e8b0f94f9fa8e0c2fe9d10c041e0c51df411bc489b2086"
+        },
+        {
+          "v": 1,
+          "seq": 2,
+          "prev": "bf0dab02b2a6837ba6e8b0f94f9fa8e0c2fe9d10c041e0c51df411bc489b2086",
+          "at": 1762500001002,
+          "oracle": "r9zRhGr7b6xPekLvT6wP4qNdWMryaumZS7",
+          "publicKey": "ED1A7C082846CFF58FF9A892BA4BA2593151CCF1DBA59F37714CC9ED39824AF85F",
+          "kind": "verdict",
+          "jobId": "6f7c1e9a-0000-4000-8000-000000000001",
+          "verdict": "fail",
+          "checks": [
+            {
+              "type": "sha256-match",
+              "pass": false
+            }
+          ],
+          "evidenceHash": "1fff4179f6947418eba511afeb2c3115d09f0dd5a8ab4b72af0efacd2de014d9",
+          "condition": "A0258020D0F631CA1DDBA8DB3BCFCB9E057CDC98D0379F1BEE00E75A545147A27DADD982810120",
+          "provider": "r3MDUP3dVq93U8ZZo9FB35jozyeoqQBg6X",
+          "issuedAt": 1762500001000,
+          "verdictHash": "3e557791aa60ce2d52ff6f79798cec1bb70c42f3a343beae348a9b38cd7e4b08",
+          "signature": "2B016CF6076EA656DA30BC5F9E2C1C1FE65A37A1CC4C5B6F41E2FAF547906EE8B4C35DBF803CE783D38F64296F3997B4D822BA2EA12F42AD31BC2D976F6E880A",
+          "hash": "0ced908b3d8f845071d146b013e0b8248d7189c33faf9db3d3ebff61296e76ce"
+        }
+      ],
+      "expected": [
+        "job 6f7c1e9a-0000-4000-8000-000000000001 has 2 verdict entries (1, 2); a job has one verdict"
+      ]
     }
   ]
 }

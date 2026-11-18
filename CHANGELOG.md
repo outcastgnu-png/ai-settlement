@@ -1,6 +1,15 @@
 # Changelog
 
-## 0.4.0 (Phase 4 auditable verifier, EDR-014; unreleased)
+## Unreleased
+
+### Fixed
+- Gpno N37: the oracle now checks every entry of its log on start, not only the first for each job.
+  A second verdict entry for a job makes it refuse to start, so it never anchors a log that says a job
+  has two verdicts. `verifyVerdictLog` / `verify_verdict_log` fail on such a log for every reader, and
+  with a verdict they compare every entry that names it (`findVerdict` / `find_verdict`). New:
+  `duplicateJobProblems` / `duplicate_job_problems`.
+
+## 0.4.0 (Phase 4 auditable verifier, EDR-014) - 2026-11-15
 
 Still testnet only, and every service listens on 127.0.0.1 only.
 

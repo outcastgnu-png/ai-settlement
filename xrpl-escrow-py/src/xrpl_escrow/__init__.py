@@ -7,7 +7,7 @@ from .escrow import EscrowRef, TxResult, cancel_escrow, create_escrow, finish_es
 from .http import ServiceError
 from .kit import DeliverResult, EscrowKit, Job, TxOutcome, escrow_ref
 from .verdict_log import (
-    LogVerification, anchor_history_problems, anchor_problem, check_chain, entry_mismatch, find_verdict, latest_anchor,
+    LogVerification, anchor_history_problems, anchor_problem, check_chain, duplicate_job_problems, entry_mismatch, find_verdict, latest_anchor,
     list_anchors, parse_anchor_memo, verdict_in_log, verify_verdict_log,
 )
 
@@ -16,7 +16,7 @@ __version__ = "0.4.0"
 __all__ = [
     "EXPLORER_TX", "TESTNET_NETWORK_ID", "DeliverResult", "EscrowKit", "EscrowRef", "Job", "NotTestnetError",
     "LogVerification", "ServiceError", "TxOutcome", "anchor_history_problems", "anchor_problem", "check_chain",
-    "entry_mismatch", "find_verdict", "latest_anchor", "list_anchors",
+    "duplicate_job_problems", "entry_mismatch", "find_verdict", "latest_anchor", "list_anchors",
     "parse_anchor_memo", "verdict_in_log", "verify_verdict_log", "TxResult", "assert_testnet", "canonical_json", "cancel_escrow",
     "condition_of_fulfillment", "connect_testnet", "create_escrow", "escrow_ref", "finish_escrow", "get_escrow",
     "load_or_fund_wallets", "make_secret", "read_env_file", "replay_key", "sha256_hex", "sign_request",
