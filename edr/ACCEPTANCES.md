@@ -6,6 +6,7 @@
 | EDR-012, ESCROW-001 Phase 2 oracle and registry | Accepted | Christopher (owner) | 2026-10-20 17:04 | Same statement. He had also chosen "Accept and build" on a decision card at 07:31 | Gpno |
 | EDR-013, ESCROW-001 Phase 3 developer preview | Accepted | Christopher (owner) | 2026-10-21 16:45 | "I accept EDR. As proposed, as Christopher is the owner, implementer is Claude, builds end-to-end. Reviewer, GPNO, one final review for phase three, drafted by Claude." Scope "Developer preview (as drafted)" chosen on a decision card at 16:39 | Gpno |
 | EDR-014, ESCROW-001 Phase 4 auditable verifier | Accepted | Christopher (owner) | 2026-11-07 18:14 | Chose "Accept, commit and open a PR" on a decision card asking "Accept EDR-014 as drafted, with Christopher owner, Claude implementer, Gpno reviewer?". Scope "Auditable verifier (as drafted)" chosen on a decision card at 18:11. Trial end date first set to 2026-11-20 on a card at 18:13, then changed by Christopher to 2026-12-04 on a card at 18:15 | Gpno |
+| EDR-015, ESCROW-001 Phase 5 shared verification (k-of-n oracles) | Accepted | Christopher (owner) | 2026-11-15 09:06 | Chose "Accept, commit and open a PR" on a decision card asking "Accept EDR-015 as drafted, with Christopher owner, Claude implementer, Gpno reviewer?". Scope "Shared verification + recruiting" chosen on a decision card at 09:05. Building starts after the N37 fix is reviewed and merged | Gpno |
 
 ## Decisions on Gpno's second review (2026-10-21 05:40 UTC)
 
