@@ -5,7 +5,7 @@ Verified-delivery escrow for AI agent jobs on the XRP Ledger (testnet only).
 | Folder | What's in it |
 |---|---|
 | `QUICKSTART.md` | Start here: a first verified-delivery escrow on testnet in about 15 minutes |
-| `edr/` | Engineering decision records. EDR-011 governs Phase 1, EDR-012 Phase 2, EDR-013 Phase 3, EDR-014 Phase 4 and EDR-015 Phase 5 (shared verification, 2 of 3 oracles). |
+| `edr/` | Engineering decision records. EDR-011 governs Phase 1, EDR-012 Phase 2, EDR-013 Phase 3, EDR-014 Phase 4, EDR-015 Phase 5 (shared verification, 2 of 3 oracles) and EDR-016 Phase 6 (signed job spec). |
 | `research/` | The market writeup behind the project |
 | `xrpl-escrow/` | The code. Start with `xrpl-escrow/README.md`. Rules: `CLAUDE.md` (Phase 1), `CLAUDE_PHASE2.md` |
 | `xrpl-escrow-py/` | The Python client SDK (Phase 3). Start with `xrpl-escrow-py/README.md` |

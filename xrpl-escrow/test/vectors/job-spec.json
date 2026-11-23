@@ -1,0 +1,1455 @@
+{
+  "note": "Signed job spec v1 vectors (EDR-016). Keys from fixed entropy; vector keys only, never funded. Regenerate with npx tsx test/vectors/make-job-spec-vectors.ts",
+  "parties": {
+    "client": {
+      "address": "rEmnmhwxmkDkj9jKiibNuXxP25VYHJ5Euy",
+      "publicKey": "02EB0511FD55C2693C1A0E4C767D37ADF1C45B0138AC6ACE236DF58EB152E5E9AB"
+    },
+    "provider": {
+      "address": "rhDcimLbV6NiwPfANiRuch9VsQUvoZJVkP",
+      "publicKey": "ED2C51BE236A6DE9DFDB5980C8DD0FB5AEC321A12B9C5767D0D663CE050BA2853A"
+    }
+  },
+  "oracle": "rRMWMo5iacRWuyNF8QhPhWUoPDQpwsrF5",
+  "jcs": [
+    {
+      "value": {
+        "b": 1,
+        "a": [
+          true,
+          false,
+          null
+        ],
+        "A": "x"
+      },
+      "canonical": "{\"A\":\"x\",\"a\":[true,false,null],\"b\":1}"
+    },
+    {
+      "value": {
+        "é": 1,
+        "€": 2,
+        "😀": 3,
+        "ﬀ": 4,
+        "z": 5,
+        "": 6
+      },
+      "canonical": "{\"\":6,\"z\":5,\"é\":1,\"€\":2,\"😀\":3,\"ﬀ\":4}"
+    },
+    {
+      "value": {
+        "text": "quote \" backslash \\ slash / tab \t newline \n cr \r bs \b ff \f ctl \u0001 \u001f del "
+      },
+      "canonical": "{\"text\":\"quote \\\" backslash \\\\ slash / tab \\t newline \\n cr \\r bs \\b ff \\f ctl \\u0001 \\u001f del \"}"
+    },
+    {
+      "value": {
+        "unicode": "café ünïcödé 日本語 😀    "
+      },
+      "canonical": "{\"unicode\":\"café ünïcödé 日本語 😀    \"}"
+    },
+    {
+      "value": {
+        "nested": {
+          "z": {
+            "y": [
+              1,
+              -2,
+              0,
+              9007199254740991
+            ]
+          },
+          "a": {}
+        },
+        "empty": []
+      },
+      "canonical": "{\"empty\":[],\"nested\":{\"a\":{},\"z\":{\"y\":[1,-2,0,9007199254740991]}}}"
+    }
+  ],
+  "refusedJcs": [
+    {
+      "value": {
+        "n": 1.5
+      },
+      "why": "whole numbers"
+    },
+    {
+      "value": {
+        "n": 1e+21
+      },
+      "why": "whole numbers"
+    }
+  ],
+  "specs": [
+    {
+      "spec": {
+        "specVersion": 1,
+        "revision": 1,
+        "nonce": "0123456789abcdef0123456789abcdef",
+        "title": "Research note on XRPL escrow fees",
+        "client": "rEmnmhwxmkDkj9jKiibNuXxP25VYHJ5Euy",
+        "provider": "rhDcimLbV6NiwPfANiRuch9VsQUvoZJVkP",
+        "priceDrops": "5000000",
+        "slaSeconds": 300,
+        "criteria": [
+          {
+            "id": "format",
+            "statement": "The note is a JSON object with summary, sources and findings",
+            "kind": "objective",
+            "checks": [
+              {
+                "type": "json-schema",
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "summary": {
+                      "type": "string"
+                    },
+                    "sources": {
+                      "type": "array"
+                    },
+                    "findings": {
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "summary",
+                    "sources",
+                    "findings"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "useful",
+            "statement": "The research is useful",
+            "kind": "subjective",
+            "checks": [
+              {
+                "type": "size-range",
+                "minBytes": 200,
+                "maxBytes": 20000
+              },
+              {
+                "type": "contains-text",
+                "text": "\"sources\""
+              }
+            ]
+          },
+          {
+            "id": "on-time",
+            "statement": "Delivered within 5 minutes of funding",
+            "kind": "objective",
+            "checks": [
+              {
+                "type": "max-latency",
+                "maxMs": 300000
+              }
+            ]
+          }
+        ],
+        "rule": {
+          "atLeast": 2
+        }
+      },
+      "canonical": "{\"client\":\"rEmnmhwxmkDkj9jKiibNuXxP25VYHJ5Euy\",\"criteria\":[{\"checks\":[{\"schema\":{\"properties\":{\"findings\":{\"type\":\"array\"},\"sources\":{\"type\":\"array\"},\"summary\":{\"type\":\"string\"}},\"required\":[\"summary\",\"sources\",\"findings\"],\"type\":\"object\"},\"type\":\"json-schema\"}],\"id\":\"format\",\"kind\":\"objective\",\"statement\":\"The note is a JSON object with summary, sources and findings\"},{\"checks\":[{\"maxBytes\":20000,\"minBytes\":200,\"type\":\"size-range\"},{\"text\":\"\\\"sources\\\"\",\"type\":\"contains-text\"}],\"id\":\"useful\",\"kind\":\"subjective\",\"statement\":\"The research is useful\"},{\"checks\":[{\"maxMs\":300000,\"type\":\"max-latency\"}],\"id\":\"on-time\",\"kind\":\"objective\",\"statement\":\"Delivered within 5 minutes of funding\"}],\"nonce\":\"0123456789abcdef0123456789abcdef\",\"priceDrops\":\"5000000\",\"provider\":\"rhDcimLbV6NiwPfANiRuch9VsQUvoZJVkP\",\"revision\":1,\"rule\":{\"atLeast\":2},\"slaSeconds\":300,\"specVersion\":1,\"title\":\"Research note on XRPL escrow fees\"}",
+      "specHash": "45d8dc06e91cd45d3c9728317f079d0428d70f0853ee1e67891306e18f3624d6"
+    },
+    {
+      "spec": {
+        "specVersion": 1,
+        "revision": 2,
+        "nonce": "0123456789abcdef0123456789abcdef",
+        "title": "Résumé ✓ with non-ASCII",
+        "client": "rEmnmhwxmkDkj9jKiibNuXxP25VYHJ5Euy",
+        "provider": "rhDcimLbV6NiwPfANiRuch9VsQUvoZJVkP",
+        "priceDrops": "5000000",
+        "slaSeconds": 300,
+        "criteria": [
+          {
+            "id": "format",
+            "statement": "The note is a JSON object with summary, sources and findings",
+            "kind": "objective",
+            "checks": [
+              {
+                "type": "json-schema",
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "summary": {
+                      "type": "string"
+                    },
+                    "sources": {
+                      "type": "array"
+                    },
+                    "findings": {
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "summary",
+                    "sources",
+                    "findings"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "useful",
+            "statement": "The research is useful",
+            "kind": "subjective",
+            "checks": [
+              {
+                "type": "size-range",
+                "minBytes": 200,
+                "maxBytes": 20000
+              },
+              {
+                "type": "contains-text",
+                "text": "\"sources\""
+              }
+            ]
+          },
+          {
+            "id": "on-time",
+            "statement": "Delivered within 5 minutes of funding",
+            "kind": "objective",
+            "checks": [
+              {
+                "type": "max-latency",
+                "maxMs": 300000
+              }
+            ]
+          }
+        ],
+        "rule": "all"
+      },
+      "canonical": "{\"client\":\"rEmnmhwxmkDkj9jKiibNuXxP25VYHJ5Euy\",\"criteria\":[{\"checks\":[{\"schema\":{\"properties\":{\"findings\":{\"type\":\"array\"},\"sources\":{\"type\":\"array\"},\"summary\":{\"type\":\"string\"}},\"required\":[\"summary\",\"sources\",\"findings\"],\"type\":\"object\"},\"type\":\"json-schema\"}],\"id\":\"format\",\"kind\":\"objective\",\"statement\":\"The note is a JSON object with summary, sources and findings\"},{\"checks\":[{\"maxBytes\":20000,\"minBytes\":200,\"type\":\"size-range\"},{\"text\":\"\\\"sources\\\"\",\"type\":\"contains-text\"}],\"id\":\"useful\",\"kind\":\"subjective\",\"statement\":\"The research is useful\"},{\"checks\":[{\"maxMs\":300000,\"type\":\"max-latency\"}],\"id\":\"on-time\",\"kind\":\"objective\",\"statement\":\"Delivered within 5 minutes of funding\"}],\"nonce\":\"0123456789abcdef0123456789abcdef\",\"priceDrops\":\"5000000\",\"provider\":\"rhDcimLbV6NiwPfANiRuch9VsQUvoZJVkP\",\"revision\":2,\"rule\":\"all\",\"slaSeconds\":300,\"specVersion\":1,\"title\":\"Résumé ✓ with non-ASCII\"}",
+      "specHash": "845e90634734a99cbcdaa645eb1138ae3f2dd7ed86485a6b6b5206e796731617"
+    },
+    {
+      "spec": {
+        "specVersion": 1,
+        "revision": 1,
+        "nonce": "ffffffffffffffffffffffffffffffff",
+        "title": "Research note on XRPL escrow fees",
+        "client": "rEmnmhwxmkDkj9jKiibNuXxP25VYHJ5Euy",
+        "provider": "rhDcimLbV6NiwPfANiRuch9VsQUvoZJVkP",
+        "priceDrops": "5000000",
+        "slaSeconds": 300,
+        "criteria": [
+          {
+            "id": "file",
+            "statement": "Delivered the file",
+            "kind": "objective",
+            "checks": [
+              {
+                "type": "sha256-match",
+                "sha256": "994659de87f727ddcde75df44314f31d7f367b3bff347e852f390530f29720c7"
+              }
+            ]
+          }
+        ],
+        "rule": "all"
+      },
+      "canonical": "{\"client\":\"rEmnmhwxmkDkj9jKiibNuXxP25VYHJ5Euy\",\"criteria\":[{\"checks\":[{\"sha256\":\"994659de87f727ddcde75df44314f31d7f367b3bff347e852f390530f29720c7\",\"type\":\"sha256-match\"}],\"id\":\"file\",\"kind\":\"objective\",\"statement\":\"Delivered the file\"}],\"nonce\":\"ffffffffffffffffffffffffffffffff\",\"priceDrops\":\"5000000\",\"provider\":\"rhDcimLbV6NiwPfANiRuch9VsQUvoZJVkP\",\"revision\":1,\"rule\":\"all\",\"slaSeconds\":300,\"specVersion\":1,\"title\":\"Research note on XRPL escrow fees\"}",
+      "specHash": "9c9a112995296fc7439992d64cfbe3f7ef17824567ce53801d2db136392a3be1"
+    }
+  ],
+  "problems": [
+    {
+      "spec": {
+        "specVersion": 1,
+        "revision": 1,
+        "nonce": "0123456789abcdef0123456789abcdef",
+        "title": "Research note on XRPL escrow fees",
+        "client": "rEmnmhwxmkDkj9jKiibNuXxP25VYHJ5Euy",
+        "provider": "rhDcimLbV6NiwPfANiRuch9VsQUvoZJVkP",
+        "priceDrops": "5000000",
+        "slaSeconds": 300,
+        "criteria": [
+          {
+            "id": "useful",
+            "statement": "The research is useful",
+            "kind": "subjective",
+            "checks": []
+          }
+        ],
+        "rule": "all"
+      },
+      "contains": "can't judge"
+    },
+    {
+      "spec": {
+        "specVersion": 1,
+        "revision": 1,
+        "nonce": "0123456789abcdef0123456789abcdef",
+        "title": "Research note on XRPL escrow fees",
+        "client": "rEmnmhwxmkDkj9jKiibNuXxP25VYHJ5Euy",
+        "provider": "rhDcimLbV6NiwPfANiRuch9VsQUvoZJVkP",
+        "priceDrops": "5000000",
+        "slaSeconds": 300,
+        "criteria": [
+          {
+            "id": "x",
+            "statement": "Done",
+            "kind": "objective",
+            "checks": []
+          }
+        ],
+        "rule": "all"
+      },
+      "contains": "names no check"
+    },
+    {
+      "spec": {
+        "specVersion": 1,
+        "revision": 1,
+        "nonce": "0123456789abcdef0123456789abcdef",
+        "title": "Research note on XRPL escrow fees",
+        "client": "rEmnmhwxmkDkj9jKiibNuXxP25VYHJ5Euy",
+        "provider": "rhDcimLbV6NiwPfANiRuch9VsQUvoZJVkP",
+        "priceDrops": "5000000",
+        "slaSeconds": 300,
+        "criteria": [
+          {
+            "id": "format",
+            "statement": "The note is a JSON object with summary, sources and findings",
+            "kind": "objective",
+            "checks": [
+              {
+                "type": "json-schema",
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "summary": {
+                      "type": "string"
+                    },
+                    "sources": {
+                      "type": "array"
+                    },
+                    "findings": {
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "summary",
+                    "sources",
+                    "findings"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "useful",
+            "statement": "The research is useful",
+            "kind": "subjective",
+            "checks": [
+              {
+                "type": "size-range",
+                "minBytes": 200,
+                "maxBytes": 20000
+              },
+              {
+                "type": "contains-text",
+                "text": "\"sources\""
+              }
+            ]
+          },
+          {
+            "id": "on-time",
+            "statement": "Delivered within 5 minutes of funding",
+            "kind": "objective",
+            "checks": [
+              {
+                "type": "max-latency",
+                "maxMs": 300000
+              }
+            ]
+          }
+        ],
+        "rule": {
+          "atLeast": 4
+        }
+      },
+      "contains": "rule"
+    },
+    {
+      "spec": {
+        "specVersion": 2,
+        "revision": 1,
+        "nonce": "0123456789abcdef0123456789abcdef",
+        "title": "Research note on XRPL escrow fees",
+        "client": "rEmnmhwxmkDkj9jKiibNuXxP25VYHJ5Euy",
+        "provider": "rhDcimLbV6NiwPfANiRuch9VsQUvoZJVkP",
+        "priceDrops": "5000000",
+        "slaSeconds": 300,
+        "criteria": [
+          {
+            "id": "format",
+            "statement": "The note is a JSON object with summary, sources and findings",
+            "kind": "objective",
+            "checks": [
+              {
+                "type": "json-schema",
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "summary": {
+                      "type": "string"
+                    },
+                    "sources": {
+                      "type": "array"
+                    },
+                    "findings": {
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "summary",
+                    "sources",
+                    "findings"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "useful",
+            "statement": "The research is useful",
+            "kind": "subjective",
+            "checks": [
+              {
+                "type": "size-range",
+                "minBytes": 200,
+                "maxBytes": 20000
+              },
+              {
+                "type": "contains-text",
+                "text": "\"sources\""
+              }
+            ]
+          },
+          {
+            "id": "on-time",
+            "statement": "Delivered within 5 minutes of funding",
+            "kind": "objective",
+            "checks": [
+              {
+                "type": "max-latency",
+                "maxMs": 300000
+              }
+            ]
+          }
+        ],
+        "rule": {
+          "atLeast": 2
+        }
+      },
+      "contains": "specVersion"
+    },
+    {
+      "spec": {
+        "specVersion": 1,
+        "revision": 1,
+        "nonce": "0123456789abcdef0123456789abcdef",
+        "title": "Research note on XRPL escrow fees",
+        "client": "rEmnmhwxmkDkj9jKiibNuXxP25VYHJ5Euy",
+        "provider": "rhDcimLbV6NiwPfANiRuch9VsQUvoZJVkP",
+        "priceDrops": "5000000",
+        "slaSeconds": 300,
+        "criteria": [
+          {
+            "id": "format",
+            "statement": "The note is a JSON object with summary, sources and findings",
+            "kind": "objective",
+            "checks": [
+              {
+                "type": "json-schema",
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "summary": {
+                      "type": "string"
+                    },
+                    "sources": {
+                      "type": "array"
+                    },
+                    "findings": {
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "summary",
+                    "sources",
+                    "findings"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "useful",
+            "statement": "The research is useful",
+            "kind": "subjective",
+            "checks": [
+              {
+                "type": "size-range",
+                "minBytes": 200,
+                "maxBytes": 20000
+              },
+              {
+                "type": "contains-text",
+                "text": "\"sources\""
+              }
+            ]
+          },
+          {
+            "id": "on-time",
+            "statement": "Delivered within 5 minutes of funding",
+            "kind": "objective",
+            "checks": [
+              {
+                "type": "max-latency",
+                "maxMs": 300000
+              }
+            ]
+          }
+        ],
+        "rule": {
+          "atLeast": 2
+        },
+        "extra": true
+      },
+      "contains": "unknown fields"
+    },
+    {
+      "spec": {
+        "specVersion": 1,
+        "revision": 1,
+        "nonce": "abc",
+        "title": "Research note on XRPL escrow fees",
+        "client": "rEmnmhwxmkDkj9jKiibNuXxP25VYHJ5Euy",
+        "provider": "rhDcimLbV6NiwPfANiRuch9VsQUvoZJVkP",
+        "priceDrops": "5000000",
+        "slaSeconds": 300,
+        "criteria": [
+          {
+            "id": "format",
+            "statement": "The note is a JSON object with summary, sources and findings",
+            "kind": "objective",
+            "checks": [
+              {
+                "type": "json-schema",
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "summary": {
+                      "type": "string"
+                    },
+                    "sources": {
+                      "type": "array"
+                    },
+                    "findings": {
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "summary",
+                    "sources",
+                    "findings"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "useful",
+            "statement": "The research is useful",
+            "kind": "subjective",
+            "checks": [
+              {
+                "type": "size-range",
+                "minBytes": 200,
+                "maxBytes": 20000
+              },
+              {
+                "type": "contains-text",
+                "text": "\"sources\""
+              }
+            ]
+          },
+          {
+            "id": "on-time",
+            "statement": "Delivered within 5 minutes of funding",
+            "kind": "objective",
+            "checks": [
+              {
+                "type": "max-latency",
+                "maxMs": 300000
+              }
+            ]
+          }
+        ],
+        "rule": {
+          "atLeast": 2
+        }
+      },
+      "contains": "nonce"
+    },
+    {
+      "spec": {
+        "specVersion": 1,
+        "revision": 1,
+        "nonce": "0123456789abcdef0123456789abcdef",
+        "title": "Research note on XRPL escrow fees",
+        "client": "rEmnmhwxmkDkj9jKiibNuXxP25VYHJ5Euy",
+        "provider": "rEmnmhwxmkDkj9jKiibNuXxP25VYHJ5Euy",
+        "priceDrops": "5000000",
+        "slaSeconds": 300,
+        "criteria": [
+          {
+            "id": "format",
+            "statement": "The note is a JSON object with summary, sources and findings",
+            "kind": "objective",
+            "checks": [
+              {
+                "type": "json-schema",
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "summary": {
+                      "type": "string"
+                    },
+                    "sources": {
+                      "type": "array"
+                    },
+                    "findings": {
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "summary",
+                    "sources",
+                    "findings"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "useful",
+            "statement": "The research is useful",
+            "kind": "subjective",
+            "checks": [
+              {
+                "type": "size-range",
+                "minBytes": 200,
+                "maxBytes": 20000
+              },
+              {
+                "type": "contains-text",
+                "text": "\"sources\""
+              }
+            ]
+          },
+          {
+            "id": "on-time",
+            "statement": "Delivered within 5 minutes of funding",
+            "kind": "objective",
+            "checks": [
+              {
+                "type": "max-latency",
+                "maxMs": 300000
+              }
+            ]
+          }
+        ],
+        "rule": {
+          "atLeast": 2
+        }
+      },
+      "contains": "differ"
+    },
+    {
+      "spec": {
+        "specVersion": 1,
+        "revision": 1,
+        "nonce": "0123456789abcdef0123456789abcdef",
+        "title": "Research note on XRPL escrow fees",
+        "client": "rEmnmhwxmkDkj9jKiibNuXxP25VYHJ5Euy",
+        "provider": "rhDcimLbV6NiwPfANiRuch9VsQUvoZJVkP",
+        "priceDrops": "5000000",
+        "slaSeconds": 300,
+        "criteria": [
+          {
+            "id": "format",
+            "statement": "The note is a JSON object with summary, sources and findings",
+            "kind": "objective",
+            "checks": [
+              {
+                "type": "json-schema",
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "summary": {
+                      "type": "string"
+                    },
+                    "sources": {
+                      "type": "array"
+                    },
+                    "findings": {
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "summary",
+                    "sources",
+                    "findings"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "format",
+            "statement": "The research is useful",
+            "kind": "subjective",
+            "checks": [
+              {
+                "type": "size-range",
+                "minBytes": 200,
+                "maxBytes": 20000
+              },
+              {
+                "type": "contains-text",
+                "text": "\"sources\""
+              }
+            ]
+          }
+        ],
+        "rule": {
+          "atLeast": 2
+        }
+      },
+      "contains": "used twice"
+    },
+    {
+      "spec": {
+        "specVersion": 1,
+        "revision": 1,
+        "nonce": "0123456789abcdef0123456789abcdef",
+        "title": "Research note on XRPL escrow fees",
+        "client": "rEmnmhwxmkDkj9jKiibNuXxP25VYHJ5Euy",
+        "provider": "rhDcimLbV6NiwPfANiRuch9VsQUvoZJVkP",
+        "priceDrops": "5000000",
+        "slaSeconds": 300,
+        "criteria": [
+          {
+            "id": "on-time",
+            "statement": "Delivered within 5 minutes of funding",
+            "kind": "objective",
+            "checks": [
+              {
+                "type": "max-latency",
+                "maxMs": 1.5
+              }
+            ]
+          }
+        ],
+        "rule": "all"
+      },
+      "contains": "whole numbers"
+    },
+    {
+      "spec": {
+        "specVersion": 1,
+        "revision": 1,
+        "nonce": "0123456789abcdef0123456789abcdef",
+        "title": "Research note on XRPL escrow fees",
+        "client": "rEmnmhwxmkDkj9jKiibNuXxP25VYHJ5Euy",
+        "provider": "rhDcimLbV6NiwPfANiRuch9VsQUvoZJVkP",
+        "priceDrops": "5000000",
+        "slaSeconds": 300,
+        "criteria": [
+          {
+            "id": "useful",
+            "statement": "The research is useful",
+            "kind": "subjective",
+            "checks": [
+              {
+                "type": "contains-text",
+                "text": ""
+              }
+            ]
+          }
+        ],
+        "rule": "all"
+      },
+      "contains": "contains-text"
+    },
+    {
+      "spec": {
+        "specVersion": 1,
+        "revision": 1,
+        "nonce": "0123456789abcdef0123456789abcdef",
+        "title": "Research note on XRPL escrow fees",
+        "client": "rEmnmhwxmkDkj9jKiibNuXxP25VYHJ5Euy",
+        "provider": "rhDcimLbV6NiwPfANiRuch9VsQUvoZJVkP",
+        "priceDrops": "5000000",
+        "slaSeconds": 300,
+        "criteria": [
+          {
+            "id": "useful",
+            "statement": "The research is useful",
+            "kind": "subjective",
+            "checks": [
+              {
+                "type": "size-range",
+                "minBytes": 10,
+                "maxBytes": 5
+              }
+            ]
+          }
+        ],
+        "rule": "all"
+      },
+      "contains": "size-range"
+    },
+    {
+      "spec": {
+        "specVersion": 1,
+        "revision": 1,
+        "nonce": "0123456789abcdef0123456789abcdef",
+        "title": "Research note on XRPL escrow fees",
+        "client": "rEmnmhwxmkDkj9jKiibNuXxP25VYHJ5Euy",
+        "provider": "rhDcimLbV6NiwPfANiRuch9VsQUvoZJVkP",
+        "priceDrops": "5000000",
+        "slaSeconds": 300,
+        "criteria": [
+          {
+            "id": "useful",
+            "statement": "The research is useful",
+            "kind": "subjective",
+            "checks": [
+              {
+                "type": "size-range",
+                "minBytes": 0,
+                "maxBytes": 9
+              },
+              {
+                "type": "size-range",
+                "minBytes": 0,
+                "maxBytes": 9
+              },
+              {
+                "type": "size-range",
+                "minBytes": 0,
+                "maxBytes": 9
+              },
+              {
+                "type": "size-range",
+                "minBytes": 0,
+                "maxBytes": 9
+              },
+              {
+                "type": "size-range",
+                "minBytes": 0,
+                "maxBytes": 9
+              },
+              {
+                "type": "size-range",
+                "minBytes": 0,
+                "maxBytes": 9
+              },
+              {
+                "type": "size-range",
+                "minBytes": 0,
+                "maxBytes": 9
+              },
+              {
+                "type": "size-range",
+                "minBytes": 0,
+                "maxBytes": 9
+              },
+              {
+                "type": "size-range",
+                "minBytes": 0,
+                "maxBytes": 9
+              }
+            ]
+          }
+        ],
+        "rule": "all"
+      },
+      "contains": "at most 8"
+    }
+  ],
+  "signatures": [
+    {
+      "address": "rEmnmhwxmkDkj9jKiibNuXxP25VYHJ5Euy",
+      "specHash": "45d8dc06e91cd45d3c9728317f079d0428d70f0853ee1e67891306e18f3624d6",
+      "signature": {
+        "address": "rEmnmhwxmkDkj9jKiibNuXxP25VYHJ5Euy",
+        "publicKey": "02EB0511FD55C2693C1A0E4C767D37ADF1C45B0138AC6ACE236DF58EB152E5E9AB",
+        "signature": "304402203C10F1390A356F6666CB813F2788F83FB61A87B3AD3B0CDFC23E28984600A3F902204FFFCA6DF19EC37FA59C4AAC56A68845566E01A9EFA096EFC2412AD7FD76DA3A"
+      }
+    },
+    {
+      "address": "rEmnmhwxmkDkj9jKiibNuXxP25VYHJ5Euy",
+      "specHash": "845e90634734a99cbcdaa645eb1138ae3f2dd7ed86485a6b6b5206e796731617",
+      "signature": {
+        "address": "rEmnmhwxmkDkj9jKiibNuXxP25VYHJ5Euy",
+        "publicKey": "02EB0511FD55C2693C1A0E4C767D37ADF1C45B0138AC6ACE236DF58EB152E5E9AB",
+        "signature": "3045022100B6C1B5BC82B23F4661741D1CD2B1635329D6F86FCBCA720F584861673F8975A2022018857D046B8644185DF4A9E12C0C79FFBADE158408E49EFB12813B47E46AC950"
+      }
+    },
+    {
+      "address": "rEmnmhwxmkDkj9jKiibNuXxP25VYHJ5Euy",
+      "specHash": "9c9a112995296fc7439992d64cfbe3f7ef17824567ce53801d2db136392a3be1",
+      "signature": {
+        "address": "rEmnmhwxmkDkj9jKiibNuXxP25VYHJ5Euy",
+        "publicKey": "02EB0511FD55C2693C1A0E4C767D37ADF1C45B0138AC6ACE236DF58EB152E5E9AB",
+        "signature": "3045022100842003B19BE57886E8D626F003F5D6260A6FFDB15A03F3F00283A5960E4EE2CC02204E56927678ED00B5223DF0DED0FA12B73EAE8224AF79AE850845AAFE7BAAA3E6"
+      }
+    },
+    {
+      "address": "rhDcimLbV6NiwPfANiRuch9VsQUvoZJVkP",
+      "specHash": "45d8dc06e91cd45d3c9728317f079d0428d70f0853ee1e67891306e18f3624d6",
+      "signature": {
+        "address": "rhDcimLbV6NiwPfANiRuch9VsQUvoZJVkP",
+        "publicKey": "ED2C51BE236A6DE9DFDB5980C8DD0FB5AEC321A12B9C5767D0D663CE050BA2853A",
+        "signature": "08027607D69E72B2F295EC4AF8CAE521B9E67FB12770AC336974523FD86B0E0E4A95D23BFE4EEFACEACCF518AD370C4454A53F07438B762EF76DEF617B2FD207"
+      }
+    },
+    {
+      "address": "rhDcimLbV6NiwPfANiRuch9VsQUvoZJVkP",
+      "specHash": "845e90634734a99cbcdaa645eb1138ae3f2dd7ed86485a6b6b5206e796731617",
+      "signature": {
+        "address": "rhDcimLbV6NiwPfANiRuch9VsQUvoZJVkP",
+        "publicKey": "ED2C51BE236A6DE9DFDB5980C8DD0FB5AEC321A12B9C5767D0D663CE050BA2853A",
+        "signature": "6937EAAE5BAC75DE24C68D46542A2597667DE6DF8C2D6F8ED71F56514A55AA37138EBB8610B6588B45750B7ED53EDC28629F559499187B344A04CB6E92C8BE02"
+      }
+    },
+    {
+      "address": "rhDcimLbV6NiwPfANiRuch9VsQUvoZJVkP",
+      "specHash": "9c9a112995296fc7439992d64cfbe3f7ef17824567ce53801d2db136392a3be1",
+      "signature": {
+        "address": "rhDcimLbV6NiwPfANiRuch9VsQUvoZJVkP",
+        "publicKey": "ED2C51BE236A6DE9DFDB5980C8DD0FB5AEC321A12B9C5767D0D663CE050BA2853A",
+        "signature": "0BA5E48C364BFB6F69DED5B7D93EEAA346FA46105A8237740398B84FD3A9D64FFF9705939E8FE769BB72EFB14B85D1E7518333347E52981628B85FFB32BF6303"
+      }
+    }
+  ],
+  "memos": [
+    {
+      "spec": "45d8dc06e91cd45d3c9728317f079d0428d70f0853ee1e67891306e18f3624d6",
+      "revision": 1,
+      "memos": [
+        {
+          "Memo": {
+            "MemoType": "7872706C2D657363726F772F6A6F622D73706563",
+            "MemoFormat": "6170706C69636174696F6E2F6A736F6E",
+            "MemoData": "7B227265766973696F6E223A312C227370656348617368223A2234356438646330366539316364343564336339373238333137663037396430343238643730663038353365653165363738393133303665313866333632346436222C227370656356657273696F6E223A317D"
+          }
+        }
+      ]
+    },
+    {
+      "spec": "845e90634734a99cbcdaa645eb1138ae3f2dd7ed86485a6b6b5206e796731617",
+      "revision": 2,
+      "memos": [
+        {
+          "Memo": {
+            "MemoType": "7872706C2D657363726F772F6A6F622D73706563",
+            "MemoFormat": "6170706C69636174696F6E2F6A736F6E",
+            "MemoData": "7B227265766973696F6E223A322C227370656348617368223A2238343565393036333437333461393963626364616136343565623131333861653366326464376564383634383561366236623532303665373936373331363137222C227370656356657273696F6E223A317D"
+          }
+        }
+      ]
+    },
+    {
+      "spec": "9c9a112995296fc7439992d64cfbe3f7ef17824567ce53801d2db136392a3be1",
+      "revision": 1,
+      "memos": [
+        {
+          "Memo": {
+            "MemoType": "7872706C2D657363726F772F6A6F622D73706563",
+            "MemoFormat": "6170706C69636174696F6E2F6A736F6E",
+            "MemoData": "7B227265766973696F6E223A312C227370656348617368223A2239633961313132393935323936666337343339393932643634636662653366376566313738323435363763653533383031643264623133363339326133626531222C227370656356657273696F6E223A317D"
+          }
+        }
+      ]
+    }
+  ],
+  "badMemos": [
+    [
+      {
+        "Memo": {
+          "MemoType": "7872706C2D657363726F772F6A6F622D73706563",
+          "MemoData": "6E6F74206A736F6E"
+        }
+      }
+    ],
+    [
+      {
+        "Memo": {
+          "MemoType": "7872706C2D657363726F772F6A6F622D73706563",
+          "MemoData": "7B227370656348617368223A2234356438646330366539316364343564336339373238333137663037396430343238643730663038353365653165363738393133303665313866333632346436222C227370656356657273696F6E223A317D"
+        }
+      }
+    ],
+    [
+      {
+        "Memo": {
+          "MemoType": "7872706C2D657363726F772F6A6F622D73706563",
+          "MemoData": "7B227370656348617368223A2234354438444330364539314344343544334339373238333137463037394430343238443730463038353345453145363738393133303645313846333632344436222C227370656356657273696F6E223A312C227265766973696F6E223A317D"
+        }
+      }
+    ],
+    [
+      {
+        "Memo": {
+          "MemoType": "7872706C2D657363726F772F6A6F622D73706563",
+          "MemoFormat": "6170706C69636174696F6E2F6A736F6E",
+          "MemoData": "7B227265766973696F6E223A312C227370656348617368223A2234356438646330366539316364343564336339373238333137663037396430343238643730663038353365653165363738393133303665313866333632346436222C227370656356657273696F6E223A317D"
+        }
+      },
+      {
+        "Memo": {
+          "MemoType": "7872706C2D657363726F772F6A6F622D73706563",
+          "MemoFormat": "6170706C69636174696F6E2F6A736F6E",
+          "MemoData": "7B227265766973696F6E223A312C227370656348617368223A2239633961313132393935323936666337343339393932643634636662653366376566313738323435363763653533383031643264623133363339326133626531222C227370656356657273696F6E223A317D"
+        }
+      }
+    ]
+  ],
+  "rules": [
+    {
+      "rule": "all",
+      "results": [
+        true,
+        true,
+        true
+      ],
+      "meets": true
+    },
+    {
+      "rule": "all",
+      "results": [
+        true,
+        false,
+        true
+      ],
+      "meets": false
+    },
+    {
+      "rule": {
+        "atLeast": 2
+      },
+      "results": [
+        true,
+        false,
+        true
+      ],
+      "meets": true
+    },
+    {
+      "rule": {
+        "atLeast": 2
+      },
+      "results": [
+        false,
+        false,
+        true
+      ],
+      "meets": false
+    },
+    {
+      "rule": {
+        "atLeast": 1
+      },
+      "results": [
+        false
+      ],
+      "meets": false
+    }
+  ],
+  "log": {
+    "mixed": [
+      {
+        "v": 1,
+        "seq": 0,
+        "prev": "0000000000000000000000000000000000000000000000000000000000000000",
+        "at": 1763800000000,
+        "oracle": "rRMWMo5iacRWuyNF8QhPhWUoPDQpwsrF5",
+        "publicKey": "ED139CE8DAEBD8B9B08CEC31E21339CD5FEC7156AD4DA16467DDB19D06B7E60111",
+        "kind": "genesis",
+        "legacyLog": null,
+        "signature": "F37F97253160E46A7F334B06A5FFAF2692C5540C0A891D323A1E9ABFCAAFC5FA92465086B5E94F39AFC9A3FD04253D7FC3B9EDD10EC8EC146007708B294D6509",
+        "hash": "5ad025fb1086b424022bfc9af2388f0d8eda38bd4554490a08ef4b345488730d"
+      },
+      {
+        "v": 1,
+        "seq": 1,
+        "prev": "5ad025fb1086b424022bfc9af2388f0d8eda38bd4554490a08ef4b345488730d",
+        "at": 1763800000001,
+        "oracle": "rRMWMo5iacRWuyNF8QhPhWUoPDQpwsrF5",
+        "publicKey": "ED139CE8DAEBD8B9B08CEC31E21339CD5FEC7156AD4DA16467DDB19D06B7E60111",
+        "kind": "verdict",
+        "jobId": "job-phase5",
+        "verdict": "pass",
+        "checks": [
+          {
+            "type": "sha256-match",
+            "pass": true
+          }
+        ],
+        "evidenceHash": "422d1aa9559f9b26762aa436b24616b483f543dcd8250edbd063a14aff91585f",
+        "condition": "A0258020ABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABAB810120",
+        "provider": "rhDcimLbV6NiwPfANiRuch9VsQUvoZJVkP",
+        "issuedAt": 1763800000000,
+        "verdictHash": "6cf980147a96db8db471d433ff55f14a66d92dc7cffad2a00f46797a5c7196d3",
+        "signature": "E823E25B7F12FC361B0D074BDB93C7EDCF7A6EC8CBC2A901865ED14DD93B5FBFD5A5D250AF0674334D6230A5BA9E9EFA91EB593A38A042F735F6216087E12B0F",
+        "hash": "9081ffe3ba38a3be95554447b4f6c4f3f25c0a70a985523026927a51f50de297"
+      },
+      {
+        "v": 2,
+        "seq": 2,
+        "prev": "9081ffe3ba38a3be95554447b4f6c4f3f25c0a70a985523026927a51f50de297",
+        "at": 1763800000002,
+        "oracle": "rRMWMo5iacRWuyNF8QhPhWUoPDQpwsrF5",
+        "publicKey": "ED139CE8DAEBD8B9B08CEC31E21339CD5FEC7156AD4DA16467DDB19D06B7E60111",
+        "kind": "verdict",
+        "jobId": "job-phase6",
+        "verdict": "pass",
+        "checks": [
+          {
+            "type": "json-schema",
+            "pass": true,
+            "criterion": "format"
+          },
+          {
+            "type": "size-range",
+            "pass": false,
+            "criterion": "useful"
+          },
+          {
+            "type": "contains-text",
+            "pass": true,
+            "criterion": "useful"
+          },
+          {
+            "type": "max-latency",
+            "pass": true,
+            "criterion": "on-time"
+          }
+        ],
+        "evidenceHash": "65c999721364379b3e5a6f4a659ffdb25207af573bde6a934cd949b31f1bcf96",
+        "condition": "A0258020ABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABAB810120",
+        "provider": "rhDcimLbV6NiwPfANiRuch9VsQUvoZJVkP",
+        "issuedAt": 1763800000002,
+        "verdictHash": "95e28aad5ba1d159e46829ce95188e3848c77c4d0f761aed61c4ef01d880652e",
+        "specHash": "45d8dc06e91cd45d3c9728317f079d0428d70f0853ee1e67891306e18f3624d6",
+        "specVersion": 1,
+        "specRevision": 1,
+        "criteria": [
+          {
+            "id": "format",
+            "kind": "objective",
+            "pass": true
+          },
+          {
+            "id": "useful",
+            "kind": "subjective",
+            "pass": false
+          },
+          {
+            "id": "on-time",
+            "kind": "objective",
+            "pass": true
+          }
+        ],
+        "signature": "026D1802938CBC5AB5584502AC69AC5290499F0C6823CCA705AF5C2BA4028BA7ED9A36D58B83B44BF722A5508C4705E0F6CECAAF9B182FA155A2DC5B6C951203",
+        "hash": "c17c9f549240e67789c0b34d3d4798480a798c9d99250414fd9a545b8ea746de"
+      },
+      {
+        "v": 2,
+        "seq": 3,
+        "prev": "c17c9f549240e67789c0b34d3d4798480a798c9d99250414fd9a545b8ea746de",
+        "at": 1763800000003,
+        "oracle": "rRMWMo5iacRWuyNF8QhPhWUoPDQpwsrF5",
+        "publicKey": "ED139CE8DAEBD8B9B08CEC31E21339CD5FEC7156AD4DA16467DDB19D06B7E60111",
+        "kind": "verdict",
+        "jobId": "job-unsigned",
+        "verdict": "fail",
+        "checks": [
+          {
+            "type": "sha256-match",
+            "pass": false
+          }
+        ],
+        "evidenceHash": "16551b15e44785737d34e48fd1e36de198138a5ef6ed2c775e0806d94e5f2cee",
+        "condition": "A0258020ABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABAB810120",
+        "provider": "rhDcimLbV6NiwPfANiRuch9VsQUvoZJVkP",
+        "issuedAt": 1763800000003,
+        "verdictHash": "d17798fe8e99a6c8bafda2d161812e0a94ac06ac5b0d40ba71e4ef77854fe4ff",
+        "specHash": null,
+        "specVersion": null,
+        "specRevision": null,
+        "criteria": null,
+        "signature": "741AE393931C96633C4BDD5A2D8118A216CAFEE35F946D71B61D81805045E9DC99344DEFB14F430F412B520BCAE17BC3686C4A7D51117463A236DC12177E060E",
+        "hash": "bb48c3d952d8456fbc910b0f8a69caae5d62eaeb847de1d829e757ec1e767bd2"
+      }
+    ],
+    "downgrade": [
+      {
+        "v": 1,
+        "seq": 0,
+        "prev": "0000000000000000000000000000000000000000000000000000000000000000",
+        "at": 1763800000000,
+        "oracle": "rRMWMo5iacRWuyNF8QhPhWUoPDQpwsrF5",
+        "publicKey": "ED139CE8DAEBD8B9B08CEC31E21339CD5FEC7156AD4DA16467DDB19D06B7E60111",
+        "kind": "genesis",
+        "legacyLog": null,
+        "signature": "F37F97253160E46A7F334B06A5FFAF2692C5540C0A891D323A1E9ABFCAAFC5FA92465086B5E94F39AFC9A3FD04253D7FC3B9EDD10EC8EC146007708B294D6509",
+        "hash": "5ad025fb1086b424022bfc9af2388f0d8eda38bd4554490a08ef4b345488730d"
+      },
+      {
+        "v": 1,
+        "seq": 1,
+        "prev": "5ad025fb1086b424022bfc9af2388f0d8eda38bd4554490a08ef4b345488730d",
+        "at": 1763800000001,
+        "oracle": "rRMWMo5iacRWuyNF8QhPhWUoPDQpwsrF5",
+        "publicKey": "ED139CE8DAEBD8B9B08CEC31E21339CD5FEC7156AD4DA16467DDB19D06B7E60111",
+        "kind": "verdict",
+        "jobId": "job-phase5",
+        "verdict": "pass",
+        "checks": [
+          {
+            "type": "sha256-match",
+            "pass": true
+          }
+        ],
+        "evidenceHash": "422d1aa9559f9b26762aa436b24616b483f543dcd8250edbd063a14aff91585f",
+        "condition": "A0258020ABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABAB810120",
+        "provider": "rhDcimLbV6NiwPfANiRuch9VsQUvoZJVkP",
+        "issuedAt": 1763800000000,
+        "verdictHash": "6cf980147a96db8db471d433ff55f14a66d92dc7cffad2a00f46797a5c7196d3",
+        "signature": "E823E25B7F12FC361B0D074BDB93C7EDCF7A6EC8CBC2A901865ED14DD93B5FBFD5A5D250AF0674334D6230A5BA9E9EFA91EB593A38A042F735F6216087E12B0F",
+        "hash": "9081ffe3ba38a3be95554447b4f6c4f3f25c0a70a985523026927a51f50de297"
+      },
+      {
+        "v": 2,
+        "seq": 2,
+        "prev": "9081ffe3ba38a3be95554447b4f6c4f3f25c0a70a985523026927a51f50de297",
+        "at": 1763800000002,
+        "oracle": "rRMWMo5iacRWuyNF8QhPhWUoPDQpwsrF5",
+        "publicKey": "ED139CE8DAEBD8B9B08CEC31E21339CD5FEC7156AD4DA16467DDB19D06B7E60111",
+        "kind": "verdict",
+        "jobId": "job-phase6",
+        "verdict": "pass",
+        "checks": [
+          {
+            "type": "json-schema",
+            "pass": true,
+            "criterion": "format"
+          },
+          {
+            "type": "size-range",
+            "pass": false,
+            "criterion": "useful"
+          },
+          {
+            "type": "contains-text",
+            "pass": true,
+            "criterion": "useful"
+          },
+          {
+            "type": "max-latency",
+            "pass": true,
+            "criterion": "on-time"
+          }
+        ],
+        "evidenceHash": "65c999721364379b3e5a6f4a659ffdb25207af573bde6a934cd949b31f1bcf96",
+        "condition": "A0258020ABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABAB810120",
+        "provider": "rhDcimLbV6NiwPfANiRuch9VsQUvoZJVkP",
+        "issuedAt": 1763800000002,
+        "verdictHash": "95e28aad5ba1d159e46829ce95188e3848c77c4d0f761aed61c4ef01d880652e",
+        "specHash": "45d8dc06e91cd45d3c9728317f079d0428d70f0853ee1e67891306e18f3624d6",
+        "specVersion": 1,
+        "specRevision": 1,
+        "criteria": [
+          {
+            "id": "format",
+            "kind": "objective",
+            "pass": true
+          },
+          {
+            "id": "useful",
+            "kind": "subjective",
+            "pass": false
+          },
+          {
+            "id": "on-time",
+            "kind": "objective",
+            "pass": true
+          }
+        ],
+        "signature": "026D1802938CBC5AB5584502AC69AC5290499F0C6823CCA705AF5C2BA4028BA7ED9A36D58B83B44BF722A5508C4705E0F6CECAAF9B182FA155A2DC5B6C951203",
+        "hash": "c17c9f549240e67789c0b34d3d4798480a798c9d99250414fd9a545b8ea746de"
+      },
+      {
+        "v": 1,
+        "seq": 3,
+        "prev": "c17c9f549240e67789c0b34d3d4798480a798c9d99250414fd9a545b8ea746de",
+        "at": 1763800000004,
+        "oracle": "rRMWMo5iacRWuyNF8QhPhWUoPDQpwsrF5",
+        "publicKey": "ED139CE8DAEBD8B9B08CEC31E21339CD5FEC7156AD4DA16467DDB19D06B7E60111",
+        "kind": "verdict",
+        "jobId": "job-phase5-late",
+        "verdict": "pass",
+        "checks": [
+          {
+            "type": "sha256-match",
+            "pass": true
+          }
+        ],
+        "evidenceHash": "422d1aa9559f9b26762aa436b24616b483f543dcd8250edbd063a14aff91585f",
+        "condition": "A0258020ABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABAB810120",
+        "provider": "rhDcimLbV6NiwPfANiRuch9VsQUvoZJVkP",
+        "issuedAt": 1763800000004,
+        "verdictHash": "b265688bfe40f0a17df00c924fb8093ea1371c2b31c41c4783cd598c2ebe12af",
+        "signature": "D985976C597ADC88301EAC2F06515E318472E9E8D77BD99233543BBC887CCB55E70AC9907EB49B8A24E50B1D7ECF2F3C99DA77F909750164990C6122FEA6380C",
+        "hash": "99282245ddcde349541ad9952272c6782b4160be19db43756dc1159c99b4541e"
+      }
+    ],
+    "verdicts": [
+      {
+        "jobId": "job-phase5",
+        "verdict": "pass",
+        "checks": [
+          {
+            "type": "sha256-match",
+            "pass": true,
+            "detail": "sha256 matches the spec"
+          }
+        ],
+        "evidenceHash": "422d1aa9559f9b26762aa436b24616b483f543dcd8250edbd063a14aff91585f",
+        "condition": "A0258020ABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABAB810120",
+        "provider": "rhDcimLbV6NiwPfANiRuch9VsQUvoZJVkP",
+        "oracle": "rRMWMo5iacRWuyNF8QhPhWUoPDQpwsrF5",
+        "publicKey": "ED139CE8DAEBD8B9B08CEC31E21339CD5FEC7156AD4DA16467DDB19D06B7E60111",
+        "issuedAt": 1763800000000,
+        "signature": "1AE0ECAF980E50947069ADB4EB076E4F166BCF669365267479D399975D0D4479E8535302BE1F900A45AD4A8D2B642184FF9E42BFEAEA196539DB9C438162FD07"
+      },
+      {
+        "jobId": "job-phase6",
+        "verdict": "pass",
+        "checks": [
+          {
+            "type": "json-schema",
+            "pass": true,
+            "detail": "valid",
+            "criterion": "format"
+          },
+          {
+            "type": "size-range",
+            "pass": false,
+            "detail": "120 bytes (allowed 200 to 20000)",
+            "criterion": "useful"
+          },
+          {
+            "type": "contains-text",
+            "pass": true,
+            "detail": "the agreed text is in the deliverable",
+            "criterion": "useful"
+          },
+          {
+            "type": "max-latency",
+            "pass": true,
+            "detail": "delivered 4000 ms after funding (limit 300000 ms)",
+            "criterion": "on-time"
+          }
+        ],
+        "evidenceHash": "65c999721364379b3e5a6f4a659ffdb25207af573bde6a934cd949b31f1bcf96",
+        "condition": "A0258020ABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABAB810120",
+        "provider": "rhDcimLbV6NiwPfANiRuch9VsQUvoZJVkP",
+        "oracle": "rRMWMo5iacRWuyNF8QhPhWUoPDQpwsrF5",
+        "publicKey": "ED139CE8DAEBD8B9B08CEC31E21339CD5FEC7156AD4DA16467DDB19D06B7E60111",
+        "issuedAt": 1763800000002,
+        "specHash": "45d8dc06e91cd45d3c9728317f079d0428d70f0853ee1e67891306e18f3624d6",
+        "specVersion": 1,
+        "specRevision": 1,
+        "criteria": [
+          {
+            "id": "format",
+            "kind": "objective",
+            "pass": true
+          },
+          {
+            "id": "useful",
+            "kind": "subjective",
+            "pass": false
+          },
+          {
+            "id": "on-time",
+            "kind": "objective",
+            "pass": true
+          }
+        ],
+        "judged": "checks",
+        "signature": "DECCA487DC26F5243E3C36CA09D6FED1E723EBEFAEEBC47809994C2DA988BAB0756F0BB3B6BA32A4BF403B8672685A16D7B7421291D3C0D3D012C57193D24901"
+      },
+      {
+        "jobId": "job-unsigned",
+        "verdict": "fail",
+        "checks": [
+          {
+            "type": "sha256-match",
+            "pass": false,
+            "detail": "no match"
+          }
+        ],
+        "evidenceHash": "16551b15e44785737d34e48fd1e36de198138a5ef6ed2c775e0806d94e5f2cee",
+        "condition": "A0258020ABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABAB810120",
+        "provider": "rhDcimLbV6NiwPfANiRuch9VsQUvoZJVkP",
+        "oracle": "rRMWMo5iacRWuyNF8QhPhWUoPDQpwsrF5",
+        "publicKey": "ED139CE8DAEBD8B9B08CEC31E21339CD5FEC7156AD4DA16467DDB19D06B7E60111",
+        "issuedAt": 1763800000003,
+        "specHash": null,
+        "specVersion": null,
+        "specRevision": null,
+        "criteria": null,
+        "judged": "checks",
+        "signature": "5A83F93E3842AC3A30ACE4571C7CF4FB0923B7178AB9D7D34057B85049A0F8DA40C9607DD9EA7A17405F3822ECE82749759ECAA99DBF2E0144CE5051D888E606"
+      },
+      {
+        "jobId": "job-phase5-late",
+        "verdict": "pass",
+        "checks": [
+          {
+            "type": "sha256-match",
+            "pass": true,
+            "detail": "sha256 matches the spec"
+          }
+        ],
+        "evidenceHash": "422d1aa9559f9b26762aa436b24616b483f543dcd8250edbd063a14aff91585f",
+        "condition": "A0258020ABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABAB810120",
+        "provider": "rhDcimLbV6NiwPfANiRuch9VsQUvoZJVkP",
+        "oracle": "rRMWMo5iacRWuyNF8QhPhWUoPDQpwsrF5",
+        "publicKey": "ED139CE8DAEBD8B9B08CEC31E21339CD5FEC7156AD4DA16467DDB19D06B7E60111",
+        "issuedAt": 1763800000004,
+        "signature": "568F69C72D06BC9B9EDDF328E1022888036E0F87D7ABE930835DEAFD85E640FCD26D2A7A4CF677CFE971F3FD982DA20EE60831DF48EDB47A30D21C16FA5D3400"
+      }
+    ],
+    "verdictHashes": [
+      "6cf980147a96db8db471d433ff55f14a66d92dc7cffad2a00f46797a5c7196d3",
+      "95e28aad5ba1d159e46829ce95188e3848c77c4d0f761aed61c4ef01d880652e",
+      "d17798fe8e99a6c8bafda2d161812e0a94ac06ac5b0d40ba71e4ef77854fe4ff",
+      "b265688bfe40f0a17df00c924fb8093ea1371c2b31c41c4783cd598c2ebe12af"
+    ]
+  }
+}

@@ -43,6 +43,17 @@
    { "type": "json-schema",  "schema": { "type": "object", "required": ["answer"] } }
    { "type": "max-latency",  "maxMs": 60000 }
    ```
+   With a 0.6.0 or later kit you can instead write a signed job spec (see
+   "Phase 6" in `xrpl-escrow/README.md`): you write the criteria as the client,
+   both wallets sign the spec, and two more checks are there for "delivered a
+   file" criteria:
+   ```
+   { "type": "size-range",    "minBytes": 200, "maxBytes": 20000 }
+   { "type": "contains-text", "text": "Summary:" }
+   ```
+   The kit judges only these checks, never the plain-words statement: a
+   subjective criterion ("useful research") needs at least one check that stands
+   in for it, or the spec is refused before any XRP moves.
    For `json-schema`, deliver the JSON as a string. Give the failing job
    `slaSeconds: 30` (the minimum), so its refund comes about a minute later
    instead of after the example's 5 minutes.

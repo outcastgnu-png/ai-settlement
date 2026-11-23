@@ -1,6 +1,53 @@
 # Changelog
 
-## 0.5.0 (Phase 5 shared verification, EDR-015) - unreleased
+## 0.6.0 (Phase 6 signed job spec, EDR-016) - unreleased
+
+Still testnet only, and every service listens on 127.0.0.1 only.
+
+### Added
+- Job spec v1 (`src/job-spec.ts`, `xrpl_escrow/job_spec.py`): `specVersion: 1`, a revision and
+  nonce, the title, client, provider, price and SLA, a list of `criteria` (each with an `id`, a
+  plain-words `statement`, a `kind` of `objective` or `subjective`, and its `checks`) and a `rule`
+  (`"all"` or `{ "atLeast": n }`). A criterion passes when all its checks pass. The spec hash is
+  SHA-256 over the RFC 8785 canonical form (`jcs`, `specHash` / `spec_hash`); a value that could
+  encode differently (a fraction, an unsafe integer, a lone surrogate) is refused.
+- Agreement before lock. `makeJobSpec` / `make_job_spec`, `createSignedJob` / `create_signed_job`,
+  `signSpec` / `sign_spec` (the signer passes the hash of the spec it read; the SDK works it out
+  again and refuses to sign a different one). Client and provider sign the spec hash with their
+  XRPL keys (`signSpecHash`, `verifySpecSignature`). Registry routes
+  `POST /jobs/:id/spec/signatures`, `PUT /jobs/:id/spec` (the next revision; a signed spec is never
+  edited in place, and the old revision is kept) and `GET /jobs/:id/spec/revisions`.
+  `fundJob` / `fund_job` refuse to lock XRP until both signatures check.
+- The `EscrowCreate` of a signed job carries one memo (`xrpl-escrow/job-spec`) with the spec hash,
+  version and revision. Before verifying, every oracle reads the escrow's creating transaction from
+  its `PreviousTxnID` in a validated ledger and signs nothing (`409`) when the memo doesn't match the
+  registry's spec or a signature doesn't check (`src/spec-ledger.ts`).
+- A `subjective` criterion needs at least one check, or the spec is refused with "This kit can't
+  judge that statement". Verdicts say `judged: "checks"`.
+- Checks `size-range` (bytes of the deliverable, min and max) and `contains-text` (literal,
+  case-sensitive, at most 256 bytes, no regex).
+- Signed verdicts carry `specHash`, `specVersion`, `specRevision` and `criteria` (each criterion's
+  pass or fail); each check result names its criterion.
+- Verdict log entries version 2 with the same spec fields. Phase 4 and 5 logs (version 1) still
+  verify; a version 1 entry after a version 2 entry fails. `verifyVerdictLog` /
+  `verify_verdict_log` with `job` also check the verdict's spec hash against the escrow memo
+  (`specOnLedger` / `spec_on_ledger`).
+- Shared jobs with a signed spec: every oracle must report the job's spec hash. The SDK never
+  combines a share from a verdict on another spec and names the oracle; an oracle that refuses the
+  job is reported as `refused`. `GET /splits` and `npm run splits` show the criteria the set split on.
+- `npm run demo:phase6`, the Python demo `python -m xrpl_escrow.demo_phase6`,
+  `test/job-spec.test.ts`, `test/signed-spec.test.ts`, `test/phase6-flow.test.ts`,
+  `tests/test_job_spec.py`, and shared vectors `test/vectors/job-spec.json`
+  (`make-job-spec-vectors.ts`).
+
+### Changed
+- Jobs with the Phase 1 to 5 `spec.checks` shape still run, marked `unsignedSpec` /
+  `unsigned_spec` in the SDK result.
+- The registry refuses an oracle verdict on a spec hash other than the job's.
+- `test/vectors/verdict-log.json` is kept as Phase 4 and 5 version 1 vectors and must not be
+  regenerated.
+
+## 0.5.0 (Phase 5 shared verification, EDR-015) - 2026-11-21
 
 Still testnet only, and every service listens on 127.0.0.1 only.
 

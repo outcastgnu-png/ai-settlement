@@ -21,7 +21,14 @@ from xrpl.models.requests import AccountTx
 
 from .auth import canonical_json, sha256_hex, verify_payload
 
-LOG_VERSION = 1
+# Entry format version: 1 for Phase 4 and 5 entries, 2 from Phase 6 (EDR-016), whose verdict
+# entries also carry the judged spec's hash, version and revision and each criterion's result.
+# A log may hold v1 entries followed by v2 entries, never a v1 after a v2.
+LOG_VERSION = 2
+LOG_VERSIONS = (1, 2)
+# The anchor memo's version, unchanged since Phase 4.
+ANCHOR_VERSION = 1
+_SPEC_FIELDS = ("specHash", "specVersion", "specRevision", "criteria")
 GENESIS_PREV = "0" * 64
 ANCHOR_MEMO_TYPE = "xrpl-escrow/verdict-log-head"
 
@@ -64,11 +71,19 @@ def check_chain(entries: list[Any], oracle_address: str | None) -> ChainCheck:
     if n == 0:
         return ChainCheck(False, "the log is empty", None, 0)
     prev = GENESIS_PREV
+    version = 0
     for i, e in enumerate(entries):
         if not isinstance(e, dict):
             return fail("not an object", i)
-        if e.get("v") != LOG_VERSION or isinstance(e.get("v"), bool):
+        if e.get("v") not in LOG_VERSIONS or isinstance(e.get("v"), bool):
             return fail(f"unknown log version {e.get('v')}", i)
+        if e["v"] < version:
+            return fail(f"a version {e['v']} entry after a version {version} entry", i)
+        version = e["v"]
+        if e["v"] == 2 and e.get("kind") == "verdict":
+            shape = _v2_spec_problem(e)
+            if shape:
+                return fail(shape, i)
         if e.get("seq") != i or isinstance(e.get("seq"), bool):
             return fail(f"sequence number is {e.get('seq')}, expected {i}", i)
         if e.get("prev") != prev:
@@ -91,6 +106,46 @@ def check_chain(entries: list[Any], oracle_address: str | None) -> ChainCheck:
             return fail("hash does not match its content", i)
         prev = e["hash"]
     return ChainCheck(True, None, {"seq": n - 1, "hash": prev}, n)
+
+
+def _whole(v: Any) -> bool:
+    return isinstance(v, int) and not isinstance(v, bool)
+
+
+def _v2_spec_problem(e: Entry) -> str | None:
+    """The spec fields of a v2 verdict entry must all be there, null or well formed."""
+    for k in _SPEC_FIELDS:
+        if k not in e:
+            return f"a version 2 verdict entry has no {k}"
+    if e["specHash"] is None:
+        if e["specVersion"] is None and e["specRevision"] is None and e["criteria"] is None:
+            return None
+        return "an unsigned-spec entry has spec fields"
+    if not isinstance(e["specHash"], str) or not _HEX64.match(e["specHash"]):
+        return "specHash is not a sha256 hex string"
+    if not _whole(e["specVersion"]) or not _whole(e["specRevision"]):
+        return "specVersion or specRevision is not a whole number"
+    if not isinstance(e["criteria"], list):
+        return "criteria is not a list"
+    return None
+
+
+def _public_checks(version: int, checks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    out = []
+    for c in checks:
+        item = {"type": c.get("type"), "pass": c.get("pass")}
+        if version >= 2 and "criterion" in c:
+            item["criterion"] = c["criterion"]
+        out.append(item)
+    return out
+
+
+def _public_spec(verdict: dict[str, Any]) -> dict[str, Any]:
+    criteria = verdict.get("criteria")
+    return {
+        "specHash": verdict.get("specHash"), "specVersion": verdict.get("specVersion"), "specRevision": verdict.get("specRevision"),
+        "criteria": [{"id": c.get("id"), "kind": c.get("kind"), "pass": c.get("pass")} for c in criteria] if isinstance(criteria, list) else None,
+    }
 
 
 def anchor_problem(entries: list[Any], anchor: dict[str, Any], oracle_address: str) -> str | None:
@@ -128,7 +183,8 @@ def entry_mismatch(entry: Entry, verdict: dict[str, Any]) -> str | None:
         return "not a verdict entry"
     if entry.get("verdictHash") != verdict_hash(verdict):
         return "verdictHash"
-    checks = [{"type": c.get("type"), "pass": c.get("pass")} for c in verdict.get("checks", [])]
+    version = entry.get("v") if _whole(entry.get("v")) else 1
+    checks = _public_checks(version, verdict.get("checks", []))
     for name in ("jobId", "verdict", "evidenceHash", "condition", "provider", "issuedAt"):
         if entry.get(name) != verdict.get(name) or type(entry.get(name)) is not type(verdict.get(name)):
             return name
@@ -137,6 +193,16 @@ def entry_mismatch(entry: Entry, verdict: dict[str, Any]) -> str | None:
             return "checks"
     except ValueError:
         return "checks"
+    if version >= 2:
+        want = _public_spec(verdict)
+        for k in _SPEC_FIELDS:
+            try:
+                if canonical_json(entry.get(k)) != canonical_json(want[k]):
+                    return k
+            except ValueError:
+                return k
+    elif "specHash" in verdict or "criteria" in verdict:
+        return "specHash"  # a v1 entry can't hold a Phase 6 verdict's spec fields
     return None
 
 
@@ -197,7 +263,7 @@ def parse_anchor_memo(memos: Any) -> dict[str, Any] | None:
         if not isinstance(data, dict) or sorted(data) != ["hash", "oracle", "seq", "v"]:
             return None
         seq = data["seq"]
-        if data["v"] != LOG_VERSION or isinstance(data["v"], bool) or not isinstance(seq, int) or isinstance(seq, bool):
+        if data["v"] != ANCHOR_VERSION or isinstance(data["v"], bool) or not isinstance(seq, int) or isinstance(seq, bool):
             return None
         if seq < 0 or seq > 2**53 - 1 or not isinstance(data["hash"], str) or not _HEX64.match(data["hash"]):
             return None
@@ -276,6 +342,7 @@ class LogVerification:
     lookback_complete: bool = True
     verdict_entry: Entry | None = None
     verdict_anchored: bool | None = None
+    spec_on_ledger: bool | None = None  # set by EscrowKit.verify_verdict_log(job=...) for a verdict on a signed spec (EDR-016)
 
 
 def verify_verdict_log(

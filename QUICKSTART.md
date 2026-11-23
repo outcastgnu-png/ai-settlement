@@ -91,6 +91,26 @@ client splits the secret between three oracles and any two passing oracles relea
 the payment, one alone never can. See "Phase 5" in
 [`xrpl-escrow/README.md`](xrpl-escrow/README.md).
 
+## Next: agree on the criteria first (0.6.0)
+
+From 0.6.0 a job can carry a signed job spec. **The client writes the criteria**: each
+one has a plain-words statement and the checks that decide it. **Both parties sign** the
+spec's hash, and the SDK refuses to lock any XRP until both signatures check. The
+`EscrowCreate` then carries the spec hash in a memo, so every oracle can see on the
+ledger which spec the money was locked against, and refuses a job whose spec was changed
+after the lock.
+
+**What the kit can judge:** only its checks (a file's hash, a JSON schema, a size range,
+a phrase that must appear, a response time, a testnet transaction). A vague criterion
+such as "useful research" needs at least one check that both parties agree stands in for
+it, or the spec is refused before any XRP moves. A pass means the checks passed, not that
+the work is good. `npm run demo:phase6` shows six cases, including a spec changed after
+the lock (refund) and a job that needs two of three criteria. See "Phase 6" in
+[`xrpl-escrow/README.md`](xrpl-escrow/README.md).
+
+The examples above still work: jobs with the older `checks` list run as before and are
+marked "unsigned spec".
+
 ## Stuck?
 
 | Problem | Fix |
@@ -101,6 +121,8 @@ the payment, one alone never can. See "Phase 5" in
 | `ORACLE_ANCHOR_SEED is missing from .env` | Your `.env` is from 0.3.x. Run `npm run setup` in `xrpl-escrow` once more. |
 | `no oracle at http://127.0.0.1:8802` | Start the services (step 3), or run the Python demo with `--start-services`. |
 | `oracles B and C are not set up` or `.env.oracle-b has no ORACLE_VERDICT_ADDRESS` | Your `.env` is from 0.4.x. Run `npm run setup` once more. |
+| `This kit can't judge that statement` | A subjective criterion has no check. Add one both parties agree stands in for it, such as `size-range` or `contains-text`. |
+| `refusing to lock XRP for job ...` | The provider (or the client) hasn't signed the spec's current hash yet. |
 | The faucet is slow or refuses | Wait a minute and rerun `npm run setup`; it only funds wallets below 60 XRP. |
 
 More detail: [`xrpl-escrow/README.md`](xrpl-escrow/README.md) and

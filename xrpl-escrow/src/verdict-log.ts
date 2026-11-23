@@ -13,6 +13,10 @@
 // by that hash (`findVerdict`), and every public field of the entry must agree
 // with that verdict (Gpno N26).
 //
+// Since Phase 6 (EDR-016, entry version 2) a verdict entry also carries the
+// hash, version and revision of the signed job spec the oracle judged, and each
+// criterion's pass or fail. Phase 4 and 5 logs (version 1 entries) still verify.
+//
 // The functions here are pure: the oracle uses them to write the log, and the
 // SDKs use them to check a copy. The Python SDK implements the same rules
 // (xrpl_escrow/verdict_log.py) and is checked against test/vectors/verdict-log.json.
@@ -20,7 +24,16 @@ import { canonicalJson, sha256Hex, signPayload, verifyPayload } from "./auth.js"
 import type { Wallet } from "xrpl";
 import type { SignedVerdict } from "./oracle/server.js";
 
-export const LOG_VERSION = 1;
+/**
+ * Entry format version. 1: Phase 4 and 5 entries. 2 (Phase 6, EDR-016): verdict
+ * entries also carry the judged spec's hash, version and revision, each
+ * criterion's pass or fail, and each check's criterion. A log may hold v1 entries
+ * followed by v2 entries (an oracle upgraded in place), never a v1 after a v2.
+ */
+export const LOG_VERSION = 2;
+export const LOG_VERSIONS = [1, 2];
+/** Version of the anchor memo on the ledger; unchanged since Phase 4. */
+export const ANCHOR_VERSION = 1;
 export const GENESIS_PREV = "0".repeat(64);
 /** Memo type of an anchor transaction, as text (it is written to the ledger as hex). */
 export const ANCHOR_MEMO_TYPE = "xrpl-escrow/verdict-log-head";
@@ -44,12 +57,17 @@ export interface VerdictEntryBody extends EntryBase {
   kind: "verdict";
   jobId: string;
   verdict: "pass" | "fail";
-  checks: { type: string; pass: boolean }[];
+  checks: { type: string; pass: boolean; criterion?: string }[];
   evidenceHash: string;
   condition: string;
   provider: string;
   issuedAt: number;
   verdictHash: string; // sha256 of the canonical JSON of the full signed verdict
+  /** v2 (EDR-016): the judged spec, null for an unsigned spec. */
+  specHash?: string | null;
+  specVersion?: number | null;
+  specRevision?: number | null;
+  criteria?: { id: string; kind: string; pass: boolean }[] | null;
 }
 
 export type EntryBody = GenesisBody | VerdictEntryBody;
@@ -101,13 +119,23 @@ export function genesisEntry(key: Wallet, legacyLog: GenesisBody["legacyLog"], a
   }, key);
 }
 
+/** The public form of a verdict's check results in an entry of version `v`. */
+const publicChecks = (v: number, checks: SignedVerdict["checks"]) =>
+  checks.map((c) => (v >= 2 && c.criterion !== undefined ? { type: c.type, pass: c.pass, criterion: c.criterion } : { type: c.type, pass: c.pass }));
+
+/** The public form of a verdict's spec fields in a v2 entry. A verdict from before 0.6.0 has none: all null. */
+const publicSpec = (verdict: SignedVerdict) => ({
+  specHash: verdict.specHash ?? null, specVersion: verdict.specVersion ?? null, specRevision: verdict.specRevision ?? null,
+  criteria: verdict.criteria ? verdict.criteria.map((c) => ({ id: c.id, kind: c.kind, pass: c.pass })) : null,
+});
+
 export function verdictEntry(key: Wallet, previous: LogHead, verdict: SignedVerdict, at = Date.now()): LogEntry {
   return sealEntry({
     v: LOG_VERSION, seq: previous.seq + 1, prev: previous.hash, at, oracle: key.address, publicKey: key.publicKey,
     kind: "verdict", jobId: verdict.jobId, verdict: verdict.verdict,
-    checks: verdict.checks.map((c) => ({ type: c.type, pass: c.pass })),
+    checks: publicChecks(LOG_VERSION, verdict.checks),
     evidenceHash: verdict.evidenceHash, condition: verdict.condition, provider: verdict.provider,
-    issuedAt: verdict.issuedAt, verdictHash: verdictHash(verdict),
+    issuedAt: verdict.issuedAt, verdictHash: verdictHash(verdict), ...publicSpec(verdict),
   }, key);
 }
 
@@ -129,10 +157,17 @@ export function checkChain(entries: unknown[], oracleAddress: string): ChainChec
   if (!oracleAddress) return { ok: false, problem: "no pinned oracle address", head: null, count: entries.length };
   if (entries.length === 0) return { ok: false, problem: "the log is empty", head: null, count: 0 };
   let prev = GENESIS_PREV;
+  let version = 0;
   for (let i = 0; i < entries.length; i++) {
     const e = entries[i] as Partial<LogEntry> | null;
     if (!e || typeof e !== "object" || Array.isArray(e)) return fail("not an object", i);
-    if (e.v !== LOG_VERSION) return fail(`unknown log version ${String(e.v)}`, i);
+    if (!LOG_VERSIONS.includes(e.v as number)) return fail(`unknown log version ${String(e.v)}`, i);
+    if ((e.v as number) < version) return fail(`a version ${String(e.v)} entry after a version ${version} entry`, i);
+    version = e.v as number;
+    if (e.v === 2 && e.kind === "verdict") {
+      const shape = v2SpecProblem(e as Partial<VerdictEntryBody>);
+      if (shape) return fail(shape, i);
+    }
     if (e.seq !== i) return fail(`sequence number is ${String(e.seq)}, expected ${i}`, i);
     if (e.prev !== prev) return fail("does not link to the entry before it", i);
     if (i === 0 ? e.kind !== "genesis" : e.kind !== "verdict") return fail(`kind ${String(e.kind)} is not allowed here`, i);
@@ -146,6 +181,18 @@ export function checkChain(entries: unknown[], oracleAddress: string): ChainChec
     prev = e.hash;
   }
   return { ok: true, problem: null, head: { seq: entries.length - 1, hash: prev }, count: entries.length };
+}
+
+/** The spec fields of a v2 verdict entry must all be there, null or well formed. */
+function v2SpecProblem(e: Partial<VerdictEntryBody>): string | null {
+  for (const k of ["specHash", "specVersion", "specRevision", "criteria"] as const) if (!(k in e)) return `a version 2 verdict entry has no ${k}`;
+  if (e.specHash === null) {
+    return e.specVersion === null && e.specRevision === null && e.criteria === null ? null : "an unsigned-spec entry has spec fields";
+  }
+  if (typeof e.specHash !== "string" || !HEX64.test(e.specHash)) return "specHash is not a sha256 hex string";
+  if (!Number.isSafeInteger(e.specVersion) || !Number.isSafeInteger(e.specRevision)) return "specVersion or specRevision is not a whole number";
+  if (!Array.isArray(e.criteria)) return "criteria is not a list";
+  return null;
 }
 
 /**
@@ -190,13 +237,21 @@ export function anchorHistoryProblems(entries: readonly unknown[], anchors: Anch
 export function entryMismatch(entry: LogEntry, verdict: SignedVerdict): string | null {
   if (entry.kind !== "verdict") return "not a verdict entry";
   if (entry.verdictHash !== verdictHash(verdict)) return "verdictHash";
-  const checks = verdict.checks.map((c) => ({ type: c.type, pass: c.pass }));
+  const checks = publicChecks(entry.v, verdict.checks);
   const fields: [string, unknown, unknown][] = [
     ["jobId", entry.jobId, verdict.jobId], ["verdict", entry.verdict, verdict.verdict],
     ["evidenceHash", entry.evidenceHash, verdict.evidenceHash], ["condition", entry.condition, verdict.condition],
     ["provider", entry.provider, verdict.provider], ["issuedAt", entry.issuedAt, verdict.issuedAt],
     ["checks", canonicalJson(entry.checks), canonicalJson(checks)],
   ];
+  if (entry.v >= 2) {
+    const want = publicSpec(verdict);
+    for (const k of ["specHash", "specVersion", "specRevision", "criteria"] as const) {
+      fields.push([k, canonicalJson(entry[k] ?? null), canonicalJson(want[k])]);
+    }
+  } else if (verdict.specHash !== undefined || verdict.criteria !== undefined) {
+    return "specHash"; // a v1 entry can't hold a Phase 6 verdict's spec fields
+  }
   for (const [name, a, b] of fields) if (a !== b) return name;
   return null;
 }
@@ -247,7 +302,7 @@ const textOfHex = (hex: string) => Buffer.from(hex, "hex").toString("utf8");
 
 /** The Memos field of an anchor transaction for this head. */
 export function anchorMemos(head: LogHead, oracle: string) {
-  const memo: AnchorMemo = { v: LOG_VERSION, seq: head.seq, hash: head.hash, oracle };
+  const memo: AnchorMemo = { v: ANCHOR_VERSION, seq: head.seq, hash: head.hash, oracle };
   return [{ Memo: { MemoType: hexText(ANCHOR_MEMO_TYPE), MemoFormat: hexText("application/json"), MemoData: hexText(canonicalJson(memo)) } }];
 }
 
@@ -272,7 +327,7 @@ export function parseAnchorMemo(memos: unknown): AnchorMemo | null {
     }
     const d = data as Partial<AnchorMemo>;
     if (!d || typeof d !== "object" || Object.keys(d).sort().join(",") !== "hash,oracle,seq,v") return null;
-    if (d.v !== LOG_VERSION || !Number.isSafeInteger(d.seq) || (d.seq as number) < 0) return null;
+    if (d.v !== ANCHOR_VERSION || !Number.isSafeInteger(d.seq) || (d.seq as number) < 0) return null;
     if (typeof d.hash !== "string" || !HEX64.test(d.hash) || typeof d.oracle !== "string") return null;
     return { v: d.v, seq: d.seq as number, hash: d.hash, oracle: d.oracle };
   }

@@ -1,0 +1,13 @@
+
+> xrpl-verified-escrow-demo@0.6.0 test:unit
+> vitest run test/condition.test.ts test/registry.test.ts test/oracle.test.ts test/watcher.test.ts test/sdk.test.ts test/verdict-log.test.ts test/xrpl-tx.test.ts test/finality.test.ts test/fs-util.test.ts test/shared.test.ts test/job-spec.test.ts test/signed-spec.test.ts
+
+
+ RUN  v5.0.5 /home/user/ai-settlement/xrpl-escrow
+
+
+ Test Files  12 passed (12)
+      Tests  173 passed (173)
+   Start at  00:20:53
+   Duration  43.29s (tests 94%, import 5%)
+

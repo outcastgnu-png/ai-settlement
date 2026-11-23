@@ -106,7 +106,7 @@ describe("registry rules for xrpl-tx-validated", () => {
     client: sender, provider: Wallet.generate().address, priceDrops: "1000000", slaSeconds: 60, spec: { checks },
   });
   it("accepts a well-formed spec", () => {
-    expect(parseNewJob(job([spec({ account: sender, destinationTag: 0, memo: "x" })])).spec.checks).toHaveLength(1);
+    expect((parseNewJob(job([spec({ account: sender, destinationTag: 0, memo: "x" })])).spec as { checks: unknown[] }).checks).toHaveLength(1);
   });
   it("refuses malformed specs and more than two transaction checks per job", () => {
     for (const bad of [

@@ -4,7 +4,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Wallet, type ECDSA } from "xrpl";
-import { ReplayGuard } from "../src/auth.js";
+import { ReplayGuard, sha256Hex } from "../src/auth.js";
 import { callJson } from "../src/http.js";
 import { startOracle, type EscrowCheck } from "../src/oracle/server.js";
 import { SecretVault } from "../src/oracle/vault.js";
@@ -13,6 +13,20 @@ import type { Job } from "../src/registry/db.js";
 import type { TxLookupResult } from "../src/oracle/checks/xrpl-tx.js";
 import type { Anchorer } from "../src/oracle/verdict-store.js";
 import type { Anchor, LogHead } from "../src/verdict-log.js";
+import { isSpecV1, specMemos, parseSpecMemo, type SpecMemo } from "../src/job-spec.js";
+import { specAgainstMemo, type SpecCheck } from "../src/spec-ledger.js";
+
+/**
+ * Stands in for the spec memos on the ledger's EscrowCreate transactions (EDR-016),
+ * by job id. `markFunded` records the memo the SDK would have written; tests can
+ * change or remove it. `memoSpecCheck` is the oracle's check against it.
+ */
+export const ledgerMemos = new Map<string, SpecMemo>();
+export const memoSpecCheck: SpecCheck = async (job) => {
+  if (!isSpecV1(job.spec)) return null;
+  const memo = ledgerMemos.get(job.id);
+  return memo ? specAgainstMemo(job, memo) : "the EscrowCreate carries no job spec memo";
+};
 
 export const tempDir = () => mkdtempSync(join(tmpdir(), "escrow-test-"));
 
@@ -57,7 +71,7 @@ export async function startLocal() {
   const launchOracle = () => startOracle({
     port: 0, verdictKey, vault: new SecretVault(vaultFile, vaultKey), registryUrl: registry.url, verdictLog,
     serviceToken: TOKENS.oracle, escrowCheck, replay: new ReplayGuard(replayFile),
-    verdictChain, anchorFile, anchorer, anchorAddress: anchorWallet.address, anchorIntervalMs: 0, lookupTx,
+    verdictChain, anchorFile, anchorer, anchorAddress: anchorWallet.address, anchorIntervalMs: 0, lookupTx, specCheck: memoSpecCheck,
     anchorHistory: async () => ({ anchors: [...onLedger], complete: lookback.complete }),
   });
   let oracle = await launchOracle();
@@ -78,11 +92,28 @@ export async function startLocal() {
   };
 }
 
-/** Pretend the watcher saw a validated EscrowCreate. */
-export const markFunded = (registryUrl: string, jobId: string, offerSequence = 7) =>
-  callJson<Job>("POST", `${registryUrl}/jobs/${jobId}/events`, {
-    source: "ledger", status: "funded", offerSequence, cancelAfter: 900_000_000, txHash: "AB".repeat(32),
+/**
+ * Pretend the watcher saw a validated EscrowCreate. For a job with a v1 spec, the stand-in
+ * ledger gets the memo the SDK writes for the registry's current spec (EDR-016).
+ */
+export const markFunded = async (registryUrl: string, jobId: string, offerSequence = 7) => {
+  const job = await callJson<Job>("GET", `${registryUrl}/jobs/${jobId}`);
+  const txHash = isSpecV1(job.spec) ? sha256Hex(`create ${jobId}`).toUpperCase() : "AB".repeat(32);
+  if (isSpecV1(job.spec)) {
+    ledgerMemos.set(jobId, parseSpecMemo(specMemos(job.spec)) as SpecMemo);
+    ledgerTxs.set(txHash, {
+      found: true, validated: true, closeTime: 1, meta: { TransactionResult: "tesSUCCESS" },
+      tx: { TransactionType: "EscrowCreate", Account: job.client, Destination: job.provider, Amount: job.priceDrops, Condition: job.condition, Sequence: offerSequence, Memos: specMemos(job.spec) },
+    });
+  }
+  return callJson<Job>("POST", `${registryUrl}/jobs/${jobId}/events`, {
+    source: "ledger", status: "funded", offerSequence, cancelAfter: 900_000_000, txHash,
   }, TOKENS.watcher);
+};
+
+/** Stands in for the ledger's EscrowCreate transactions of v1-spec jobs, by hash, for an EscrowKit's `lookupTx`. */
+export const ledgerTxs = new Map<string, TxLookupResult>();
+export const kitLookupTx = async (hash: string): Promise<TxLookupResult> => ledgerTxs.get(hash) ?? { found: false };
 
 let fakeLedgerIndex = 1_000;
 /** An anchor as the ledger would hold it, with a made-up transaction hash. */
@@ -125,6 +156,8 @@ export async function startSharedLocal(n = 3, faults: ("fail" | undefined)[] = [
     const state = {
       i, dir: od, verdictKey, anchorAddress: anchorWallet.address, vaultKey: randomBytes(32), shareKey: generateShareKey(), onLedger,
       fault: faults[i], txs: new Map<string, TxLookupResult | Error>(),
+      /** Where this oracle reads jobs from, and how it checks a v1 spec; tests change these, then restart it. */
+      registryUrl: registry.url, specCheck: memoSpecCheck as SpecCheck,
       server: null as Awaited<ReturnType<typeof startOracle>> | null, port: 0,
     };
     return state;
@@ -136,7 +169,8 @@ export async function startSharedLocal(n = 3, faults: ("fail" | undefined)[] = [
       return anchor;
     };
     o.server = await startOracle({
-      port: o.port, verdictKey: o.verdictKey, vault: new SecretVault(join(o.dir, "vault.json"), o.vaultKey), registryUrl: registry.url,
+      port: o.port, verdictKey: o.verdictKey, vault: new SecretVault(join(o.dir, "vault.json"), o.vaultKey), registryUrl: o.registryUrl,
+      specCheck: o.specCheck,
       verdictLog: join(o.dir, "verdicts.jsonl"), serviceToken: TOKENS.oracle, escrowCheck: async () => ledger.problem,
       replay: new ReplayGuard(join(o.dir, "replay.json")), verdictChain: join(o.dir, "verdict-log.jsonl"),
       anchorFile: join(o.dir, "anchors.jsonl"), anchorer, anchorAddress: o.anchorAddress, anchorIntervalMs: 0,
@@ -176,4 +210,24 @@ export async function startSharedLocal(n = 3, faults: ("fail" | undefined)[] = [
       await registry.close();
     },
   };
+}
+
+/**
+ * For the Python SDK's local tests (EDR-016): a stand-in ledger the Python side can tell
+ * what memo it put on a job's EscrowCreate. POST /memos {jobId, memos}; an empty list
+ * removes the memo. Local only, test harnesses only.
+ */
+export async function startMemoLedger() {
+  const { jsonServer, listenLocal } = await import("../src/http.js");
+  const server = jsonServer([{
+    method: "POST", path: "/memos", handler: (_p, body) => {
+      const { jobId, memos } = body as { jobId: string; memos: unknown[] };
+      const memo = parseSpecMemo(memos);
+      if (memo && !("problem" in memo)) ledgerMemos.set(jobId, memo);
+      else ledgerMemos.delete(jobId);
+      return { ok: true };
+    },
+  }]);
+  const port = await listenLocal(server, 0);
+  return { url: `http://127.0.0.1:${port}`, close: () => new Promise<void>((done) => server.close(() => done())) };
 }
