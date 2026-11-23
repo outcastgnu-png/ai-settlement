@@ -16,7 +16,17 @@
 //   deliverShared()    provider posts the work and asks every oracle of the set; each signed verdict is
 //                      checked against its pinned address and its own verdict log, and k shares from
 //                      passing oracles of the set are combined into the fulfillment
-//   splitJobs()        shared jobs where the oracles of the set disagreed
+//   splitJobs()        shared jobs where the oracles of the set disagreed, and on which criteria
+//
+// Signed job specs (EDR-016):
+//
+//   makeJobSpec()      write a job spec v1: criteria, the checks that decide each, and the rule
+//   createJob() / createSharedJob()  take a v1 spec as `spec`; the job's parties, price and SLA come from it
+//   signSpec()         client or provider signs the spec hash it read; the provider's signature is its acceptance
+//   reviseSpec()       the client replaces a draft's spec with its next revision; both sign again
+//   fundJob()          refuses to lock XRP until both signatures over the spec check, and puts the
+//                      spec hash in a memo on the EscrowCreate
+//   deliver() / deliverShared()  check that every verdict judged that same spec hash
 //
 // Every transaction is signed locally by the wallet that sends it.
 import type { Client, Wallet } from "xrpl";
@@ -26,6 +36,11 @@ import { choose, combine, decodeShare, encodeShare, split, type Share } from "..
 import { seal, verifyShareKey } from "../share-box.js";
 import type { AnchorHistory } from "../anchors.js";
 import { cancelEscrow, createEscrow, finishEscrow, sleep, waitPastCancelAfter, type EscrowRef, type TxResult } from "../escrow.js";
+import {
+  agreementProblems, isSpecV1, signSpecHash, specHash, specMemos, specProblem, type JobSpecV1,
+} from "../job-spec.js";
+import { ledgerTxLookup, type TxLookup } from "../oracle/checks/xrpl-tx.js";
+import { escrowCreateSpecMemo } from "../spec-ledger.js";
 import { HttpError, callJson } from "../http.js";
 import { ORACLE_URL, REGISTRY_URL, readEnvFile } from "../local-config.js";
 import type { Job, JobEvent, JobSpec, JobStatus, OracleRef } from "../registry/db.js";
@@ -40,6 +55,15 @@ export type { Anchor, LogEntry, LogHead } from "../verdict-log.js";
 export { ANCHOR_MEMO_TYPE, anchorHistoryProblems, anchorProblem, checkChain, duplicateJobProblems, entryMismatch, findVerdict, verdictInLog } from "../verdict-log.js";
 export { listAnchors } from "../anchors.js";
 export { localOracleSet } from "../local-config.js";
+export {
+  SPEC_MEMO_TYPE, agreementProblems, isSpecV1, jcs, makeJobSpec, meetsRule, parseSpecMemo, reviseJobSpec, ruleText, signSpecHash,
+  specHash, specMemos, specProblem, verifySpecSignature,
+} from "../job-spec.js";
+export type { Criterion, CriterionResult, JobSpecV1, SpecMemo, SpecRule, SpecSignature } from "../job-spec.js";
+export { escrowCreateSpecMemo } from "../spec-ledger.js";
+
+/** The hash of a job's v1 spec, worked out here from the spec itself (never taken from the registry), or null for an unsigned spec. */
+export const jobSpecHash = (job: Job): string | null => (isSpecV1(job.spec) ? specHash(job.spec) : null);
 
 export interface KitOptions {
   xrpl?: Client; // needed for fundJob, claim and refund
@@ -60,6 +84,8 @@ export interface KitOptions {
   statusTimeoutMs?: number;
   /** Reads an anchor account's anchors from the ledger. Defaults to `listAnchors` on the xrpl Client; tests pass a stand-in. */
   listAnchors?: (anchorAddress: string, verdictAddress: string, maxTx?: number) => Promise<AnchorHistory>;
+  /** Reads a transaction from the ledger, for the spec memo of a job's EscrowCreate. Defaults to the xrpl Client; tests pass a stand-in. */
+  lookupTx?: TxLookup;
 }
 
 export interface SharedJobInput extends NewJobInput {
@@ -75,9 +101,11 @@ export interface OracleReport {
   index: number; // share x
   /**
    * pass / fail: a verdict that checked. rejected: a verdict came back but did not check
-   * (signature, fields, share or verdict log), so it is not used. unreachable: no verdict.
+   * (signature, fields, spec hash, share or verdict log), so it is not used. refused: the
+   * oracle answered but would not verify the job (409), for example because the spec it was
+   * given is not the one locked on the ledger (EDR-016). unreachable: no answer.
    */
-  status: "pass" | "fail" | "rejected" | "unreachable";
+  status: "pass" | "fail" | "rejected" | "refused" | "unreachable";
   verdict?: SignedVerdict;
   problems: string[];
   log?: LogVerification;
@@ -91,9 +119,13 @@ export interface SharedVerification {
   passed: string[];
   failed: string[];
   rejected: string[];
+  refused: string[];
   unreachable: string[];
   /** The fulfillment from k shares of passing oracles, or null with fewer than k usable passes. */
   fulfillment: string | null;
+  /** The spec hash every used verdict judged (worked out from the job's spec), or null for an unsigned spec (EDR-016). */
+  specHash: string | null;
+  unsignedSpec: boolean;
 }
 
 export interface SharedVerifyOptions {
@@ -155,8 +187,14 @@ export interface NewJobInput {
 export interface DeliverResult {
   job: Job;
   verdict: SignedVerdict;
+  /** Signed by the pinned oracle, for this deliverable, and (for a v1 spec) for the job's signed spec hash. */
   verdictSignatureValid: boolean;
   fulfillment: string | null;
+  /** The job's spec hash, worked out from its spec, or null for an unsigned spec (EDR-016). */
+  specHash: string | null;
+  /** True when the verdict judged exactly that spec hash. */
+  specMatches: boolean;
+  unsignedSpec: boolean;
 }
 
 export interface LogVerification {
@@ -177,6 +215,11 @@ export interface LogVerification {
   verdictEntry?: LogEntry | null;
   /** When a verdict was passed in: whether its entry is at or before the newest anchor, so pinned on the ledger. */
   verdictAnchored?: boolean;
+  /**
+   * When a verdict on a signed spec and its job were passed in (EDR-016): whether the spec hash in
+   * the verdict is the one in the memo of the job's EscrowCreate on a validated ledger.
+   */
+  specOnLedger?: boolean;
 }
 
 /** The newest anchor of `verdictAddress`'s log, read from the ledger itself (see `listAnchors`). */
@@ -198,6 +241,19 @@ export const escrowRef = (job: Job): EscrowRef => {
   return { owner: job.client, offerSequence: job.offerSequence, condition: job.condition, cancelAfter: job.cancelAfter };
 };
 
+/** The registry body for a new job. A v1 spec supplies the client, provider, price and SLA, and any given beside it must agree. */
+function jobBody(input: NewJobInput | { spec: JobSpecV1 }): NewJobInput {
+  const spec = input.spec;
+  if (!isSpecV1(spec)) return input as NewJobInput;
+  const problem = specProblem(spec);
+  if (problem) throw new Error(`job spec refused before anything was sent: ${problem}`);
+  const given = input as Partial<NewJobInput>;
+  for (const k of ["client", "provider", "priceDrops", "slaSeconds"] as const) {
+    if (given[k] !== undefined && given[k] !== spec[k]) throw new Error(`${k} differs from the one in the spec`);
+  }
+  return { client: spec.client, provider: spec.provider, priceDrops: spec.priceDrops, slaSeconds: spec.slaSeconds, spec };
+}
+
 export class EscrowKit {
   readonly registryUrl: string;
   readonly oracleUrl: string;
@@ -206,6 +262,7 @@ export class EscrowKit {
   readonly anchorAddress: string | null;
   readonly #timeout: number;
   readonly #listAnchors?: KitOptions["listAnchors"];
+  readonly #lookupTx?: TxLookup;
 
   constructor(opts: KitOptions = {}) {
     this.registryUrl = opts.registryUrl ?? REGISTRY_URL;
@@ -213,6 +270,7 @@ export class EscrowKit {
     this.#xrpl = opts.xrpl;
     this.#timeout = opts.statusTimeoutMs ?? 60_000;
     this.#listAnchors = opts.listAnchors;
+    this.#lookupTx = opts.lookupTx;
     const env = opts.oracleAddress && opts.anchorAddress ? {} : readEnvFile();
     this.oracleAddress = opts.oracleAddress ?? env.ORACLE_VERDICT_ADDRESS ?? null;
     this.anchorAddress = opts.anchorAddress ?? env.ORACLE_ANCHOR_ADDRESS ?? null;
@@ -264,6 +322,8 @@ export class EscrowKit {
    */
   async verifyVerdictLog(opts: {
     verdict?: SignedVerdict; requireAnchor?: boolean; allowUnanchored?: boolean; entries?: LogEntry[]; maxTx?: number;
+    /** With `verdict` on a signed spec: also check its spec hash against the memo of this job's EscrowCreate (EDR-016). */
+    job?: Job;
   } = {}): Promise<LogVerification> {
     const problems: string[] = [];
     if (!this.oracleAddress) problems.push("no pinned oracle address (ORACLE_VERDICT_ADDRESS)");
@@ -299,9 +359,28 @@ export class EscrowKit {
       else if (!result.verdictAnchored && !opts.allowUnanchored) {
         problems.push(`verdict for job ${opts.verdict.jobId} is entry ${found.entry.seq}, after the newest anchor; it is not pinned on the ledger yet`);
       }
+      const judged = opts.verdict.specHash;
+      if (opts.job && typeof judged === "string") {
+        const p = await this.#specOnLedgerProblem(opts.job, opts.verdict);
+        result.specOnLedger = p === null;
+        if (p) problems.push(p);
+      }
     }
     result.ok = problems.length === 0;
     return result;
+  }
+
+  /** Null when the verdict's spec hash is the one in the memo of the job's EscrowCreate on a validated ledger. */
+  async #specOnLedgerProblem(job: Job, verdict: SignedVerdict): Promise<string | null> {
+    if (verdict.jobId !== job.id) return "the verdict is for another job";
+    if (!job.createTx) return "the job has no EscrowCreate recorded, so its spec memo could not be read";
+    const lookup = this.#lookupTx ?? ledgerTxLookup(this.#ledger() as never);
+    const read = await escrowCreateSpecMemo(lookup, job.createTx, { owner: job.client, destination: verdict.provider, condition: verdict.condition });
+    if ("problem" in read) return `spec memo: ${read.problem}`;
+    if (read.memo.specHash !== verdict.specHash) {
+      return `the verdict judged spec ${verdict.specHash}, but the escrow was locked against spec ${read.memo.specHash}`;
+    }
+    return null;
   }
 
   /** Poll the registry until the job reaches one of `statuses`. */
@@ -315,19 +394,91 @@ export class EscrowKit {
     }
   }
 
-  /** Register a draft job, then have the oracle create its secret and set the condition. */
-  async createJob(input: NewJobInput): Promise<Job> {
-    const draft = await callJson<Job>("POST", `${this.registryUrl}/jobs`, input);
+  /**
+   * Register a draft job, then have the oracle create its secret and set the condition.
+   * With a job spec v1 as `spec`, the job's client, provider, price and SLA are taken from
+   * the spec (any given here must agree), and the job then waits for both parties'
+   * signatures (`signSpec`) before `fundJob` will lock anything.
+   */
+  async createJob(input: NewJobInput | { spec: JobSpecV1 }): Promise<Job> {
+    const body = jobBody(input);
+    const draft = await callJson<Job>("POST", `${this.registryUrl}/jobs`, body);
     await callJson("POST", `${this.oracleUrl}/jobs/${draft.id}/condition`);
     return this.getJob(draft.id);
   }
 
-  /** Client locks the price in escrow. Resolves when the watcher has seen the validated EscrowCreate. */
-  async fundJob(jobId: string, clientWallet: Wallet): Promise<{ tx: TxResult; job: Job }> {
+  /** Create a job with a v1 spec and sign it as its client (`createJob` then `signSpec`). The provider signs next. */
+  async createSignedJob(spec: JobSpecV1, clientWallet: Wallet): Promise<Job> {
+    if (clientWallet.address !== spec.client) throw new Error("only the spec's client can create its job");
+    const job = await this.createJob({ spec });
+    return this.signSpec(job.id, clientWallet, specHash(spec));
+  }
+
+  /**
+   * Sign a job's spec as its client or provider (EDR-016). Pass the hash of the spec you
+   * read and agree to (`specHash(spec)`): the SDK works the hash out again from the spec
+   * the registry holds and refuses to sign if it differs, so a registry can't get you to
+   * sign a spec you didn't read. The provider's signature is its acceptance of the criteria.
+   */
+  async signSpec(jobId: string, wallet: Wallet, agreedSpecHash: string): Promise<Job> {
+    const job = await this.getJob(jobId);
+    if (!isSpecV1(job.spec)) throw new Error(`job ${jobId} has an unsigned (Phase 1 to 5) spec; there is nothing to sign`);
+    const problem = specProblem(job.spec);
+    if (problem) throw new Error(`job ${jobId}'s spec is not acceptable: ${problem}`);
+    const hash = specHash(job.spec);
+    if (hash !== agreedSpecHash) throw new Error(`the registry's spec for job ${jobId} has hash ${hash}, not the ${agreedSpecHash} you agreed to; nothing signed`);
+    if (wallet.address !== job.spec.client && wallet.address !== job.spec.provider) throw new Error("only the spec's client or provider can sign it");
+    return callJson<Job>("POST", `${this.registryUrl}/jobs/${encodeURIComponent(jobId)}/spec/signatures`, {
+      specHash: hash, signature: signSpecHash(hash, wallet),
+    });
+  }
+
+  /**
+   * The client replaces a draft job's spec with its next revision (`reviseJobSpec`). The
+   * registry keeps the old revision; the new one needs both signatures again.
+   */
+  reviseSpec(jobId: string, next: JobSpecV1, clientWallet: Wallet): Promise<Job> {
+    const problem = specProblem(next);
+    if (problem) throw new Error(problem);
+    return callJson<Job>("PUT", `${this.registryUrl}/jobs/${encodeURIComponent(jobId)}/spec`, {
+      spec: next, auth: signRequest(clientWallet, "revise-spec", jobId, specHash(next)),
+    });
+  }
+
+  /** Earlier revisions of a job's spec, each with the signatures it had. */
+  specRevisions(jobId: string): Promise<{ revision: number; specHash: string; spec: JobSpecV1; replacedAt: number }[]> {
+    return callJson("GET", `${this.registryUrl}/jobs/${encodeURIComponent(jobId)}/spec/revisions`);
+  }
+
+  /**
+   * Client locks the price in escrow. Resolves when the watcher has seen the validated EscrowCreate.
+   * For a job spec v1 (EDR-016) it refuses to lock anything until the client's and the provider's
+   * signatures over the spec hash check (worked out here from the spec, never taken from the
+   * registry), and the EscrowCreate carries the spec hash and revision in a memo. Pass
+   * `specHash` to also pin the hash you agreed to.
+   */
+  async fundJob(jobId: string, clientWallet: Wallet, opts: { specHash?: string } = {}): Promise<{ tx: TxResult; job: Job }> {
     const job = await this.getJob(jobId);
     if (job.status !== "draft" || !job.condition) throw new Error(`job ${jobId} is ${job.status}; only a draft with a condition can be funded`);
     if (clientWallet.address !== job.client) throw new Error("only the job's client can fund it");
-    const tx = await createEscrow(this.#ledger(), clientWallet, job.provider, job.priceDrops, job.condition, job.slaSeconds);
+    let memos;
+    if (isSpecV1(job.spec)) {
+      const spec = job.spec;
+      const refuse = (why: string) => new Error(`refusing to lock XRP for job ${jobId}: ${why}`);
+      const problem = specProblem(spec);
+      if (problem) throw refuse(`its spec is not acceptable (${problem})`);
+      const hash = specHash(spec);
+      if (opts.specHash && opts.specHash !== hash) throw refuse(`its spec has hash ${hash}, not the ${opts.specHash} you agreed to`);
+      if (spec.client !== job.client || spec.provider !== job.provider || spec.priceDrops !== job.priceDrops || spec.slaSeconds !== job.slaSeconds) {
+        throw refuse("the job's parties, price or SLA differ from its spec");
+      }
+      const missing = agreementProblems(spec, job.specSignatures ?? {});
+      if (missing.length) throw refuse(missing.join("; "));
+      memos = specMemos(spec);
+    } else if (opts.specHash) {
+      throw new Error(`job ${jobId} has an unsigned spec; it has no spec hash to pin`);
+    }
+    const tx = await createEscrow(this.#ledger(), clientWallet, job.provider, job.priceDrops, job.condition, job.slaSeconds, memos);
     if (tx.code !== "tesSUCCESS") return { tx, job };
     return { tx, job: await this.waitForStatus(jobId, ["funded"]) };
   }
@@ -359,13 +510,17 @@ export class EscrowKit {
     await callJson("POST", `${this.registryUrl}/jobs/${jobId}/deliverable`, {
       content, auth: signRequest(providerWallet, "deliver", jobId, sha256Hex(content)),
     });
+    const before = await this.getJob(jobId);
+    const expected = jobSpecHash(before);
     const { verdict, fulfillment } = await this.requestVerification(jobId, providerWallet);
+    const specMatches = (verdict.specHash ?? null) === expected;
     return {
       job: await this.getJob(jobId),
       verdict,
       verdictSignatureValid: this.oracleAddress !== null && verifyVerdict(verdict, this.oracleAddress)
-        && verdict.evidenceHash === sha256Hex(content),
+        && verdict.evidenceHash === sha256Hex(content) && specMatches,
       fulfillment: fulfillment ?? null,
+      specHash: expected, specMatches, unsignedSpec: expected === null,
     };
   }
 
@@ -374,8 +529,11 @@ export class EscrowKit {
     return callJson("GET", `${this.registryUrl}/jobs/${encodeURIComponent(jobId)}/verdicts`);
   }
 
-  /** Shared jobs whose oracles disagreed: at least one signed pass and one signed fail. */
-  splitJobs(): Promise<{ jobId: string; status: JobStatus; threshold: number; oracles: string[]; passed: string[]; failed: string[] }[]> {
+  /** Shared jobs whose oracles disagreed: at least one signed pass and one signed fail, and the criteria they split on (EDR-016). */
+  splitJobs(): Promise<{
+    jobId: string; status: JobStatus; threshold: number; oracles: string[]; passed: string[]; failed: string[];
+    specHash: string | null; criteria: { id: string; passed: string[]; failed: string[] }[];
+  }[]> {
     return callJson("GET", `${this.registryUrl}/splits`);
   }
 
@@ -387,7 +545,8 @@ export class EscrowKit {
    * The secret and the shares are wiped from memory afterwards and never stored.
    * Throws if any oracle could not take its share; then don't fund the job.
    */
-  async createSharedJob(input: SharedJobInput, clientWallet: Wallet): Promise<Job> {
+  async createSharedJob(sharedInput: SharedJobInput | { spec: JobSpecV1; oracles: OracleRef[]; threshold: number }, clientWallet: Wallet): Promise<Job> {
+    const input = { ...jobBody(sharedInput), oracles: sharedInput.oracles, threshold: sharedInput.threshold };
     if (clientWallet.address !== input.client) throw new Error("only the job's client can create its shared job");
     const n = input.oracles.length;
     if (!Number.isInteger(input.threshold) || input.threshold < 2 || input.threshold > n) throw new Error("threshold must be from 2 to the number of oracles");
@@ -425,6 +584,8 @@ export class EscrowKit {
         }
       }));
       if (failures.length) throw new Error(`job ${job.id} is registered, but not every oracle took its share; do not fund it: ${failures.join("; ")}`);
+      // A v1 spec: the client signs it now; the provider signs next (signSpec), then fundJob can lock.
+      if (isSpecV1(input.spec)) return this.signSpec(job.id, clientWallet, specHash(input.spec));
       return this.getJob(job.id);
     } finally {
       for (const s of shares) s.y.fill(0);
@@ -447,12 +608,19 @@ export class EscrowKit {
     }
     const set = opts.oracles ?? job.oracles;
     const evidenceHash = sha256Hex(content);
+    // Every oracle must have judged the one signed spec (EDR-016), worked out here from the spec.
+    const expectedSpec = jobSpecHash(job);
+    if (isSpecV1(job.spec)) {
+      const missing = agreementProblems(job.spec, job.specSignatures ?? {});
+      if (missing.length) throw new Error(`job ${jobId}'s spec is not signed by both parties: ${missing.join("; ")}`);
+    }
     const reports = await Promise.all(set.map(async (ref, i): Promise<OracleReport & { share?: string }> => {
       const report: OracleReport & { share?: string } = { oracle: ref, index: i + 1, status: "unreachable", problems: [], used: false };
       let answer: { verdict: SignedVerdict; share?: string };
       try {
         answer = await this.#verifyAt(ref.url, jobId, wallet, ref.address, opts.attempts ?? 4);
       } catch (err) {
+        if (err instanceof HttpError && err.status === 409) report.status = "refused";
         report.problems.push(err instanceof Error ? err.message : String(err));
         return report;
       }
@@ -463,6 +631,9 @@ export class EscrowKit {
       if (v.jobId !== jobId || v.condition !== job.condition || v.provider !== job.provider) p.push("verdict is for another job, condition or provider");
       if (v.evidenceHash !== evidenceHash) p.push("verdict is not for this deliverable");
       if (v.shareIndex !== i + 1 || v.threshold !== job.threshold) p.push("verdict names the wrong share index or threshold");
+      if ((v.specHash ?? null) !== expectedSpec) {
+        p.push(`verdict judged spec ${v.specHash ?? "(unsigned)"}, not the job's signed spec ${expectedSpec ?? "(unsigned)"}; its share is never combined`);
+      }
       if (v.verdict === "fail" && answer.share !== undefined) p.push("oracle sent a share with a fail verdict; it is not used");
       if (v.verdict === "pass") {
         try {
@@ -472,9 +643,12 @@ export class EscrowKit {
         }
       }
       if (p.length === 0) {
-        const kit = new EscrowKit({ xrpl: this.#xrpl, oracleUrl: ref.url, registryUrl: this.registryUrl, oracleAddress: ref.address, anchorAddress: ref.anchor, listAnchors: this.#listAnchors });
+        const kit = new EscrowKit({
+          xrpl: this.#xrpl, oracleUrl: ref.url, registryUrl: this.registryUrl, oracleAddress: ref.address, anchorAddress: ref.anchor,
+          listAnchors: this.#listAnchors, lookupTx: this.#lookupTx,
+        });
         try {
-          report.log = await kit.verifyVerdictLog({ verdict: v, allowUnanchored: !opts.requireAnchored, requireAnchor: !!opts.requireAnchored });
+          report.log = await kit.verifyVerdictLog({ verdict: v, allowUnanchored: !opts.requireAnchored, requireAnchor: !!opts.requireAnchored, job });
           if (!report.log.ok) p.push(...report.log.problems.map((x) => `verdict log: ${x}`));
         } catch (err) {
           p.push(`verdict log could not be checked: ${err instanceof Error ? err.message : String(err)}`);
@@ -502,8 +676,8 @@ export class EscrowKit {
     }
     const by = (s: OracleReport["status"]) => reports.filter((r) => r.status === s).map((r) => r.oracle.address);
     return {
-      job: await this.getJob(jobId), reports, passed: by("pass"), failed: by("fail"), rejected: by("rejected"), unreachable: by("unreachable"),
-      fulfillment: combined?.fulfillment ?? null,
+      job: await this.getJob(jobId), reports, passed: by("pass"), failed: by("fail"), rejected: by("rejected"), refused: by("refused"),
+      unreachable: by("unreachable"), fulfillment: combined?.fulfillment ?? null, specHash: expectedSpec, unsignedSpec: expectedSpec === null,
     };
   }
 

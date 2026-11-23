@@ -3,12 +3,15 @@
 // for the Python SDK's shared-verification tests. Prints the set and the test
 // watcher token as one JSON line and stops when stdin closes.
 // Used by xrpl-escrow-py/tests/test_shared_local.py; not a service to run by hand.
-import { TOKENS, startSharedLocal } from "./helpers.js";
+// For signed specs (EDR-016) it also starts a stand-in ledger for EscrowCreate memos (memoLedgerUrl).
+import { TOKENS, startMemoLedger, startSharedLocal } from "./helpers.js";
 
 const local = await startSharedLocal(3, [undefined, undefined, "fail"]);
-console.log(JSON.stringify({ registryUrl: local.registry.url, oracles: local.set(), watcherToken: TOKENS.watcher }));
+const memoLedger = await startMemoLedger();
+console.log(JSON.stringify({ registryUrl: local.registry.url, oracles: local.set(), watcherToken: TOKENS.watcher, memoLedgerUrl: memoLedger.url }));
 process.stdin.resume();
 process.stdin.on("end", async () => {
   await local.close();
+  await memoLedger.close();
   process.exit(0);
 });

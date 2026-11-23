@@ -29,6 +29,16 @@
 // even after a restart, returns that same verdict without running the checks,
 // and a fail never releases the fulfillment.
 //
+// Signed job specs (EDR-016): for a job with a job spec v1, the oracle first
+// reads the job's EscrowCreate on a validated ledger (from the open escrow's
+// PreviousTxnID) and refuses the job, signing nothing, unless the memo there
+// has the hash of the spec the registry gave it and both parties signed that
+// hash. It then decides each criterion by its checks, applies the spec's rule
+// (all, or at least n), and signs a verdict that names the spec hash, version,
+// revision and each criterion's pass or fail. It judges the checks, never the
+// words of a criterion. A job with the older unsigned spec still runs, and its
+// verdict says so (spec fields null).
+//
 // Every verdict goes into the hash-chained public verdict log
 // (src/verdict-log.ts, data/verdict-log.jsonl), which anyone on this machine
 // can read. On a timer and on shutdown the oracle anchors the log's head on
@@ -47,7 +57,9 @@ import {
   ANCHOR_FILE, ANCHOR_INTERVAL_MS, localOracleProfile, ORACLE_PORT, REGISTRY_URL, REPLAY_FILE, VAULT_FILE, VERDICT_CHAIN, VERDICT_LOG, readEnvFile, requireEnv,
 } from "../local-config.js";
 import type { Deliverable, Job } from "../registry/db.js";
-import { CheckUnavailable, runChecks, stopSchemaWorker, type CheckResult } from "./checks/index.js";
+import { CheckUnavailable, runChecks, runCriteria, stopSchemaWorker, type CheckResult } from "./checks/index.js";
+import { isSpecV1, specHash, type CriterionResult } from "../job-spec.js";
+import { ledgerSpecCheck, type SpecCheck } from "../spec-ledger.js";
 import { ledgerTxLookup, type TxLookup } from "./checks/xrpl-tx.js";
 import { SecretVault, parseVaultKey } from "./vault.js";
 import { canonicalJson } from "../auth.js";
@@ -70,6 +82,18 @@ export interface VerdictBody {
   /** Shared jobs only (EDR-015): which share of the job's secret this oracle holds (x = 1..n), and the job's k. */
   shareIndex?: number;
   threshold?: number;
+  /**
+   * Phase 6 (EDR-016), on every verdict from 0.6.0: the hash, format version and
+   * revision of the signed job spec this verdict judged, and each criterion's
+   * pass or fail. All null for a job with an unsigned (Phase 1 to 5) spec.
+   * Absent on verdicts from before 0.6.0.
+   */
+  specHash?: string | null;
+  specVersion?: number | null;
+  specRevision?: number | null;
+  criteria?: CriterionResult[] | null;
+  /** Always "checks": the oracle judged the machine checks, never a criterion's statement. */
+  judged?: "checks";
 }
 
 export interface SignedVerdict extends VerdictBody {
@@ -78,12 +102,19 @@ export interface SignedVerdict extends VerdictBody {
 
 /** Returns null when the job's escrow is on the ledger as agreed, otherwise what is wrong. */
 export type EscrowCheck = (job: Job) => Promise<string | null>;
+export type { SpecCheck } from "../spec-ledger.js";
 
 export interface OracleOptions {
   verdictKey: Wallet; // signs verdicts; a key of its own, not a funded wallet
   vault: SecretVault;
   serviceToken: string; // ORACLE_SERVICE_TOKEN, for writes to the registry
   escrowCheck: EscrowCheck;
+  /**
+   * For a job spec v1 (EDR-016): the spec read from the registry must be the one whose
+   * hash is in the job's EscrowCreate memo, signed by both parties. Defaults to the
+   * ledger check (src/spec-ledger.ts); without it, v1 jobs are refused.
+   */
+  specCheck?: SpecCheck;
   replay?: ReplayGuard;
   registryUrl?: string;
   /** The older unchained log; only hashed into the genesis entry of a new chain. */
@@ -136,11 +167,13 @@ export function ledgerEscrowCheck(client: Client): EscrowCheck {
   };
 }
 
+type Outcome = { pass: boolean; results: CheckResult[]; criteria: CriterionResult[] | null };
+
 export function oracleRoutes(opts: OracleRoutesOptions): Route[] {
   const registry = opts.registryUrl ?? REGISTRY_URL;
   // Checks still running, by job: a provider asking again before the first answer
   // waits for that run instead of starting another one.
-  const running = new Map<string, Promise<{ pass: boolean; results: CheckResult[] }>>();
+  const running = new Map<string, Promise<Outcome>>();
   const replay = opts.replay ?? new ReplayGuard();
   const me = opts.verdictKey.address;
   const shareKeyInfo = opts.shareKey ? signShareKey(opts.verdictKey, shareKeyPublic(opts.shareKey)) : null;
@@ -269,6 +302,13 @@ export function oracleRoutes(opts: OracleRoutesOptions): Route[] {
         }
         const escrowProblem = await opts.escrowCheck(job);
         if (escrowProblem) throw new HttpError(409, `escrow check failed: ${escrowProblem}`);
+        // A signed job spec (EDR-016): judge only the spec whose hash the escrow was locked against.
+        const v1 = isSpecV1(job.spec) ? job.spec : null;
+        if (v1) {
+          if (!opts.specCheck) throw new HttpError(409, "this oracle can't check job specs on the ledger; it refuses the job and signs nothing");
+          const specProblem = await opts.specCheck(job);
+          if (specProblem) throw new HttpError(409, `spec check failed: ${specProblem}. This oracle refuses the job and signs nothing; the client is refunded after the deadline`);
+        }
         const deliverable = await callJson<Deliverable>("GET", `${registry}/jobs/${encodeURIComponent(jobId)}/deliverable`);
 
         const evidenceHash = sha256Hex(deliverable.content);
@@ -291,12 +331,14 @@ export function oracleRoutes(opts: OracleRoutesOptions): Route[] {
           }
           let run = running.get(jobId);
           if (!run) {
-            run = runChecks(job.spec.checks, {
-              job, content: deliverable.content, deliveredAt: deliverable.deliveredAt, lookupTx: opts.lookupTx,
-            }).finally(() => running.delete(jobId));
+            const ctx = { job, content: deliverable.content, deliveredAt: deliverable.deliveredAt, lookupTx: opts.lookupTx };
+            const started: Promise<Outcome> = v1
+              ? runCriteria(v1, ctx)
+              : runChecks((job.spec as { checks: never[] }).checks, ctx).then((o) => ({ ...o, criteria: null }));
+            run = started.finally(() => running.delete(jobId));
             running.set(jobId, run);
           }
-          let outcome: { pass: boolean; results: CheckResult[] };
+          let outcome: Outcome;
           try {
             outcome = await run;
           } catch (err) {
@@ -306,6 +348,7 @@ export function oracleRoutes(opts: OracleRoutesOptions): Route[] {
           }
           if (opts.fault === "fail") {
             outcome = {
+              ...outcome,
               pass: false,
               results: [...outcome.results, { type: "oracle-fault", pass: false, detail: "this oracle was started with ORACLE_FAULT=fail and fails every job" }],
             };
@@ -320,6 +363,8 @@ export function oracleRoutes(opts: OracleRoutesOptions): Route[] {
               condition: job.condition!, provider: job.provider, oracle: opts.verdictKey.address,
               publicKey: opts.verdictKey.publicKey, issuedAt: Date.now(),
               ...(shared ? { shareIndex: index, threshold: job.threshold! } : {}),
+              specHash: v1 ? specHash(v1) : null, specVersion: v1 ? v1.specVersion : null, specRevision: v1 ? v1.revision : null,
+              criteria: outcome.criteria, judged: "checks",
             };
             verdict = { ...unsigned, signature: signPayload(unsigned, opts.verdictKey) };
             opts.store.append(verdict);
@@ -371,6 +416,8 @@ export async function startOracle(opts: Partial<OracleOptions> & { port?: number
   if (needsLedger) ledger = await connectTestnet();
   const escrowCheck = opts.escrowCheck ?? ledgerEscrowCheck(ledger!);
   const lookupTx = opts.lookupTx ?? ledgerTxLookup(ledger! as never);
+  // Tests that stand in for the ledger pass their own specCheck; without one and without a ledger, v1 jobs are refused.
+  const specCheck = opts.specCheck ?? (ledger ? ledgerSpecCheck(ledger, lookupTx) : undefined);
   const anchorer = opts.anchorer ?? ledgerAnchorer(ledger!, anchorWallet!, verdictKey.address);
   const anchorAddress = opts.anchorAddress ?? anchorWallet?.address;
   // Never extend a log that disagrees with what the anchor account already put on the
@@ -395,7 +442,7 @@ export async function startOracle(opts: Partial<OracleOptions> & { port?: number
   const schedule = new AnchorSchedule(store, anchors, anchorer, opts.anchorIntervalMs ?? ANCHOR_INTERVAL_MS, undefined, onLedger[0] ?? null);
   const replay = opts.replay ?? new ReplayGuard(at("oracle-replay.json", REPLAY_FILE));
   const server = jsonServer(oracleRoutes({
-    ...opts, verdictKey, vault, serviceToken, escrowCheck, replay, store, anchors, lookupTx, anchorAddress, shareKey, fault,
+    ...opts, verdictKey, vault, serviceToken, escrowCheck, specCheck, replay, store, anchors, lookupTx, anchorAddress, shareKey, fault,
   }));
   const port = await listenLocal(server, opts.port ?? ORACLE_PORT);
   schedule.start();

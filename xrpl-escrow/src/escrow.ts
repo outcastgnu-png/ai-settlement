@@ -61,6 +61,7 @@ export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 /** Client locks `drops` for `provider`, unlockable with `condition` until `slaSeconds` from now. */
 export async function createEscrow(
   client: Client, payer: Wallet, provider: string, drops: string, condition: string, slaSeconds: number,
+  memos?: EscrowCreate["Memos"],
 ): Promise<TxResult & { escrow: EscrowRef }> {
   const cancelAfter = nowRippleTime() + slaSeconds;
   const tx: EscrowCreate = {
@@ -70,6 +71,7 @@ export async function createEscrow(
     Amount: drops,
     Condition: condition,
     CancelAfter: cancelAfter,
+    ...(memos ? { Memos: memos } : {}),
   };
   const result = await submitValidated(client, payer, tx);
   return { ...result, escrow: { owner: payer.address, offerSequence: result.sequence, condition, cancelAfter } };

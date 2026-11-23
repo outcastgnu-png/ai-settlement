@@ -1,0 +1,34 @@
+$ npm.cmd run test:unit
+start 2026-11-22T21:22:22-06:00
+
+> xrpl-verified-escrow-demo@0.6.0 test:unit
+> vitest run test/condition.test.ts test/registry.test.ts test/oracle.test.ts test/watcher.test.ts test/sdk.test.ts test/verdict-log.test.ts test/xrpl-tx.test.ts test/finality.test.ts test/fs-util.test.ts test/shared.test.ts test/job-spec.test.ts test/signed-spec.test.ts
+
+
+ RUN  v5.0.5 C:/dev/ai-settlement-e7ed6ca/xrpl-escrow
+
+ ❯ test/verdict-log.test.ts (24 tests | 11 skipped) 10225ms
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/verdict-log.test.ts > oracle verdict log routes, anchoring and EscrowKit.verifyVerdictLog
+Error: Hook timed out in 10000ms.
+If this is a long-running hook, pass a timeout value as the last argument or configure it globally with "hookTimeout".
+ ❯ test/verdict-log.test.ts:228:3
+    226|   const jobs: { id: string; verdict: SignedVerdict }[] = [];
+    227|
+    228|   beforeAll(async () => {
+       |   ^
+    229|     local = await startLocal();
+    230|     kit = new EscrowKit({ registryUrl: local.registry.url, oracleUrl: …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 11 passed (12)
+      Tests  162 passed | 11 skipped (173)
+   Start at  21:22:24
+   Duration  44.10s (tests 95%, import 5%, transform 1%)
+
+EXIT 1
+elapsed 46 s

@@ -14,7 +14,16 @@ Shared verification, k of n oracles (EDR-015):
                           oracle of the set and registers the job with the condition
     deliver_shared()      the provider asks every oracle of the set, checks each verdict against its
                           pinned address and its own log, and combines k shares into the fulfillment
-    split_jobs()          shared jobs where the oracles disagreed
+    split_jobs()          shared jobs where the oracles disagreed, and on which criteria
+
+Signed job specs (EDR-016):
+
+    make_job_spec()       write a job spec v1: criteria, the checks behind each, and the rule
+    create_job() / create_shared_job()  take a v1 spec as ``spec``; parties, price and SLA come from it
+    sign_spec()           client or provider signs the spec hash it read; the provider's signature is its acceptance
+    revise_spec()         the client replaces a draft's spec with its next revision; both sign again
+    fund_job()            refuses to lock XRP until both signatures check; the EscrowCreate carries the spec hash in a memo
+    deliver() / deliver_shared()  check that every verdict judged that same spec hash
 
 It talks to the registry, oracle and watcher that the TypeScript kit runs
 (``npm run registry``, ``npm run oracle``, ``npm run watcher``). Every
@@ -37,6 +46,9 @@ from .share_box import BoxContext, seal, verify_share_key
 from .env import read_env_file
 from .escrow import EscrowRef, TxResult, cancel_escrow, create_escrow, finish_escrow, wait_past_cancel_after
 from .http import ServiceError, call_json
+from .job_spec import (
+    agreement_problems, escrow_create_spec_memo, is_spec_v1, ledger_tx_lookup, sign_spec_hash, spec_hash, spec_memos, spec_problem,
+)
 from .verdict_log import LogVerification, list_anchors, verify_verdict_log
 
 Job = dict[str, Any]
@@ -54,12 +66,17 @@ class DeliverResult:
     verdict: dict[str, Any]
     verdict_signature_valid: bool
     fulfillment: str | None
+    spec_hash: str | None = None  # the job's spec hash, worked out from its spec; None for an unsigned spec (EDR-016)
+    spec_matches: bool = True  # the verdict judged exactly that spec hash
+    unsigned_spec: bool = True
 
 
 @dataclass
 class OracleReport:
     """What one oracle of a shared job's set answered. ``status`` is pass or fail (a verdict that
-    checked), rejected (a verdict that did not check: signature, fields, share or log) or unreachable."""
+    checked), rejected (a verdict that did not check: signature, fields, spec hash, share or log), refused
+    (the oracle would not verify the job, HTTP 409, e.g. the spec it was given is not the one on the
+    ledger, EDR-016) or unreachable."""
 
     oracle: dict[str, str]
     index: int
@@ -79,6 +96,9 @@ class SharedVerification:
     rejected: list[str]
     unreachable: list[str]
     fulfillment: str | None
+    refused: list[str] | None = None
+    spec_hash: str | None = None
+    unsigned_spec: bool = True
 
 
 def new_job_hash(body: dict[str, Any]) -> str:
@@ -119,6 +139,26 @@ class TxOutcome:
     job: Job
 
 
+def job_spec_hash(job: Job) -> str | None:
+    """The hash of a job's v1 spec, worked out from the spec itself (never taken from the registry), or None."""
+    return spec_hash(job["spec"]) if is_spec_v1(job.get("spec")) else None
+
+
+def _job_body(*, spec: dict[str, Any], client: str | None = None, provider: str | None = None, price_drops: str | None = None,
+              sla_seconds: int | None = None) -> dict[str, Any]:
+    """The registry body for a new job. A v1 spec supplies the parties, price and SLA; any given beside it must agree."""
+    if not is_spec_v1(spec):
+        return {"client": client, "provider": provider, "priceDrops": price_drops, "slaSeconds": sla_seconds, "spec": spec}
+    problem = spec_problem(spec)
+    if problem:
+        raise ValueError(f"job spec refused before anything was sent: {problem}")
+    for name, given, key in (("client", client, "client"), ("provider", provider, "provider"),
+                             ("price_drops", price_drops, "priceDrops"), ("sla_seconds", sla_seconds, "slaSeconds")):
+        if given is not None and given != spec[key]:
+            raise ValueError(f"{name} differs from the one in the spec")
+    return {"client": spec["client"], "provider": spec["provider"], "priceDrops": spec["priceDrops"], "slaSeconds": spec["slaSeconds"], "spec": spec}
+
+
 def escrow_ref(job: Job) -> EscrowRef:
     if job.get("offerSequence") is None or job.get("cancelAfter") is None or job.get("condition") is None:
         raise ValueError(f"job {job['id']} has no escrow on the ledger yet")
@@ -136,6 +176,7 @@ class EscrowKit:
         env_file: str | os.PathLike[str] = ".env",
         status_timeout: float = 60,
         list_anchors_fn: Any = None,
+        lookup_tx_fn: Any = None,
     ) -> None:
         """``oracle_address`` pins the oracle's verdict signing address. It defaults to
         ORACLE_VERDICT_ADDRESS from ``env_file``; it is never taken from the oracle's
@@ -148,6 +189,8 @@ class EscrowKit:
         self._timeout = status_timeout
         # (anchor_address, oracle_address[, max_tx]) -> (anchors, complete); tests pass a stand-in for the ledger read.
         self._list_anchors = list_anchors_fn
+        # tx hash -> {"found", "validated", "tx", "meta"}; reads a job's EscrowCreate for its spec memo. Tests pass a stand-in.
+        self._lookup_tx = lookup_tx_fn
         self._env_file = env_file
         env = read_env_file(env_file)
         self.oracle_address = oracle_address or env.get("ORACLE_VERDICT_ADDRESS")
@@ -184,7 +227,7 @@ class EscrowKit:
 
     def verify_verdict_log(
         self, *, verdict: dict[str, Any] | None = None, require_anchor: bool = True, allow_unanchored: bool = False,
-        entries: list[dict[str, Any]] | None = None, max_tx: int | None = None,
+        entries: list[dict[str, Any]] | None = None, max_tx: int | None = None, job: Job | None = None,
     ) -> LogVerification:
         """Fetch the public verdict log and check it: every entry is signed by the pinned oracle address,
         the chain is unbroken from the genesis entry, and every anchor on a validated ledger from the pinned
@@ -192,7 +235,9 @@ class EscrowKit:
         signed verdict is in the log with matching fields, at or before the newest anchor
         (``allow_unanchored=True`` accepts it in the not-yet-anchored tail). The anchors are read from the
         ledger itself, never from the oracle. If the anchor account has more than ``max_tx`` transactions
-        (default 10,000), older anchors can't be read and ``ok`` is False (Gpno N32)."""
+        (default 10,000), older anchors can't be read and ``ok`` is False (Gpno N32). With ``verdict`` on a
+        signed spec and its ``job``, the verdict's spec hash must also be the one in the memo of the job's
+        EscrowCreate on a validated ledger (EDR-016); ``spec_on_ledger`` says whether it is."""
         log = self.fetch_verdict_log() if entries is None else entries
         anchors: list[dict[str, Any]] = []
         complete = True
@@ -202,8 +247,29 @@ class EscrowKit:
             else:
                 anchors, complete = list_anchors(self._ledger(), self.anchor_address, self.oracle_address,
                                                  *([max_tx] if max_tx is not None else []))
-        return verify_verdict_log(log, self.oracle_address, anchors, anchor_address=self.anchor_address, verdict=verdict,
-                                  require_anchor=require_anchor, allow_unanchored=allow_unanchored, lookback_complete=complete)
+        result = verify_verdict_log(log, self.oracle_address, anchors, anchor_address=self.anchor_address, verdict=verdict,
+                                    require_anchor=require_anchor, allow_unanchored=allow_unanchored, lookback_complete=complete)
+        if verdict is not None and job is not None and isinstance(verdict.get("specHash"), str):
+            problem = self._spec_on_ledger_problem(job, verdict)
+            result.spec_on_ledger = problem is None
+            if problem:
+                result.problems.append(problem)
+            result.ok = not result.problems
+        return result
+
+    def _spec_on_ledger_problem(self, job: Job, verdict: dict[str, Any]) -> str | None:
+        if verdict.get("jobId") != job.get("id"):
+            return "the verdict is for another job"
+        if not job.get("createTx"):
+            return "the job has no EscrowCreate recorded, so its spec memo could not be read"
+        lookup = self._lookup_tx or ledger_tx_lookup(self._ledger())
+        read = escrow_create_spec_memo(lookup, job["createTx"], owner=job["client"], destination=verdict.get("provider", ""),
+                                       condition=verdict.get("condition", ""))
+        if "problem" in read:
+            return f"spec memo: {read['problem']}"
+        if read["memo"]["specHash"] != verdict["specHash"]:
+            return f"the verdict judged spec {verdict['specHash']}, but the escrow was locked against spec {read['memo']['specHash']}"
+        return None
 
     def wait_for_status(self, job_id: str, statuses: list[str], timeout: float | None = None) -> Job:
         """Poll the registry until the job reaches one of ``statuses``."""
@@ -216,24 +282,87 @@ class EscrowKit:
                 raise TimeoutError(f"job {job_id} is {job['status']}, still waiting for {' or '.join(statuses)}")
             time.sleep(0.5)
 
-    def create_job(self, *, client: str, provider: str, price_drops: str, sla_seconds: int, spec: dict[str, Any]) -> Job:
+    def create_job(self, *, spec: dict[str, Any], client: str | None = None, provider: str | None = None,
+                   price_drops: str | None = None, sla_seconds: int | None = None) -> Job:
         """Register a draft job, then have the oracle create its secret and set the condition.
 
-        Every argument is keyword-only, like the fields of the TypeScript ``createJob()``."""
-        draft = call_json("POST", f"{self.registry_url}/jobs", {
-            "client": client, "provider": provider, "priceDrops": price_drops, "slaSeconds": sla_seconds, "spec": spec,
-        })
+        Every argument is keyword-only, like the fields of the TypeScript ``createJob()``. With a job spec
+        v1 as ``spec`` (EDR-016), the parties, price and SLA come from the spec, and the job waits for both
+        signatures (``sign_spec``) before ``fund_job`` will lock anything."""
+        draft = call_json("POST", f"{self.registry_url}/jobs", _job_body(spec=spec, client=client, provider=provider,
+                                                                          price_drops=price_drops, sla_seconds=sla_seconds))
         call_json("POST", f"{self.oracle_url}/jobs/{urllib.parse.quote(draft['id'], safe='')}/condition")
         return self.get_job(draft["id"])
 
-    def fund_job(self, job_id: str, client_wallet: Wallet) -> TxOutcome:
-        """Client locks the price in escrow. Returns when the watcher has seen the validated EscrowCreate."""
+    def create_signed_job(self, spec: dict[str, Any], client_wallet: Wallet) -> Job:
+        """Create a job with a v1 spec and sign it as its client. The provider signs next (``sign_spec``)."""
+        if client_wallet.address != spec.get("client"):
+            raise ValueError("only the spec's client can create its job")
+        job = self.create_job(spec=spec)
+        return self.sign_spec(job["id"], client_wallet, spec_hash(spec))
+
+    def sign_spec(self, job_id: str, wallet: Wallet, agreed_spec_hash: str) -> Job:
+        """Sign a job's spec as its client or provider (EDR-016). Pass the hash of the spec you read and agree
+        to: the SDK works the hash out again from the registry's spec and refuses to sign if it differs."""
+        job = self.get_job(job_id)
+        if not is_spec_v1(job.get("spec")):
+            raise ValueError(f"job {job_id} has an unsigned (Phase 1 to 5) spec; there is nothing to sign")
+        problem = spec_problem(job["spec"])
+        if problem:
+            raise ValueError(f"job {job_id}'s spec is not acceptable: {problem}")
+        digest = spec_hash(job["spec"])
+        if digest != agreed_spec_hash:
+            raise ValueError(f"the registry's spec for job {job_id} has hash {digest}, not the {agreed_spec_hash} you agreed to; nothing signed")
+        if wallet.address not in (job["spec"]["client"], job["spec"]["provider"]):
+            raise ValueError("only the spec's client or provider can sign it")
+        return call_json("POST", self._job_url(job_id, "/spec/signatures"), {"specHash": digest, "signature": sign_spec_hash(digest, wallet)})
+
+    def revise_spec(self, job_id: str, next_spec: dict[str, Any], client_wallet: Wallet) -> Job:
+        """The client replaces a draft job's spec with its next revision; the registry keeps the old one."""
+        problem = spec_problem(next_spec)
+        if problem:
+            raise ValueError(problem)
+        return call_json("PUT", self._job_url(job_id, "/spec"), {
+            "spec": next_spec, "auth": sign_request(client_wallet, "revise-spec", job_id, spec_hash(next_spec)),
+        })
+
+    def spec_revisions(self, job_id: str) -> list[dict[str, Any]]:
+        """Earlier revisions of a job's spec, each with the signatures it had."""
+        return call_json("GET", self._job_url(job_id, "/spec/revisions"))
+
+    def fund_job(self, job_id: str, client_wallet: Wallet, *, spec_hash_pin: str | None = None) -> TxOutcome:
+        """Client locks the price in escrow. Returns when the watcher has seen the validated EscrowCreate.
+
+        For a job spec v1 (EDR-016) it refuses to lock anything until the client's and the provider's
+        signatures over the spec hash check (worked out here from the spec), and the EscrowCreate carries
+        the spec hash and revision in a memo. ``spec_hash_pin`` also pins the hash you agreed to."""
         job = self.get_job(job_id)
         if job["status"] != "draft" or not job.get("condition"):
             raise ValueError(f"job {job_id} is {job['status']}; only a draft with a condition can be funded")
         if client_wallet.address != job["client"]:
             raise ValueError("only the job's client can fund it")
-        tx, _ = create_escrow(self._ledger(), client_wallet, job["provider"], job["priceDrops"], job["condition"], int(job["slaSeconds"]))
+        memos = None
+        if is_spec_v1(job.get("spec")):
+            spec = job["spec"]
+
+            def refuse(why: str) -> ValueError:
+                return ValueError(f"refusing to lock XRP for job {job_id}: {why}")
+
+            problem = spec_problem(spec)
+            if problem:
+                raise refuse(f"its spec is not acceptable ({problem})")
+            digest = spec_hash(spec)
+            if spec_hash_pin and spec_hash_pin != digest:
+                raise refuse(f"its spec has hash {digest}, not the {spec_hash_pin} you agreed to")
+            if (spec["client"], spec["provider"], spec["priceDrops"], spec["slaSeconds"]) != (job["client"], job["provider"], job["priceDrops"], job["slaSeconds"]):
+                raise refuse("the job's parties, price or SLA differ from its spec")
+            missing = agreement_problems(spec, job.get("specSignatures"))
+            if missing:
+                raise refuse("; ".join(missing))
+            memos = spec_memos(spec)
+        elif spec_hash_pin:
+            raise ValueError(f"job {job_id} has an unsigned spec; it has no spec hash to pin")
+        tx, _ = create_escrow(self._ledger(), client_wallet, job["provider"], job["priceDrops"], job["condition"], int(job["slaSeconds"]), memos)
         if tx.code != "tesSUCCESS":
             return TxOutcome(tx, job)
         return TxOutcome(tx, self.wait_for_status(job_id, ["funded"]))
@@ -266,13 +395,16 @@ class EscrowKit:
         call_json("POST", self._job_url(job_id, "/deliverable"), {
             "content": content, "auth": sign_request(provider_wallet, "deliver", job_id, sha256_hex(content)),
         })
+        expected = job_spec_hash(self.get_job(job_id))
         answer = self.request_verification(job_id, provider_wallet)
         verdict = answer["verdict"]
+        matches = verdict.get("specHash") == expected
         return DeliverResult(
             job=self.get_job(job_id),
             verdict=verdict,
-            verdict_signature_valid=verify_verdict(verdict, self.oracle_address) and verdict.get("evidenceHash") == sha256_hex(content),
+            verdict_signature_valid=verify_verdict(verdict, self.oracle_address) and verdict.get("evidenceHash") == sha256_hex(content) and matches,
             fulfillment=answer.get("fulfillment"),
+            spec_hash=expected, spec_matches=matches, unsigned_spec=expected is None,
         )
 
     def claim(self, job_id: str, provider_wallet: Wallet, fulfillment: str) -> TxOutcome:
@@ -314,12 +446,16 @@ class EscrowKit:
         """Shared jobs whose oracles disagreed: at least one signed pass and one signed fail."""
         return call_json("GET", f"{self.registry_url}/splits")
 
-    def create_shared_job(self, *, client: str, provider: str, price_drops: str, sla_seconds: int, spec: dict[str, Any],
-                          oracles: list[dict[str, str]], threshold: int, client_wallet: Wallet) -> Job:
+    def create_shared_job(self, *, spec: dict[str, Any], oracles: list[dict[str, str]], threshold: int, client_wallet: Wallet,
+                          client: str | None = None, provider: str | None = None, price_drops: str | None = None,
+                          sla_seconds: int | None = None) -> Job:
         """Client side of a shared job. Checks each oracle of the pinned set (verdict address, anchor
         account, and a share key signed by its verdict key), makes the secret, splits it ``threshold``
         of n, registers the job with the condition, signed by the client, and seals each share to its
-        oracle. The secret is never stored. Raises if any oracle did not take its share; then don't fund it."""
+        oracle. The secret is never stored. Raises if any oracle did not take its share; then don't fund it.
+        With a v1 spec, the client also signs it; the provider signs next."""
+        fields = _job_body(spec=spec, client=client, provider=provider, price_drops=price_drops, sla_seconds=sla_seconds)
+        client, provider, price_drops, sla_seconds = fields["client"], fields["provider"], fields["priceDrops"], fields["slaSeconds"]
         if client_wallet.address != client:
             raise ValueError("only the job's client can create its shared job")
         n = len(oracles)
@@ -353,6 +489,8 @@ class EscrowKit:
                 failures.append(f"oracle {i + 1} ({ref['address']}): {err}")
         if failures:
             raise RuntimeError(f"job {job['id']} is registered, but not every oracle took its share; do not fund it: {'; '.join(failures)}")
+        if is_spec_v1(spec):
+            return self.sign_spec(job["id"], client_wallet, spec_hash(spec))
         return self.get_job(job["id"])
 
     def request_shared_verification(self, job_id: str, wallet: Wallet, content: str, *, oracles: list[dict[str, str]] | None = None,
@@ -369,6 +507,12 @@ class EscrowKit:
             raise ValueError("the registry's oracle set for this job is not the set you pinned")
         oracle_set = oracles or job["oracles"]
         evidence = sha256_hex(content)
+        # Every oracle must have judged the one signed spec (EDR-016), worked out here from the spec.
+        expected_spec = job_spec_hash(job)
+        if is_spec_v1(job.get("spec")):
+            missing = agreement_problems(job["spec"], job.get("specSignatures"))
+            if missing:
+                raise ValueError(f"job {job_id}'s spec is not signed by both parties: {'; '.join(missing)}")
         reports: list[OracleReport] = []
         shares: dict[str, str] = {}
         for i, ref in enumerate(oracle_set):
@@ -377,6 +521,8 @@ class EscrowKit:
             try:
                 answer = self._verify_at(ref["url"], job_id, wallet, ref["address"], attempts)
             except (ServiceError, OSError) as err:
+                if isinstance(err, ServiceError) and err.status == 409:
+                    report.status = "refused"
                 report.problems.append(str(err))
                 continue
             v = answer["verdict"]
@@ -390,6 +536,9 @@ class EscrowKit:
                 p.append("verdict is not for this deliverable")
             if v.get("shareIndex") != i + 1 or v.get("threshold") != job["threshold"]:
                 p.append("verdict names the wrong share index or threshold")
+            if v.get("specHash") != expected_spec:
+                p.append(f"verdict judged spec {v.get('specHash') or '(unsigned)'}, not the job's signed spec {expected_spec or '(unsigned)'}; "
+                         "its share is never combined")
             if v.get("verdict") == "fail" and "share" in answer:
                 p.append("oracle sent a share with a fail verdict; it is not used")
             if v.get("verdict") == "pass":
@@ -400,9 +549,10 @@ class EscrowKit:
                     p.append(f"pass without a usable share: {err}")
             if not p:
                 kit = EscrowKit(xrpl=self._xrpl, registry_url=self.registry_url, oracle_url=ref["url"], oracle_address=ref["address"],
-                                anchor_address=ref["anchor"], env_file=self._env_file, list_anchors_fn=self._list_anchors)
+                                anchor_address=ref["anchor"], env_file=self._env_file, list_anchors_fn=self._list_anchors,
+                                lookup_tx_fn=self._lookup_tx)
                 try:
-                    report.log = kit.verify_verdict_log(verdict=v, allow_unanchored=not require_anchored, require_anchor=require_anchored)
+                    report.log = kit.verify_verdict_log(verdict=v, allow_unanchored=not require_anchored, require_anchor=require_anchored, job=job)
                     if not report.log.ok:
                         p.extend(f"verdict log: {x}" for x in report.log.problems)
                 except Exception as err:  # noqa: BLE001 - any failure to check means the share is not used
@@ -424,7 +574,8 @@ class EscrowKit:
             return [r.oracle["address"] for r in reports if r.status == status]
 
         return SharedVerification(self.get_job(job_id), reports, by("pass"), by("fail"), by("rejected"), by("unreachable"),
-                                  combined[0] if combined else None)
+                                  combined[0] if combined else None, refused=by("refused"), spec_hash=expected_spec,
+                                  unsigned_spec=expected_spec is None)
 
     def deliver_shared(self, job_id: str, provider_wallet: Wallet, content: str, **opts: Any) -> SharedVerification:
         """Provider posts the work for a shared job, then asks every oracle of the set."""

@@ -11,6 +11,7 @@ same local services, which stay in TypeScript (`../xrpl-escrow`):
 | `deliver()` | The provider posts the work and asks the oracle for a signed verdict (and, on a pass, the fulfillment) |
 | `claim()` | The provider submits `EscrowFinish` with the fulfillment; returns once the job is `paid` |
 | `refund()` | After the deadline, submits `EscrowCancel`; returns once the job is `refunded` |
+| `create_signed_job()`, `sign_spec()` | Register a job with a signed spec v1, and sign its hash as the other party; `fund_job()` refuses to lock XRP until both have signed (0.6.0, EDR-016) |
 | `verify_verdict_log()` | Fetches the oracle's public verdict log and checks every signature, the chain, and the newest anchor read from the testnet ledger (0.4.0, EDR-014) |
 
 The SDK signs every request and transaction locally with the wallet that sends
@@ -140,6 +141,45 @@ verdicts. `kit.split_jobs()` lists jobs where the oracles disagreed. Unlike the 
 python -m xrpl_escrow.demo_phase5
 ```
 
+## Signed job spec (0.6.0, EDR-016)
+
+The client writes the job's criteria, both parties sign the spec's hash, and the
+SDK locks nothing until both signatures check. The `EscrowCreate` carries a memo
+with the spec hash, and every oracle refuses a job whose registry spec isn't the
+one on the ledger.
+
+```python
+from xrpl_escrow import make_job_spec, spec_hash
+spec = make_job_spec(
+    title="fee research", client=w["client"].address, provider=w["provider"].address, price_drops="5000000", sla_seconds=300,
+    criteria=[
+        {"id": "format", "statement": "A JSON report with a summary", "kind": "objective",
+         "checks": [{"type": "json-schema", "schema": {"type": "object", "properties": {"summary": {"type": "string"}}, "required": ["summary"]}}]},
+        {"id": "useful", "statement": "The research is useful", "kind": "subjective",
+         "checks": [{"type": "size-range", "minBytes": 200, "maxBytes": 20000}, {"type": "contains-text", "text": "Sources:"}]},
+    ],
+    rule="all",                                  # or {"atLeast": n}
+)
+job = kit.create_signed_job(spec, w["client"])                   # registered and signed by the client
+kit.sign_spec(job["id"], w["provider"], spec_hash(spec))         # the provider signs the hash of the spec it read
+kit.fund_job(job["id"], w["client"])                             # refuses unless both have signed; memo on EscrowCreate
+res = kit.deliver(job["id"], w["provider"], work)
+# res.verdict["criteria"]: each criterion's pass or fail; res.spec_matches; res.unsigned_spec
+```
+
+What the kit can and can't judge: it runs checks, nothing else. A `subjective`
+criterion needs at least one check both parties agree stands in for it, or
+`make_job_spec` raises a `ValueError` saying the kit can't judge that statement,
+before anything is sent. Verdicts say `"judged": "checks"`. A change to a signed spec is a new
+revision (`revise_job_spec`, `kit.revise_spec`); the registry keeps the old one
+(`kit.spec_revisions`). `kit.verify_verdict_log(..., job=job)` also checks the
+verdict's spec hash against the escrow memo (`spec_on_ledger`). Jobs with the older
+`spec={"checks": [...]}` shape still run, marked `unsigned_spec`. The demo:
+
+```
+python -m xrpl_escrow.demo_phase6
+```
+
 ## Tests
 
 ```
@@ -164,6 +204,10 @@ python -m pytest --testnet    # also runs both demo scenarios on testnet (about 
   the TypeScript kit (`../xrpl-escrow/test/vectors/shamir.json`, `share-box.json`).
 - `tests/test_shared_local.py`: a Python client and provider against the real TypeScript
   registry and three oracles, one of them dissenting (`../xrpl-escrow/test/py-shared-harness.ts`).
+- `tests/test_job_spec.py`: canonical JSON, spec hashes, signatures, memos and rules, the same
+  as the TypeScript kit (`../xrpl-escrow/test/vectors/job-spec.json`, made by
+  `npx tsx test/vectors/make-job-spec-vectors.ts`); version 1 then version 2 log entries; and a
+  Python-signed spec against the real TypeScript registry and oracle.
 - `tests/test_demo_testnet.py`: the demo scenarios on testnet, with the services on
   spare ports and throwaway data.
 
@@ -185,3 +229,5 @@ services through a proxy.
 | `src/xrpl_escrow/demo.py` | The demo scenarios: pass and claim, fail and refund, verdict log |
 | `src/xrpl_escrow/shamir.py`, `share_box.py` | Shamir split and combine; sealing a share to an oracle (EDR-015) |
 | `src/xrpl_escrow/demo_phase5.py` | The shared-verification scenarios with three local oracles |
+| `src/xrpl_escrow/job_spec.py` | Job spec v1 (EDR-016): canonical JSON, spec hash, signatures, rules, the escrow memo |
+| `src/xrpl_escrow/demo_phase6.py` | The signed-spec scenarios |

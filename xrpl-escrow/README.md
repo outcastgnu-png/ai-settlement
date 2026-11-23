@@ -336,6 +336,82 @@ npm run demo:phase5   # 2 pass 1 fail, 1 pass 2 fail then refund, 3 pass, one or
 The run log goes to `logs/<date>-phase5.txt`; `test/shared.test.ts` covers the
 same rules without the ledger.
 
+## Phase 6: signed job spec (EDR-016)
+
+A job's acceptance criteria are now a record both parties signed and the ledger
+holds. Three things answer "who decided what counts as done?":
+
+- **Who writes the criteria.** The client writes the job spec: a title, the price,
+  the SLA, and a list of `criteria`. Each criterion has a plain-words `statement`, a
+  `kind` (`objective` or `subjective`) and the `checks` that decide it. A `rule`
+  says how many criteria must pass: `"all"` (the default) or `{ "atLeast": n }`.
+- **Who signs.** The client and the provider each sign the spec's hash (SHA-256 over
+  the RFC 8785 canonical JSON) with their own XRPL keys. The registry keeps the spec
+  and both signatures. A signed spec is never edited in place: a change is a new
+  revision with a new hash and new signatures, and the registry keeps the old one.
+  The SDK refuses to lock XRP until both signatures check, and the `EscrowCreate`
+  carries a memo with the spec hash, so the ledger holds what was agreed.
+- **What the kit can and can't judge.** The oracle runs the checks, nothing else.
+  An `objective` criterion ("delivered a file") is decided by its checks. A
+  `subjective` criterion ("useful research") is accepted only with at least one
+  check both parties agree stands in for it (a schema with required sections, a
+  minimum size, a phrase that must appear, a source transaction). Without one the
+  spec is refused before anything is sent, with the message "This kit can't judge
+  that statement". Verdicts say `judged: "checks"`: a pass means the checks
+  passed, not that the work is good. No model judges anything in this phase.
+
+```ts
+import { makeJobSpec, specHash } from "./src/sdk/index.js";
+const spec = makeJobSpec({
+  title: "fee research", client: client.address, provider: provider.address, priceDrops: "5000000", slaSeconds: 300,
+  criteria: [
+    { id: "format", statement: "A JSON report with summary, sources and findings", kind: "objective",
+      checks: [{ type: "json-schema", schema: { type: "object", properties: { summary: { type: "string" } }, required: ["summary"] } }] },
+    { id: "useful", statement: "The research is useful", kind: "subjective",
+      checks: [{ type: "size-range", minBytes: 200, maxBytes: 20000 }, { type: "contains-text", text: "Sources:" }] },
+  ],
+  rule: "all",
+});
+const job = await kit.createSignedJob(spec, clientWallet);         // registers the spec, signed by the client
+await kit.signSpec(job.id, providerWallet, specHash(spec));         // the provider signs the hash of the spec it read
+await kit.fundJob(job.id, clientWallet);                            // refuses unless both signatures check; memo on EscrowCreate
+const res = await kit.deliver(job.id, providerWallet, work);
+// res.verdict.criteria: each criterion's pass or fail; res.verdict.specHash; res.specMatches
+```
+
+New checks for "delivered a file" style criteria: `{ "type": "size-range", "minBytes": 1, "maxBytes": 100000 }`
+(bytes of the deliverable) and `{ "type": "contains-text", "text": "Summary:" }` (literal and
+case-sensitive, no regex, at most 256 bytes). A job still has at most 8 checks in all, and at
+most two `xrpl-tx-validated`.
+
+**On the ledger.** Before it verifies, each oracle reads the escrow's creating
+transaction (from the escrow's `PreviousTxnID`) in a validated ledger. If its memo
+names a different spec hash from the one the registry gives it, the oracle signs
+nothing and answers `409`, and the client is refunded after the deadline. The
+signed verdict and its log entry carry the spec hash, the revision and each
+criterion's result (log entries are now version 2; Phase 4 and 5 logs still
+verify, and a version 1 entry after a version 2 entry fails). `verifyVerdictLog(..., { job })`
+also checks the verdict's spec hash against the escrow memo (`specOnLedger`).
+
+**Shared jobs.** Every oracle of the set must report the job's signed spec hash.
+The SDK never combines a share from a verdict on another spec and names the oracle
+(`rejected`); an oracle that refuses the job shows as `refused`. `npm run splits`
+shows which criterion the set split on.
+
+**Older jobs.** Jobs created with the Phase 1 to 5 `spec.checks` shape still run.
+They have no signatures or memo, and the SDK result says `unsignedSpec: true`.
+
+```
+npm run demo:phase6   # both sign and pass; provider hasn't signed; spec changed after lock, refund;
+                      # subjective with no check; atLeast 2 of 3; shared job with one oracle on another spec;
+                      # then the logs and memos checked (about 5 minutes)
+```
+
+The run log goes to `logs/<date>-phase6.txt`; `test/job-spec.test.ts` and
+`test/signed-spec.test.ts` cover the same rules without the ledger, and
+`test/vectors/job-spec.json` holds the canonical forms, hashes, signatures and
+memos both SDKs must match.
+
 ## Safety rails
 
 - Testnet only. On connect the code reads `network_id` from the server and
@@ -363,7 +439,7 @@ same rules without the ledger.
 | `src/schema-policy.ts` | Which JSON Schemas a job spec may contain |
 | `src/http.ts`, `src/auth.ts` | JSON over `node:http` on 127.0.0.1; signed requests, replay guard, service tokens, signed verdicts |
 | `src/registry/` | `db.ts` (SQLite job store, transitions, reputation) and `server.ts` (HTTP API on 8801) |
-| `src/oracle/` | `server.ts` (HTTP on 8802), `vault.ts` (AES-256-GCM secrets), `verdict-store.ts` (the chained log file and its testnet anchors), `checks/` (`sha256-match`, `json-schema`, `max-latency`, `xrpl-tx-validated`) |
+| `src/oracle/` | `server.ts` (HTTP on 8802), `vault.ts` (AES-256-GCM secrets), `verdict-store.ts` (the chained log file and its testnet anchors), `checks/` (`sha256-match`, `json-schema`, `max-latency`, `xrpl-tx-validated`, `size-range`, `contains-text`) |
 | `src/verdict-log.ts` | Verdict log rules shared by the oracle and the SDK: entries, chain check, anchor memos |
 | `src/watcher.ts` | Ledger subscription that drives job status from validated transactions |
 | `src/sdk/index.ts` | `createJob`, `fundJob`, `deliver`, `claim`, `refund`, `verifyVerdict`, `verifyVerdictLog`, `latestAnchor`; shared jobs: `createSharedJob`, `deliverShared`, `requestSharedVerification`, `combineForCondition`, `splitJobs` |
@@ -372,6 +448,10 @@ same rules without the ledger.
 | `src/demo-phase4.ts` | The Phase 4 scenarios: transaction check and verdict log |
 | `src/shamir.ts`, `src/share-box.ts` | Phase 5: Shamir split and combine over GF(256); sealing a share to one oracle's X25519 share key |
 | `src/demo-phase5.ts`, `src/splits.ts` | The Phase 5 scenarios with three local oracles; the list of jobs where the set split |
+| `src/job-spec.ts`, `src/check-spec.ts` | Phase 6: job spec v1, canonical JSON and spec hash, signatures, rules, the escrow memo; the check list rules |
+| `src/spec-ledger.ts` | Reads the spec memo from the escrow's validated `EscrowCreate` and compares it with the registry's spec |
+| `src/demo-phase6.ts`, `src/tamper-proxy.ts` | The Phase 6 scenarios; a local proxy that changes a job's spec, for the demo of a spec changed after lock |
+| `test/job-spec.test.ts`, `test/signed-spec.test.ts` | Phase 6 unit tests, no network needed; `test/phase6-flow.test.ts` runs the demo on testnet |
 | `test/shared.test.ts` | Phase 5 unit tests: shares, boxes, the registry's counting, the oracles and the SDK, no network needed |
 | `test/py-shared-harness.ts` | Throwaway registry and three oracles for the Python SDK's shared tests |
 | `test/registry.test.ts`, `oracle.test.ts`, `watcher.test.ts`, `sdk.test.ts` | Phase 2 unit tests, no network needed |
@@ -379,24 +459,25 @@ same rules without the ledger.
 | `test/phase3-flow.test.ts` | `expired_unclaimed` then refund, and watcher reconnect, on the live testnet |
 | `test/verdict-log.test.ts`, `xrpl-tx.test.ts` | Phase 4 unit tests: tampered logs, anchors, the transaction check, no network needed |
 | `test/phase4-flow.test.ts` | All Phase 4 scenarios through the services on the live testnet |
-| `test/vectors/` | `make-sdk-vectors.ts` and `make-verdict-log-vectors.ts`, and the `sdk-parity.json` and `verdict-log.json` they write, which the Python SDK must match |
+| `test/vectors/` | `make-sdk-vectors.ts`, `make-verdict-log-vectors.ts` and `make-job-spec-vectors.ts`, and the `sdk-parity.json`, `verdict-log.json` (Phase 4 and 5 version 1 entries, kept as they are) and `job-spec.json` they write, which the Python SDK must match |
 | `test/py-harness.ts` | Throwaway registry and oracle for the Python SDK's tests |
 
 ## Not in these phases
 
-RLUSD, the AI judge, disputes and multisig, the x402 bridge, payments,
+RLUSD, the AI judge (a subjective criterion is never judged by a model), disputes and multisig, the x402 bridge, payments,
 mainnet, a UI, and any hosted or non-localhost deployment. The governing
 records are `CLAUDE.md` (Phase 1), `CLAUDE_PHASE2.md`,
 `../edr/EDR-012_ESCROW_PHASE2_ORACLE_REGISTRY.md`,
 `../edr/EDR-013_ESCROW_PHASE3_DEVELOPER_PREVIEW.md` and
 `../edr/EDR-014_ESCROW_PHASE4_AUDITABLE_VERIFIER.md` and
-`../edr/EDR-015_ESCROW_PHASE5_SHARED_VERIFIERS.md`. What the kit does not
+`../edr/EDR-015_ESCROW_PHASE5_SHARED_VERIFIERS.md` and
+`../edr/EDR-016_ESCROW_PHASE6_SIGNED_JOB_SPEC.md`. What the kit does not
 protect against is in [`../docs/THREAT_MODEL.md`](../docs/THREAT_MODEL.md).
 
 ## Review
 
 Gpno is the single final reviewer for each phase (Phase 1 and 2 together, then
-Phase 3, then Phase 4, then Phase 5). The handoff is
+Phase 3, then Phase 4, then Phase 5, then Phase 6). The handoff is
 [`REVIEW_HANDOFF.md`](REVIEW_HANDOFF.md), the review brief is
 [`docs/reviews/REVIEW.md`](docs/reviews/REVIEW.md), and the verdict goes in
 [`docs/reviews/VERDICT.md`](docs/reviews/VERDICT.md).

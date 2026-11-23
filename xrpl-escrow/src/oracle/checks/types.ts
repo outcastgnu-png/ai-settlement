@@ -1,7 +1,8 @@
 // A check reads the deliverable as bytes or parsed data and returns a result.
 // Checks are deterministic and never execute or follow anything inside the
 // deliverable or the job spec.
-import type { CheckSpec, Job } from "../../registry/db.js";
+import type { CheckSpec } from "../../check-spec.js";
+import type { Job } from "../../registry/db.js";
 import type { TxLookup } from "./xrpl-tx.js";
 
 export interface CheckContext {
@@ -17,4 +18,6 @@ export interface CheckResult {
   type: CheckSpec["type"] | "oracle-fault";
   pass: boolean;
   detail: string;
+  /** Job spec v1 (EDR-016): the id of the criterion this check decides. */
+  criterion?: string;
 }

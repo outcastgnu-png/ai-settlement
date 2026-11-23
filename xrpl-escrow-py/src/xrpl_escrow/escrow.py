@@ -7,7 +7,7 @@ from typing import Any
 from xrpl.clients import WebsocketClient
 from xrpl.models.requests import Ledger, LedgerEntry, Tx
 from xrpl.models.requests.ledger_entry import Escrow as EscrowLocator
-from xrpl.models.transactions import EscrowCancel, EscrowCreate, EscrowFinish, Transaction
+from xrpl.models.transactions import EscrowCancel, EscrowCreate, EscrowFinish, Memo, Transaction
 from xrpl.transaction import autofill_and_sign, submit
 from xrpl.wallet import Wallet
 
@@ -57,10 +57,16 @@ def submit_validated(client: WebsocketClient, wallet: Wallet, tx: Transaction) -
 
 def create_escrow(
     client: WebsocketClient, payer: Wallet, provider: str, drops: str, condition: str, sla_seconds: int,
+    memos: list[dict[str, Any]] | None = None,
 ) -> tuple[TxResult, EscrowRef]:
     """Client locks ``drops`` for ``provider``, unlockable with ``condition`` until ``sla_seconds`` from now."""
     cancel_after = now_ripple_time() + sla_seconds
-    tx = EscrowCreate(account=payer.address, destination=provider, amount=drops, condition=condition, cancel_after=cancel_after)
+    extra: dict[str, Any] = {}
+    if memos:
+        # A signed job spec (EDR-016): its hash and revision in one memo, hex as on the ledger.
+        extra["memos"] = [Memo(memo_type=m["Memo"]["MemoType"], memo_format=m["Memo"].get("MemoFormat"), memo_data=m["Memo"]["MemoData"])
+                          for m in memos]
+    tx = EscrowCreate(account=payer.address, destination=provider, amount=drops, condition=condition, cancel_after=cancel_after, **extra)
     result = submit_validated(client, payer, tx)
     return result, EscrowRef(payer.address, result.sequence, condition, cancel_after)
 

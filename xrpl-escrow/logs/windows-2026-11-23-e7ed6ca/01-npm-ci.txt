@@ -1,0 +1,11 @@
+$ npm.cmd ci
+start 2026-11-22T21:22:12-06:00
+
+added 81 packages, and audited 82 packages in 9s
+
+22 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+EXIT 0
+elapsed 9 s

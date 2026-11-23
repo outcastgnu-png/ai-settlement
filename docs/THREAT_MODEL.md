@@ -1,6 +1,6 @@
-# Threat model (Phase 3 developer preview, with the Phase 4 auditable verifier)
+# Threat model (Phase 3 developer preview, with the Phase 4 to 6 additions)
 
-What the kit protects, and what it does not, as of version 0.4.0 (Phase 4, EDR-014). Everything
+What the kit protects, and what it does not, as of version 0.6.0 (Phase 6, EDR-016). Everything
 runs on the XRP Ledger testnet, and the registry and oracle listen on
 127.0.0.1 only.
 
@@ -62,6 +62,9 @@ runs on the XRP Ledger testnet, and the registry and oracle listen on
 - **A slow schema can't hang the oracle.** Validation runs in a worker thread and
   is stopped after 2 seconds of the job's own time, which gives a fail verdict.
   Time spent starting the worker or waiting in line doesn't count against a job.
+- **The agreed criteria are on the ledger** (Phase 6). For a signed job spec both parties
+  sign its hash before any XRP is locked, the `EscrowCreate` memo holds the hash, and every
+  oracle refuses a job whose registry spec isn't that one. See "Spec changed after lock" below.
 - **Testnet only.** Every connection checks `network_id === 1` or aborts.
 
 ## What is not protected (known limits of this preview)
@@ -76,7 +79,8 @@ runs on the XRP Ledger testnet, and the registry and oracle listen on
 | Keys in `.env` | Wallet seeds (the anchor wallet's too), the vault key, the service tokens, the verdict seed and the share key sit in one plaintext file; oracles B and C have their own `.env.oracle-b` and `.env.oracle-c`. Whoever holds an oracle's `ORACLE_SHARE_KEY` or its vault key and file can read that oracle's shares, which is one share per job, not the secret. | Fine for testnet; a hosted setup needs a secrets store. |
 | Open local reads and job creation | Anyone on the machine can list jobs, read deliverables and create draft jobs. There are no rate limits. | Accounts and rate limits come with hosting. |
 | Deliverables in plaintext | The registry's SQLite file holds every deliverable as sent. | Store hashes only, or encrypt, if a use case needs it. |
-| Only deterministic checks | `sha256-match` needs the client to know the exact output in advance; `json-schema` checks structure, not quality; `max-latency` checks timing; `xrpl-tx-validated` checks that a transaction happened, not why. Nothing judges whether work is *good*. | An optional LLM-judge check is a later EDR, with an appeal path. |
+| Spec changed after lock (signed job spec, since 0.6.0) | For a job with a signed spec v1 (EDR-016) the client and the provider each sign the spec's hash, the SDK locks no XRP until both signatures check, and the `EscrowCreate` carries the hash in a memo. Before it verifies, every oracle reads that memo from the escrow's creating transaction in a validated ledger, through its own connection; a registry (or anyone in between) that hands an oracle another spec, or a spec without both signatures, gets no verdict, and the client is refunded after the deadline. Each verdict and log entry names the spec hash it judged, so a provider can show which criteria it agreed to, and with k of n oracles two oracles can no longer be judged against different specs without it showing: the SDK refuses to combine their shares and names the oracle. **What this does not cover:** (1) the kit judges the checks, never the plain-words statements: a subjective criterion passes when its stand-in checks pass, which may not match what either party meant; (2) a provider that signs a hash without reading the spec has still agreed to it; (3) the oracle trusts the testnet server it reads the memo from; (4) jobs with the older `spec.checks` shape (Phase 1 to 5) have no signatures or memo and are marked "unsigned spec", so for them the registry's spec is still only the client's word. | An LLM-judge check as one voter of a k-of-n set, with an appeal path, is a later EDR. |
+| Only deterministic checks | `sha256-match` needs the client to know the exact output in advance; `json-schema` checks structure, not quality; `size-range` and `contains-text` (0.6.0) check size and a literal phrase, not meaning; `max-latency` checks timing; `xrpl-tx-validated` checks that a transaction happened, not why. Nothing judges whether work is *good*. | An optional LLM-judge check is a later EDR, with an appeal path. |
 | No disputes | A verdict is final. A provider who thinks a fail was wrong has no appeal inside the kit. | Dispute module (writeup phase 4). |
 | Reputation is a stub | Counts per provider address. One party can play both client and provider, or use many addresses. | Don't rely on it for decisions. |
 | Watcher downtime | While the watcher is down, job status lags the ledger. The ledger stays the source of truth, and the oracle checks the escrow on the ledger before it releases anything. | The watcher backfills from `account_tx` when it subscribes. |

@@ -2,6 +2,10 @@
 // it, anchor memos and account_tx rows, with what the TypeScript kit says about
 // each, so the Python SDK can be checked against the same answers (EDR-014).
 // Vector keys only (all-zero entropy), never funded.
+// Phase 6 note: verdict-log.json holds Phase 4 and 5 (version 1) entries and is kept
+// as it is, so both SDKs keep proving that old logs still verify. Don't regenerate it
+// with the version 2 code: the version 2 vectors live in job-spec.json
+// (make-job-spec-vectors.ts).
 // Run with: npx tsx test/vectors/make-verdict-log-vectors.ts
 import { writeFileSync } from "node:fs";
 import { Wallet, type Client, type ECDSA } from "xrpl";

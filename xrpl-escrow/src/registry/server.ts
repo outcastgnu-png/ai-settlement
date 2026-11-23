@@ -12,7 +12,19 @@
 //   GET  /providers/:address/reputation
 //   POST /jobs/:id/verdicts             a shared job's signed oracle verdict {verdict} (EDR-015); checked, no token
 //   GET  /jobs/:id/verdicts             the signed oracle verdicts recorded for a shared job
-//   GET  /splits                        shared jobs whose oracles disagreed (at least one pass and one fail)
+//   GET  /splits                        shared jobs whose oracles disagreed (at least one pass and one fail), and on which criteria
+//   POST /jobs/:id/spec/signatures      a party's signature over the job's spec hash {specHash, signature} (EDR-016); checked, no token
+//   PUT  /jobs/:id/spec                 the client sends the spec's next revision {spec, auth} while the job is a draft (EDR-016)
+//   GET  /jobs/:id/spec/revisions       the earlier revisions of a job's spec, each with its signatures
+//
+// A job spec v1 (EDR-016, src/job-spec.ts) states the acceptance criteria and
+// the checks behind each. Client and provider each sign its hash here; the SDK
+// refuses to fund the escrow until both signatures check, and puts the hash in
+// a memo on the EscrowCreate. A spec is never edited in place: a change is the
+// next revision, with a new hash and new signatures, and the old revision is
+// kept. Once the job is funded its spec can't change. The registry is not what
+// makes this hold, though: each oracle checks the spec it reads here against
+// the hash on the ledger, so a registry that changes a spec gets refused.
 //
 // A shared job (EDR-015) is created by its client, signed, with its oracle set,
 // threshold k and the condition of a secret the client made and split. The
@@ -30,9 +42,9 @@ import { isValidClassicAddress } from "xrpl";
 import { canonicalJson, checkBearer, checkRequest, newJobHash, sha256Hex, verifyPayload } from "../auth.js";
 import { HttpError, jsonServer, listenLocal, type Route } from "../http.js";
 import { JOBS_DB, REGISTRY_PORT, readEnvFile, requireEnv } from "../local-config.js";
-import { TX_TYPES } from "../oracle/checks/xrpl-tx.js";
-import { schemaProblem } from "../schema-policy.js";
-import { JobStore, TERMINAL, canMove, type CheckSpec, type Job, type JobPatch, type JobStatus, type NewJob, type OracleRef } from "./db.js";
+import { CHECK_TYPES, MAX_CHECKS, MAX_TX_CHECKS, checkListProblem, checkProblem, isObject, validCheck } from "../check-spec.js";
+import { isSpecV1, specHash, specProblem, verifySpecSignature, type JobSpecV1, type SpecSignature } from "../job-spec.js";
+import { JobStore, TERMINAL, canMove, type Job, type JobPatch, type JobSpec, type JobStatus, type NewJob, type OracleRef, type OracleVerdictRecord } from "./db.js";
 import type { SignedVerdict } from "../oracle/server.js";
 
 /** A shared job has at most this many oracles. */
@@ -65,37 +77,13 @@ function parseOracleSet(body: Record<string, unknown>): { oracles: OracleRef[]; 
 }
 
 const FORBIDDEN_KEYS = ["secret", "fulfillment", "preimage"];
-const CHECK_TYPES = ["sha256-match", "json-schema", "max-latency", "xrpl-tx-validated"];
-/** Each json-schema check may hold the oracle's schema worker for up to its timeout, so a job gets a few checks, not hundreds (Gpno N9). */
-export const MAX_CHECKS = 8;
-/** Each xrpl-tx-validated check makes one ledger lookup, so a job gets at most this many (EDR-014). */
-export const MAX_TX_CHECKS = 2;
-const TX_KEYS = ["type", "txType", "destination", "minDrops", "account", "destinationTag", "memo"];
-const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
+
+export { MAX_CHECKS, MAX_TX_CHECKS };
 
 function containsForbiddenKey(value: unknown): boolean {
   if (Array.isArray(value)) return value.some(containsForbiddenKey);
   if (!isObject(value)) return false;
   return Object.keys(value).some((k) => FORBIDDEN_KEYS.includes(k.toLowerCase()) || containsForbiddenKey(value[k]));
-}
-
-function validCheck(c: unknown): c is CheckSpec {
-  if (!isObject(c) || !CHECK_TYPES.includes(c.type as string)) return false;
-  if (c.type === "sha256-match") return typeof c.sha256 === "string" && /^[0-9a-fA-F]{64}$/.test(c.sha256);
-  if (c.type === "json-schema") return isObject(c.schema) && schemaProblem(c.schema) === null;
-  if (c.type === "xrpl-tx-validated") return validTxCheck(c);
-  return typeof c.maxMs === "number" && c.maxMs > 0;
-}
-
-function validTxCheck(c: Record<string, unknown>): boolean {
-  if (!Object.keys(c).every((k) => TX_KEYS.includes(k))) return false;
-  if (!(TX_TYPES as readonly unknown[]).includes(c.txType)) return false;
-  if (typeof c.destination !== "string" || !isValidClassicAddress(c.destination)) return false;
-  if (typeof c.minDrops !== "string" || !/^[1-9][0-9]{0,16}$/.test(c.minDrops)) return false;
-  if (c.account !== undefined && (typeof c.account !== "string" || !isValidClassicAddress(c.account))) return false;
-  if (c.destinationTag !== undefined && !(Number.isInteger(c.destinationTag) && (c.destinationTag as number) >= 0 && (c.destinationTag as number) <= 0xffffffff)) return false;
-  if (c.memo !== undefined && (typeof c.memo !== "string" || c.memo.length === 0 || Buffer.byteLength(c.memo) > 256)) return false;
-  return true;
 }
 
 export function parseNewJob(body: unknown): NewJob {
@@ -109,30 +97,88 @@ export function parseNewJob(body: unknown): NewJob {
   if (!Number.isInteger(slaSeconds) || (slaSeconds as number) < 30 || (slaSeconds as number) > 86_400) {
     throw new HttpError(400, "slaSeconds must be an integer from 30 to 86400");
   }
-  if (isObject(spec) && Array.isArray(spec.checks) && spec.checks.length > MAX_CHECKS) {
-    throw new HttpError(400, `spec.checks may hold at most ${MAX_CHECKS} checks`);
-  }
-  if (isObject(spec) && Array.isArray(spec.checks)
-    && spec.checks.filter((c) => isObject(c) && c.type === "xrpl-tx-validated").length > MAX_TX_CHECKS) {
-    throw new HttpError(400, `spec.checks may hold at most ${MAX_TX_CHECKS} xrpl-tx-validated checks`);
-  }
-  if (isObject(spec) && Array.isArray(spec.checks)) {
-    for (const c of spec.checks) {
-      const problem = isObject(c) && c.type === "json-schema" ? schemaProblem(c.schema) : null;
-      if (problem) throw new HttpError(400, `json-schema check refused: ${problem}`);
+  let jobSpec: JobSpec;
+  if (isSpecV1(spec)) {
+    // A signed job spec (EDR-016): it names the parties, price and SLA itself, and the job must agree with it.
+    const problem = specProblem(spec);
+    if (problem) throw new HttpError(400, `job spec refused: ${problem}`);
+    if (spec.client !== client || spec.provider !== provider || spec.priceDrops !== priceDrops || spec.slaSeconds !== slaSeconds) {
+      throw new HttpError(400, "the job's client, provider, priceDrops and slaSeconds must be the ones in its spec");
     }
+    if (spec.revision !== 1) throw new HttpError(400, "a new job's spec starts at revision 1");
+    jobSpec = spec;
+  } else {
+    if (isObject(spec) && Array.isArray(spec.checks)) {
+      const listProblem = checkListProblem(spec.checks);
+      if (listProblem) throw new HttpError(400, listProblem);
+      for (const c of spec.checks) {
+        const problem = isObject(c) && c.type === "json-schema" ? checkProblem(c) : null;
+        if (problem) throw new HttpError(400, problem);
+      }
+    }
+    if (!isObject(spec) || !Array.isArray(spec.checks) || spec.checks.length === 0 || !spec.checks.every(validCheck)) {
+      throw new HttpError(400, `spec.checks must be a non-empty list of: ${CHECK_TYPES.join(", ")}`);
+    }
+    const title = typeof spec.title === "string" ? spec.title : undefined;
+    jobSpec = { title, checks: spec.checks };
   }
-  if (!isObject(spec) || !Array.isArray(spec.checks) || spec.checks.length === 0 || !spec.checks.every(validCheck)) {
-    throw new HttpError(400, `spec.checks must be a non-empty list of: ${CHECK_TYPES.join(", ")}`);
-  }
-  const title = typeof spec.title === "string" ? spec.title : undefined;
-  const job: NewJob = { client, provider, priceDrops, slaSeconds: slaSeconds as number, spec: { title, checks: spec.checks } };
+  const job: NewJob = { client, provider, priceDrops, slaSeconds: slaSeconds as number, spec: jobSpec };
   if (body.oracles !== undefined || body.threshold !== undefined || body.condition !== undefined) {
     job.shared = parseOracleSet(body);
     // Only the client may create its shared job, since it names the condition the client will fund.
     checkRequest(body.auth, "create", "", newJobHash(body), client);
   }
   return job;
+}
+
+/** A party posts its signature over the job's current spec hash (EDR-016). The signature is what counts, so no token. */
+function applySpecSignature(store: JobStore, job: Job, body: unknown): Job {
+  if (!isSpecV1(job.spec) || !job.specHash) throw new HttpError(409, "this job has an unsigned (Phase 1 to 5) spec; there is nothing to sign");
+  if (job.status !== "draft") throw new HttpError(409, `job is ${job.status}; its spec was locked when it was funded`);
+  const b = isObject(body) ? body : {};
+  const sig = b.signature as SpecSignature | undefined;
+  if (b.specHash !== job.specHash) {
+    throw new HttpError(409, `that signature is for spec ${String(b.specHash)}, but the job's current spec (revision ${job.specRevision}) is ${job.specHash}`);
+  }
+  const role = isObject(sig) && sig.address === job.spec.client ? "client" : isObject(sig) && sig.address === job.spec.provider ? "provider" : null;
+  if (!role) throw new HttpError(403, "only the spec's client or provider can sign it");
+  if (!verifySpecSignature(job.specHash, sig, sig!.address)) throw new HttpError(400, "the signature does not check against the spec hash");
+  const clean: SpecSignature = { address: sig!.address, publicKey: sig!.publicKey, signature: sig!.signature };
+  if (store.putSpecSignature(job.id, job.specHash, role, clean)) {
+    const after = store.get(job.id)!;
+    const both = !!after.specSignatures?.client && !!after.specSignatures?.provider;
+    store.addEvent({ jobId: job.id, at: Date.now(), source: "registry", status: null, detail: `${role} signed spec revision ${job.specRevision} (${job.specHash})${both ? "; both parties have signed" : ""}` });
+  }
+  return store.get(job.id)!;
+}
+
+/**
+ * The client replaces a draft job's spec with its next revision (EDR-016). A spec is
+ * never edited in place: the revision number must go up by one, the old revision is
+ * kept with its signatures, and the new one needs both signatures again. Once the job
+ * is funded the spec can't change at all, since its hash is on the ledger.
+ */
+function applySpecRevision(store: JobStore, job: Job, body: unknown): Job {
+  if (!isSpecV1(job.spec) || !job.specHash || job.specRevision === null) throw new HttpError(409, "this job has an unsigned (Phase 1 to 5) spec; it can't be revised");
+  if (job.status !== "draft") throw new HttpError(409, `job is ${job.status}; its spec was locked on the ledger when it was funded and can't change`);
+  const b = isObject(body) ? body : {};
+  const next = b.spec;
+  if (containsForbiddenKey(next)) throw new HttpError(400, "the registry never stores secrets or fulfillments");
+  const problem = specProblem(next);
+  if (problem) throw new HttpError(400, `job spec refused: ${problem}`);
+  const spec = next as JobSpecV1;
+  checkRequest(b.auth, "revise-spec", job.id, specHash(spec), job.client);
+  if (spec.revision === job.specRevision) {
+    if (specHash(spec) === job.specHash) return job;
+    throw new HttpError(409, `revision ${job.specRevision} is already set; a spec is never edited in place. Send revision ${job.specRevision + 1}, which both parties sign again`);
+  }
+  if (spec.revision !== job.specRevision + 1) throw new HttpError(409, `the next revision of this spec is ${job.specRevision + 1}, not ${spec.revision}`);
+  if (spec.client !== job.spec.client || spec.provider !== job.spec.provider || spec.nonce !== job.spec.nonce) {
+    throw new HttpError(400, "a revision keeps the spec's client, provider and nonce");
+  }
+  if (job.oracles && spec.priceDrops !== job.priceDrops) throw new HttpError(400, "a shared job's price is part of what its client signed at creation; create a new job instead");
+  if (store.bySpecHash(specHash(spec))) throw new HttpError(409, "a job with this spec already exists");
+  return store.reviseSpec(job.id, spec);
 }
 
 /** Check a posted verdict for a shared job and record it; then move the job's status if the set has decided. */
@@ -151,6 +197,10 @@ function applyOracleVerdict(store: JobStore, job: Job, body: unknown): Job {
   }
   if (v.verdict !== "pass" && v.verdict !== "fail") throw new HttpError(400, "verdict must be pass or fail");
   if (v.shareIndex !== index + 1 || v.threshold !== job.threshold) throw new HttpError(400, "verdict names the wrong share index or threshold");
+  // Every oracle of the set judges the one signed spec (EDR-016): a verdict on another spec does not count.
+  if ((v.specHash ?? null) !== job.specHash) {
+    throw new HttpError(400, `verdict judged spec ${v.specHash ?? "(unsigned)"}, not this job's spec ${job.specHash ?? "(unsigned)"}`);
+  }
   const deliverable = store.getDeliverable(job.id);
   if (!deliverable || deliverable.sha256 !== v.evidenceHash) throw new HttpError(400, "verdict is not for the delivered work");
 
@@ -178,6 +228,26 @@ function applyOracleVerdict(store: JobStore, job: Job, body: unknown): Job {
   return store.get(job.id)!;
 }
 
+/**
+ * The criteria a shared job's oracles split on (EDR-016): each criterion that at
+ * least one oracle passed and another failed, with who said what. Empty for
+ * verdicts without per-criterion results (an unsigned spec).
+ */
+export function splitCriteria(verdicts: OracleVerdictRecord[]): { id: string; passed: string[]; failed: string[] }[] {
+  const by = new Map<string, { passed: string[]; failed: string[] }>();
+  for (const v of verdicts) {
+    const criteria = (v.signed as { criteria?: unknown }).criteria;
+    if (!Array.isArray(criteria)) continue;
+    for (const c of criteria as { id?: unknown; pass?: unknown }[]) {
+      if (typeof c?.id !== "string") continue;
+      const entry = by.get(c.id) ?? { passed: [], failed: [] };
+      (c.pass === true ? entry.passed : entry.failed).push(v.oracle);
+      by.set(c.id, entry);
+    }
+  }
+  return [...by].filter(([, e]) => e.passed.length > 0 && e.failed.length > 0).map(([id, e]) => ({ id, ...e }));
+}
+
 const LEDGER_STATUSES: JobStatus[] = ["funded", "paid", "refunded", "expired_unclaimed"];
 const ORACLE_STATUSES: JobStatus[] = ["verified_pass", "verified_fail"];
 
@@ -201,6 +271,7 @@ export function registryRoutes(store: JobStore, tokens: ServiceTokens): Route[] 
       handler: (_p, body) => {
         const input = parseNewJob(body);
         if (input.shared && store.byCondition(input.shared.condition)) throw new HttpError(409, "a job with this condition already exists");
+        if (isSpecV1(input.spec) && store.bySpecHash(specHash(input.spec))) throw new HttpError(409, "a job with this spec already exists (each spec has its own nonce)");
         return store.create(input);
       },
     },
@@ -209,6 +280,7 @@ export function registryRoutes(store: JobStore, tokens: ServiceTokens): Route[] 
       method: "GET", path: "/splits",
       handler: () => store.splitJobs().map(({ job, passed, failed }) => ({
         jobId: job.id, status: job.status, threshold: job.threshold, oracles: job.oracles?.map((o) => o.address) ?? [], passed, failed,
+        specHash: job.specHash, criteria: splitCriteria(store.oracleVerdicts(job.id)),
       })),
     },
 
@@ -220,6 +292,12 @@ export function registryRoutes(store: JobStore, tokens: ServiceTokens): Route[] 
     },
 
     { method: "GET", path: "/jobs/:id", handler: ({ id }) => mustGet(id) },
+
+    { method: "POST", path: "/jobs/:id/spec/signatures", handler: ({ id }, body) => applySpecSignature(store, mustGet(id), body) },
+
+    { method: "PUT", path: "/jobs/:id/spec", handler: ({ id }, body) => applySpecRevision(store, mustGet(id), body) },
+
+    { method: "GET", path: "/jobs/:id/spec/revisions", handler: ({ id }) => (mustGet(id), store.specRevisions(id)) },
 
     {
       method: "PUT", path: "/jobs/:id/condition",

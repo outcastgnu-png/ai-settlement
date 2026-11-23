@@ -5,8 +5,13 @@ from .config import EXPLORER_TX, TESTNET_NETWORK_ID, NotTestnetError, assert_tes
 from .env import load_or_fund_wallets, read_env_file, xrp_balance
 from .escrow import EscrowRef, TxResult, cancel_escrow, create_escrow, finish_escrow, get_escrow, wait_past_cancel_after
 from .http import ServiceError
+from .job_spec import (
+    SPEC_MEMO_TYPE, agreement_problems, escrow_create_spec_memo, is_spec_v1, jcs, make_job_spec, meets_rule, parse_spec_memo,
+    revise_job_spec, sign_spec_hash, spec_hash, spec_memos, spec_problem, verify_spec_signature,
+)
 from .kit import (
-    DeliverResult, EscrowKit, Job, OracleReport, SharedVerification, TxOutcome, combine_for_condition, escrow_ref, new_job_hash,
+    DeliverResult, EscrowKit, Job, OracleReport, SharedVerification, TxOutcome, combine_for_condition, escrow_ref, job_spec_hash,
+    new_job_hash,
 )
 from .shamir import Share, combine, decode_share, encode_share, split
 from .share_box import BoxContext, seal, share_key_public, verify_share_key
@@ -15,7 +20,7 @@ from .verdict_log import (
     list_anchors, parse_anchor_memo, verdict_in_log, verify_verdict_log,
 )
 
-__version__ = "0.5.0"
+__version__ = "0.6.0"
 
 __all__ = [
     "EXPLORER_TX", "TESTNET_NETWORK_ID", "DeliverResult", "EscrowKit", "EscrowRef", "Job", "NotTestnetError",
@@ -27,4 +32,7 @@ __all__ = [
     "to_condition", "to_fulfillment", "verify_verdict", "wait_past_cancel_after", "xrp_balance",
     "BoxContext", "OracleReport", "Share", "SharedVerification", "combine", "combine_for_condition", "decode_share",
     "encode_share", "new_job_hash", "seal", "share_key_public", "split", "verify_share_key",
+    "SPEC_MEMO_TYPE", "agreement_problems", "escrow_create_spec_memo", "is_spec_v1", "jcs", "job_spec_hash", "make_job_spec",
+    "meets_rule", "parse_spec_memo", "revise_job_spec", "sign_spec_hash", "spec_hash", "spec_memos", "spec_problem",
+    "verify_spec_signature",
 ]

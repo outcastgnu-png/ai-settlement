@@ -1,0 +1,19 @@
+============================= test session starts ==============================
+platform linux -- Python 3.13.18, pytest-9.2.0, pluggy-1.7.0
+rootdir: /home/user/ai-settlement/xrpl-escrow-py
+configfile: pyproject.toml
+testpaths: tests
+plugins: anyio-4.16.0
+collected 72 items
+
+tests/test_condition.py .....                                            [  6%]
+tests/test_demo_testnet.py ss                                            [  9%]
+tests/test_job_spec.py ..............                                    [ 29%]
+tests/test_kit_local.py ...........                                      [ 44%]
+tests/test_parity.py ........                                            [ 55%]
+tests/test_retry.py ..                                                   [ 58%]
+tests/test_shared_local.py .....                                         [ 65%]
+tests/test_shared_vectors.py ............                                [ 81%]
+tests/test_verdict_log.py .............                                  [100%]
+
+======================== 70 passed, 2 skipped in 7.29s =========================

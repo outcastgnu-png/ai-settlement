@@ -5,7 +5,10 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import Database from "better-sqlite3";
-import type { TxCheckSpec } from "../oracle/checks/xrpl-tx.js";
+import type { CheckSpec } from "../check-spec.js";
+import { isSpecV1, specHash, type JobSpecV1, type SpecSignature } from "../job-spec.js";
+
+export type { CheckSpec } from "../check-spec.js";
 
 export type JobStatus =
   | "draft" | "funded" | "delivered" | "verified_pass" | "verified_fail"
@@ -13,15 +16,22 @@ export type JobStatus =
 
 export const TERMINAL: JobStatus[] = ["paid", "refunded"];
 
-export type CheckSpec =
-  | { type: "sha256-match"; sha256: string }
-  | { type: "json-schema"; schema: Record<string, unknown> }
-  | { type: "max-latency"; maxMs: number }
-  | TxCheckSpec;
-
-export interface JobSpec {
+/** The Phase 1 to 5 job spec: a title and a flat list of checks, not signed by anyone ("unsigned spec"). */
+export interface LegacyJobSpec {
   title?: string;
   checks: CheckSpec[];
+}
+
+/** A job's spec: a signed job spec v1 (EDR-016), or the older unsigned shape. */
+export type JobSpec = LegacyJobSpec | JobSpecV1;
+
+/** A revision of a job's v1 spec that a newer revision replaced, kept as it was (EDR-016). */
+export interface SpecRevision {
+  revision: number;
+  specHash: string;
+  spec: JobSpecV1;
+  signatures: { client: SpecSignature | null; provider: SpecSignature | null };
+  replacedAt: number;
 }
 
 /** One oracle of a shared job's set (EDR-015). The order is the share order: oracle i holds share x = i + 1. */
@@ -47,6 +57,10 @@ export interface Job {
   priceDrops: string;
   slaSeconds: number;
   spec: JobSpec;
+  /** Job spec v1 only (EDR-016): the hash of the current spec, its revision, and the parties' signatures over that hash as posted. Null for an unsigned (Phase 1 to 5) spec. */
+  specHash: string | null;
+  specRevision: number | null;
+  specSignatures: { client: SpecSignature | null; provider: SpecSignature | null } | null;
   /** Shared jobs only (EDR-015): the oracle set and how many passes release the funds. Null for single-oracle jobs. */
   oracles: OracleRef[] | null;
   threshold: number | null;
@@ -114,14 +128,14 @@ const COLUMNS = `
   cancel_after INTEGER, status TEXT NOT NULL, verdict TEXT, expiring_soon INTEGER NOT NULL DEFAULT 0,
   create_tx TEXT, finish_tx TEXT, cancel_tx TEXT, created_at INTEGER NOT NULL, funded_at INTEGER,
   delivered_at INTEGER, verified_at INTEGER, closed_at INTEGER, updated_at INTEGER NOT NULL,
-  oracles TEXT, threshold INTEGER`;
+  oracles TEXT, threshold INTEGER, spec_hash TEXT, spec_revision INTEGER`;
 
 /** Columns added after a database may already exist; added on open if missing. */
-const ADDED_COLUMNS: [string, string][] = [["oracles", "TEXT"], ["threshold", "INTEGER"]];
+const ADDED_COLUMNS: [string, string][] = [["oracles", "TEXT"], ["threshold", "INTEGER"], ["spec_hash", "TEXT"], ["spec_revision", "INTEGER"]];
 
 type Row = Record<string, unknown>;
 
-function toJob(r: Row): Job {
+function toJob(r: Row, sigs: Job["specSignatures"]): Job {
   return {
     id: r.id as string,
     client: r.client as string,
@@ -129,6 +143,9 @@ function toJob(r: Row): Job {
     priceDrops: r.price_drops as string,
     slaSeconds: r.sla_seconds as number,
     spec: JSON.parse(r.spec as string),
+    specHash: (r.spec_hash as string) ?? null,
+    specRevision: (r.spec_revision as number) ?? null,
+    specSignatures: r.spec_hash ? sigs : null,
     oracles: r.oracles ? JSON.parse(r.oracles as string) : null,
     threshold: (r.threshold as number) ?? null,
     condition: (r.condition as string) ?? null,
@@ -175,6 +192,12 @@ export class JobStore {
       CREATE TABLE IF NOT EXISTS events (
         job_id TEXT NOT NULL REFERENCES jobs(id), at INTEGER NOT NULL, source TEXT NOT NULL,
         status TEXT, detail TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS spec_signatures (
+        job_id TEXT NOT NULL REFERENCES jobs(id), spec_hash TEXT NOT NULL, role TEXT NOT NULL, signed TEXT NOT NULL,
+        at INTEGER NOT NULL, PRIMARY KEY (job_id, spec_hash, role));
+      CREATE TABLE IF NOT EXISTS spec_revisions (
+        job_id TEXT NOT NULL REFERENCES jobs(id), revision INTEGER NOT NULL, spec_hash TEXT NOT NULL, spec TEXT NOT NULL,
+        replaced_at INTEGER NOT NULL, PRIMARY KEY (job_id, revision));
       CREATE TABLE IF NOT EXISTS oracle_verdicts (
         job_id TEXT NOT NULL REFERENCES jobs(id), oracle TEXT NOT NULL, verdict TEXT NOT NULL, at INTEGER NOT NULL,
         signed TEXT NOT NULL, PRIMARY KEY (job_id, oracle));
@@ -191,21 +214,81 @@ export class JobStore {
     const now = Date.now();
     const id = randomUUID();
     const shared = input.shared;
+    const v1 = isSpecV1(input.spec) ? input.spec : null;
+    const hash = v1 ? specHash(v1) : null;
     this.db.prepare(`INSERT INTO jobs (id, client, provider, price_drops, sla_seconds, spec, status, created_at, updated_at,
-        oracles, threshold, condition)
-      VALUES (?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?)`)
+        oracles, threshold, condition, spec_hash, spec_revision)
+      VALUES (?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?)`)
       .run(id, input.client, input.provider, input.priceDrops, input.slaSeconds, JSON.stringify(input.spec), now, now,
-        shared ? JSON.stringify(shared.oracles) : null, shared?.threshold ?? null, shared?.condition ?? null);
+        shared ? JSON.stringify(shared.oracles) : null, shared?.threshold ?? null, shared?.condition ?? null, hash, v1?.revision ?? null);
+    const what = shared ? `shared job created: ${shared.threshold} of ${shared.oracles.length} oracles, condition set by the client` : "job created";
     this.addEvent({
       jobId: id, at: now, source: "registry", status: "draft",
-      detail: shared ? `shared job created: ${shared.threshold} of ${shared.oracles.length} oracles, condition set by the client` : "job created",
+      detail: v1 ? `${what}; job spec v1 revision ${v1.revision}, hash ${hash}, waiting for both signatures` : `${what}; unsigned spec`,
     });
     return this.get(id)!;
   }
 
   get(id: string): Job | null {
     const row = this.db.prepare("SELECT * FROM jobs WHERE id = ?").get(id) as Row | undefined;
-    return row ? toJob(row) : null;
+    return row ? this.#toJob(row) : null;
+  }
+
+  #toJob(r: Row): Job {
+    return toJob(r, r.spec_hash ? this.specSignatures(r.id as string, r.spec_hash as string) : null);
+  }
+
+  /** The parties' signatures recorded for this hash of a job's spec. */
+  specSignatures(jobId: string, hash: string): { client: SpecSignature | null; provider: SpecSignature | null } {
+    const rows = this.db.prepare("SELECT role, signed FROM spec_signatures WHERE job_id = ? AND spec_hash = ?").all(jobId, hash) as Row[];
+    const of = (role: string) => {
+      const r = rows.find((x) => x.role === role);
+      return r ? (JSON.parse(r.signed as string) as SpecSignature) : null;
+    };
+    return { client: of("client"), provider: of("provider") };
+  }
+
+  /** Record a party's checked signature over a spec hash. False if that party already has one for it (the first is kept). */
+  putSpecSignature(jobId: string, hash: string, role: "client" | "provider", sig: SpecSignature): boolean {
+    const r = this.db.prepare("INSERT OR IGNORE INTO spec_signatures (job_id, spec_hash, role, signed, at) VALUES (?, ?, ?, ?, ?)")
+      .run(jobId, hash, role, JSON.stringify(sig), Date.now());
+    return r.changes === 1;
+  }
+
+  /** The job using this spec hash, if any: a spec belongs to one job only. */
+  bySpecHash(hash: string): Job | null {
+    const row = this.db.prepare("SELECT * FROM jobs WHERE spec_hash = ?").get(hash) as Row | undefined;
+    if (row) return this.#toJob(row);
+    const old = this.db.prepare("SELECT job_id FROM spec_revisions WHERE spec_hash = ?").get(hash) as Row | undefined;
+    return old ? this.get(old.job_id as string) : null;
+  }
+
+  /**
+   * Replace a draft job's v1 spec with its next revision. The old revision is kept,
+   * with its signatures, in spec_revisions; the new one starts with none. Price and
+   * SLA follow the new spec. The caller checks who may do this and when.
+   */
+  reviseSpec(id: string, next: JobSpecV1): Job {
+    const job = this.get(id)!;
+    const now = Date.now();
+    const hash = specHash(next);
+    const tx = this.db.transaction(() => {
+      this.db.prepare("INSERT INTO spec_revisions (job_id, revision, spec_hash, spec, replaced_at) VALUES (?, ?, ?, ?, ?)")
+        .run(id, job.specRevision, job.specHash, JSON.stringify(job.spec), now);
+      this.db.prepare("UPDATE jobs SET spec = ?, spec_hash = ?, spec_revision = ?, price_drops = ?, sla_seconds = ?, updated_at = ? WHERE id = ?")
+        .run(JSON.stringify(next), hash, next.revision, next.priceDrops, next.slaSeconds, now, id);
+      this.addEvent({ jobId: id, at: now, source: "registry", status: null, detail: `spec revision ${next.revision} replaces revision ${job.specRevision}; new hash ${hash}, waiting for both signatures` });
+    });
+    tx();
+    return this.get(id)!;
+  }
+
+  /** Earlier revisions of a job's v1 spec, oldest first, each with the signatures it had. */
+  specRevisions(id: string): SpecRevision[] {
+    return (this.db.prepare("SELECT * FROM spec_revisions WHERE job_id = ? ORDER BY revision").all(id) as Row[]).map((r) => ({
+      revision: r.revision as number, specHash: r.spec_hash as string, spec: JSON.parse(r.spec as string),
+      signatures: this.specSignatures(id, r.spec_hash as string), replacedAt: r.replaced_at as number,
+    }));
   }
 
   list(filter: { status?: string; provider?: string; client?: string } = {}): Job[] {
@@ -218,7 +301,7 @@ export class JobStore {
       }
     }
     const sql = `SELECT * FROM jobs ${where.length ? `WHERE ${where.join(" AND ")}` : ""} ORDER BY created_at`;
-    return (this.db.prepare(sql).all(...args) as Row[]).map(toJob);
+    return (this.db.prepare(sql).all(...args) as Row[]).map((r) => this.#toJob(r));
   }
 
   update(id: string, patch: JobPatch): Job {
@@ -239,7 +322,7 @@ export class JobStore {
   /** The job using `condition`, if any: a condition belongs to one job only. */
   byCondition(condition: string): Job | null {
     const row = this.db.prepare("SELECT * FROM jobs WHERE condition = ?").get(condition) as Row | undefined;
-    return row ? toJob(row) : null;
+    return row ? this.#toJob(row) : null;
   }
 
   /** Record an oracle's verdict for a shared job. False if that oracle already has one (the first is kept). */
