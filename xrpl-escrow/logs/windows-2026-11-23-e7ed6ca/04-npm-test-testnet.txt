@@ -1,0 +1,17 @@
+$ npm.cmd test
+start 2026-11-22T21:23:08-06:00
+
+> xrpl-verified-escrow-demo@0.6.0 test
+> vitest run
+
+
+ RUN  v5.0.5 C:/dev/ai-settlement-e7ed6ca/xrpl-escrow
+
+
+ Test Files  18 passed (18)
+      Tests  180 passed (180)
+   Start at  21:23:08
+   Duration  765.30s (tests 100%)
+
+EXIT 0
+elapsed 766 s
