@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Wallet } from "xrpl";
 import { sha256Hex, signRequest } from "../src/auth.js";
 import { callJson } from "../src/http.js";
-import { makeJobSpec, reviseJobSpec, signSpecHash, specHash, type JobSpecV1 } from "../src/job-spec.js";
+import { SPEC_MEMO_TYPE, jcs, makeJobSpec, reviseJobSpec, signSpecHash, specHash, type JobSpecV1 } from "../src/job-spec.js";
 import { EscrowKit } from "../src/sdk/index.js";
 import { startSpecTamperProxy } from "../src/tamper-proxy.js";
 import { kitLookupTx, ledgerMemos, markFunded, startLocal, startSharedLocal } from "./helpers.js";
@@ -199,6 +199,13 @@ describe("signed job spec: a shared job, 2 of 3 oracles", () => {
     const check = await lone.verifyVerdictLog({ verdict: res.reports[0].verdict, job: fresh, allowUnanchored: true, requireAnchor: false });
     expect(check.specOnLedger).toBe(false);
     expect(check.problems.join()).toMatch(/escrow was locked against spec/);
+    // N41: a memo with the right hash but another revision number is refused too.
+    const wrongRevision = [{ Memo: { MemoType: Buffer.from(SPEC_MEMO_TYPE).toString("hex").toUpperCase(), MemoFormat: Buffer.from("application/json").toString("hex").toUpperCase(),
+      MemoData: Buffer.from(jcs({ revision: 2, specHash: specHash(spec), specVersion: 1 })).toString("hex").toUpperCase() } }];
+    ledgerTxs.set(fresh.createTx!, { ...real, tx: { ...(real as { tx: Record<string, unknown> }).tx, Memos: wrongRevision } } as never);
+    const check2 = await lone.verifyVerdictLog({ verdict: res.reports[0].verdict, job: fresh, allowUnanchored: true, requireAnchor: false });
+    expect(check2.specOnLedger).toBe(false);
+    expect(check2.problems.join()).toMatch(/escrow was locked against revision 2/);
     ledgerTxs.set(fresh.createTx!, real);
   });
 

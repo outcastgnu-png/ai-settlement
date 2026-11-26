@@ -84,7 +84,7 @@ export function specAgainstMemo(job: Job, memo: SpecMemo): string | null {
     return "the registry's spec names other parties, price or SLA than the job";
   }
   const hash = specHash(spec);
-  if (memo.specHash !== hash) {
+  if (memo.specHash !== hash || memo.revision !== spec.revision) {
     return `the registry's spec (revision ${spec.revision}, hash ${hash}) is not the spec locked on the ledger `
       + `(revision ${memo.revision}, hash ${memo.specHash})`;
   }

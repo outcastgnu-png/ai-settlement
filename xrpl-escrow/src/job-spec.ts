@@ -40,6 +40,7 @@ import { CHECK_TYPES, MAX_CHECKS, checkListProblem, checkProblem, isObject, type
 export const SPEC_VERSION = 1;
 /** Memo type on the EscrowCreate that carries the spec hash, as text (written to the ledger as hex). */
 export const SPEC_MEMO_TYPE = "xrpl-escrow/job-spec";
+export const SPEC_MEMO_FORMAT = "application/json";
 /** What a party signs: this prefix, the format version and the spec hash. */
 export const SPEC_SIGN_PREFIX = "xrpl-escrow/job-spec";
 export const MAX_CRITERIA = 8;
@@ -270,34 +271,44 @@ const textOfHex = (hex: string) => Buffer.from(hex, "hex").toString("utf8");
 /** The Memos field of the EscrowCreate for this spec: one memo with its hash and version. */
 export function specMemos(spec: JobSpecV1) {
   const memo: SpecMemo = { specHash: specHash(spec), specVersion: spec.specVersion, revision: spec.revision };
-  return [{ Memo: { MemoType: hexText(SPEC_MEMO_TYPE), MemoFormat: hexText("application/json"), MemoData: hexText(jcs(memo)) } }];
+  return [{ Memo: { MemoType: hexText(SPEC_MEMO_TYPE), MemoFormat: hexText(SPEC_MEMO_FORMAT), MemoData: hexText(jcs(memo)) } }];
 }
 
 /**
  * Read the spec memo out of a transaction's Memos. Ledger data is data: only
- * the exact memo type is looked at, its JSON must have exactly the expected
- * fields and types, and more than one spec memo is refused (which spec would
- * count?). Returns the memo, null when there is none, or a problem string.
+ * the exact memo type is looked at, its MemoFormat must be application/json,
+ * its JSON must have exactly the expected fields and types and be byte for
+ * byte the canonical (RFC 8785) form that specMemos() writes, so duplicate
+ * keys, spacing or another key order are refused rather than read one way by
+ * one parser and another way by the next. More than one spec memo is refused
+ * (which spec would count?). Memos of other types beside it are ignored.
+ * Returns the memo, null when there is none, or a problem string.
  */
 export function parseSpecMemo(memos: unknown): SpecMemo | null | { problem: string } {
   if (memos === undefined) return null;
   if (!Array.isArray(memos)) return { problem: "Memos is not a list" };
   const found: SpecMemo[] = [];
   for (const wrapper of memos) {
-    const m = (wrapper as { Memo?: { MemoType?: unknown; MemoData?: unknown } } | null)?.Memo;
+    const m = (wrapper as { Memo?: { MemoType?: unknown; MemoFormat?: unknown; MemoData?: unknown } } | null)?.Memo;
     if (!m || typeof m.MemoType !== "string") continue;
     if (!/^([0-9A-Fa-f]{2})*$/.test(m.MemoType) || textOfHex(m.MemoType) !== SPEC_MEMO_TYPE) continue;
+    if (typeof m.MemoFormat !== "string" || !/^([0-9A-Fa-f]{2})+$/.test(m.MemoFormat) || textOfHex(m.MemoFormat) !== SPEC_MEMO_FORMAT) {
+      return { problem: `the spec memo's format is not ${SPEC_MEMO_FORMAT}` };
+    }
     if (typeof m.MemoData !== "string" || !/^([0-9A-Fa-f]{2}){1,1024}$/.test(m.MemoData)) return { problem: "the spec memo's data is not hex" };
+    const text = textOfHex(m.MemoData);
     let d: Partial<SpecMemo>;
     try {
-      d = JSON.parse(textOfHex(m.MemoData));
+      d = JSON.parse(text);
     } catch {
       return { problem: "the spec memo's data is not JSON" };
     }
     if (!isObject(d) || Object.keys(d).sort().join(",") !== "revision,specHash,specVersion") return { problem: "the spec memo has the wrong fields" };
     if (typeof d.specHash !== "string" || !HEX64.test(d.specHash) || d.specVersion !== SPEC_VERSION
       || !Number.isSafeInteger(d.revision) || (d.revision as number) < 1) return { problem: "the spec memo has a malformed field" };
-    found.push({ specHash: d.specHash, specVersion: d.specVersion, revision: d.revision as number });
+    const memo: SpecMemo = { specHash: d.specHash, specVersion: d.specVersion, revision: d.revision as number };
+    if (jcs(memo) !== text) return { problem: "the spec memo's data is not canonical JSON (RFC 8785): duplicate keys, spacing or key order" };
+    found.push(memo);
   }
   if (found.length > 1) return { problem: "the EscrowCreate carries more than one spec memo" };
   return found[0] ?? null;

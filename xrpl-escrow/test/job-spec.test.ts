@@ -111,6 +111,13 @@ describe("the EscrowCreate memo", () => {
     expect(parseSpecMemo([{ Memo: { MemoType: "AB", MemoData: "CD" } }])).toBeNull();
   });
 
+  it("refuses a spec memo whose MemoFormat is not application/json, or whose JSON is not canonical (N41)", () => {
+    expect(V.strictBadMemos.length).toBeGreaterThan(0);
+    for (const bad of V.strictBadMemos) {
+      expect(parseSpecMemo(bad.memos), bad.name).toHaveProperty("problem", expect.stringContaining(bad.problem));
+    }
+  });
+
   const s = spec();
   const condition = `A0258020${"CD".repeat(32)}810120`;
   const tx = (over: Record<string, unknown> = {}) => ({
@@ -146,6 +153,8 @@ describe("the EscrowCreate memo", () => {
     const edited = { ...job, spec: { ...s, criteria: s.criteria.slice(0, 1), rule: "all" } } as Job;
     expect(specAgainstMemo(edited, memo)).toMatch(/is not the spec locked on the ledger/);
     expect(specAgainstMemo({ ...job, specSignatures: { client: job.specSignatures!.client, provider: null } }, memo)).toMatch(/provider .* has not signed/);
+    // N41: the memo's revision must be the registry spec's revision too, not only its hash.
+    expect(specAgainstMemo(job, { ...memo, revision: 2 })).toMatch(/is not the spec locked on the ledger/);
   });
 });
 

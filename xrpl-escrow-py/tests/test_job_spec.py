@@ -9,7 +9,7 @@ from xrpl.wallet import Wallet
 
 from conftest import TS_KIT
 from xrpl_escrow import (
-    EscrowKit, ServiceError, agreement_problems, check_chain, entry_mismatch, escrow_create_spec_memo, find_verdict, jcs,
+    SPEC_MEMO_TYPE, EscrowKit, ServiceError, agreement_problems, check_chain, entry_mismatch, escrow_create_spec_memo, find_verdict, jcs,
     make_job_spec, meets_rule, parse_spec_memo, revise_job_spec, sha256_hex, sign_spec_hash, spec_hash, spec_memos, spec_problem,
     verify_spec_signature,
 )
@@ -61,6 +61,36 @@ def test_memos_match_and_bad_memos_are_refused():
     for bad in V["badMemos"]:
         assert "problem" in parse_spec_memo(bad)
     assert parse_spec_memo(None) is None
+
+
+def test_spec_memos_with_another_format_or_non_canonical_json_are_refused():
+    """Gpno N41: the same strict memo vectors TypeScript refuses, for the same reasons."""
+    assert V["strictBadMemos"]
+    for bad in V["strictBadMemos"]:
+        got = parse_spec_memo(bad["memos"])
+        assert got is not None and bad["problem"] in got.get("problem", ""), bad["name"]
+
+
+def test_the_sdk_refuses_a_memo_with_the_verdicts_hash_but_another_revision():
+    """Gpno N41: the provider's check compares the memo's revision with the verdict's, not only the hash."""
+    s = new_spec()
+    cond = "A0258020" + "CD" * 32 + "810120"
+    h = spec_hash(s)
+
+    def lookup_with(memo_json):
+        memos = [{"Memo": {"MemoType": SPEC_MEMO_TYPE.encode().hex().upper(), "MemoFormat": b"application/json".hex().upper(),
+                           "MemoData": memo_json.encode().hex().upper()}}]
+        tx = {"TransactionType": "EscrowCreate", "Account": CLIENT.address, "Destination": PROVIDER.address, "Condition": cond, "Memos": memos}
+        return lambda _h: {"found": True, "validated": True, "tx": tx, "meta": {"TransactionResult": "tesSUCCESS"}}
+
+    job = {"id": "j", "client": CLIENT.address, "createTx": "AB" * 32}
+    verdict = {"jobId": "j", "provider": PROVIDER.address, "condition": cond, "specHash": h, "specRevision": 1}
+    same = EscrowKit(registry_url="http://127.0.0.1:9", oracle_address="unused", anchor_address="unused",
+                     lookup_tx_fn=lookup_with(jcs({"revision": 1, "specHash": h, "specVersion": 1})))
+    assert same._spec_on_ledger_problem(job, verdict) is None
+    other = EscrowKit(registry_url="http://127.0.0.1:9", oracle_address="unused", anchor_address="unused",
+                      lookup_tx_fn=lookup_with(jcs({"revision": 2, "specHash": h, "specVersion": 1})))
+    assert "locked against revision 2" in other._spec_on_ledger_problem(job, verdict)
 
 
 def test_rules_match():
