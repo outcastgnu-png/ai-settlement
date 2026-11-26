@@ -269,6 +269,9 @@ class EscrowKit:
             return f"spec memo: {read['problem']}"
         if read["memo"]["specHash"] != verdict["specHash"]:
             return f"the verdict judged spec {verdict['specHash']}, but the escrow was locked against spec {read['memo']['specHash']}"
+        if read["memo"]["revision"] != verdict.get("specRevision"):
+            return (f"the verdict judged revision {verdict.get('specRevision')} of the spec, "
+                    f"but the escrow was locked against revision {read['memo']['revision']}")
         return None
 
     def wait_for_status(self, job_id: str, statuses: list[str], timeout: float | None = None) -> Job:

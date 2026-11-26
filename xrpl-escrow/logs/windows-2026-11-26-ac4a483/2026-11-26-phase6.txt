@@ -1,0 +1,129 @@
+npm run demo:phase6 — XRP Ledger testnet, 2026-11-26T08:21:08.390Z
+Connected to wss://s.altnet.rippletest.net:51233 (testnet, network_id 1). Loading or funding wallets from the faucet...
+  client   rDFzDtcCJfDKxDfXxWZ5KTTZxcmRmDvA4t  124.999639 XRP
+  provider rw2Yr7c83vhTwyMSdT7zEYP6ah1NF5V1QB  173.994477 XRP
+  oracle   r4igGxuBa9wtcxdh3eKu2AcKn4Grd5ETKU  101.000001 XRP
+  anchor-a raU1zQN3PxSGmYh9e14cBVSz3R7PKK9xvG  100.000000 XRP
+  anchor-b rJiWxZYNoRBEnzNmSDAGQ3ASyVSkS46Ut9  100.000000 XRP
+  anchor-c rQ9iciiGbNFjViwjK7ddx7VAoXErUDvnKQ  100.000000 XRP
+
+Starting the registry, the watcher and three local oracles on 127.0.0.1 ...
+  oracle A: verdict key rHZ1TRehgeP6tD5h56gBGbLSoVh9Z9ohsB, anchor account raU1zQN3PxSGmYh9e14cBVSz3R7PKK9xvG, http://127.0.0.1:8832
+  oracle B: verdict key rUqeigTDUB7BHwDhusGWm85jPo8iASYyHb, anchor account rJiWxZYNoRBEnzNmSDAGQ3ASyVSkS46Ut9, http://127.0.0.1:8833
+  oracle C: verdict key rEPtHRGHy5gnaFFLGtciaD5JqAmBRWXmLb, anchor account rQ9iciiGbNFjViwjK7ddx7VAoXErUDvnKQ, http://127.0.0.1:8834
+    | registry listening on http://127.0.0.1:8831 (db C:\dev\ai-settlement-ac4a483\xrpl-escrow\data\jobs-phase6.db)
+    | [watcher] subscribed to rDFzDtcCJfDKxDfXxWZ5KTTZxcmRmDvA4t, rw2Yr7c83vhTwyMSdT7zEYP6ah1NF5V1QB
+    | [watcher] connected to wss://s.altnet.rippletest.net:51233 (testnet), watching jobs in http://127.0.0.1:8831
+    A | oracle (verdict key rHZ1TRehgeP6tD5h56gBGbLSoVh9Z9ohsB, anchor account raU1zQN3PxSGmYh9e14cBVSz3R7PKK9xvG) listening on http://127.0.0.1:8832
+    B | oracle (verdict key rUqeigTDUB7BHwDhusGWm85jPo8iASYyHb, anchor account rJiWxZYNoRBEnzNmSDAGQ3ASyVSkS46Ut9) listening on http://127.0.0.1:8833
+    C | oracle (verdict key rEPtHRGHy5gnaFFLGtciaD5JqAmBRWXmLb, anchor account rQ9iciiGbNFjViwjK7ddx7VAoXErUDvnKQ) listening on http://127.0.0.1:8834
+
+3. Spec changed after the lock: both sign and the client funds; then the registry's copy of the spec is loosened
+    spec v1 revision 1, hash e5e23acfec027d27d646d85546859ccf103ed2998fc3a96ca0a9a9d1c48af4c4; rule: all 3 criteria
+      format (objective): "A JSON report with a summary, sources and findings" decided by json-schema
+      useful (subjective): "The research is useful" decided by size-range, contains-text
+      exact (objective): "It is the exact report agreed in advance" decided by sha256-match
+  PASS  client and provider both signed the spec hash (client rDFzDtcCJfDKxDfXxWZ5KTTZxcmRmDvA4t, provider rw2Yr7c83vhTwyMSdT7zEYP6ah1NF5V1QB)
+    | [watcher] job ef27cb41-39ff-4fd9-8ff4-0b0cca2cd3a4: status funded (EscrowCreate 21A6C3DB23EBCD9BB238C9DA60BB5C2C1E8FBB6E0F50A6F061515A4266BA9F21)
+  PASS  EscrowCreate with the spec memo -> tesSUCCESS (tesSUCCESS https://testnet.xrpl.org/transactions/21A6C3DB23EBCD9BB238C9DA60BB5C2C1E8FBB6E0F50A6F061515A4266BA9F21)
+  PASS  the validated EscrowCreate's memo holds the spec hash and revision (memo {"specHash":"e5e23acfec027d27d646d85546859ccf103ed2998fc3a96ca0a9a9d1c48af4c4","specVersion":1,"revision":1})
+  PASS  watcher marked the job funded
+    the registry now serves a spec with hash 48601868f87b30113b80987d33dfc1d45e252c3ef107a8206cd7f0c52d306435 (one criterion: "anything at all")
+  PASS  the oracle refuses the job and signs nothing (spec check failed: the registry's spec (revision 1, hash 48601868f87b30113b80987d33dfc1d45e252c3ef107a8206cd7f0c52d306435) is not the spec locked on the ledger (revision 1, hash e5e23acfec027d27d646d85546859ccf103ed2998fc3a96ca0a9a9d1c48af4c4). This oracle refuses the job and signs nothing; the client is refunded after the deadline)
+  PASS  no verdict for job 3 in oracle A's public log
+
+1. Both sign, the work passes
+    spec v1 revision 1, hash c2c6d37612e5839dc6267b77990b9ad910615e9807bf7c51641fc68ad088d087; rule: all 3 criteria
+      format (objective): "A JSON report with a summary, sources and findings" decided by json-schema
+      useful (subjective): "The research is useful" decided by size-range, contains-text
+      exact (objective): "It is the exact report agreed in advance" decided by sha256-match
+  PASS  client and provider both signed the spec hash (client rDFzDtcCJfDKxDfXxWZ5KTTZxcmRmDvA4t, provider rw2Yr7c83vhTwyMSdT7zEYP6ah1NF5V1QB)
+    | [watcher] job aeb89492-5e4b-4396-ace2-f4a7c7d67298: status funded (EscrowCreate 11AB04AD8175DF0E3D388B2AA4AD75D4D7BE57C616732DCC7854A103D8484D75)
+  PASS  EscrowCreate with the spec memo -> tesSUCCESS (tesSUCCESS https://testnet.xrpl.org/transactions/11AB04AD8175DF0E3D388B2AA4AD75D4D7BE57C616732DCC7854A103D8484D75)
+  PASS  the validated EscrowCreate's memo holds the spec hash and revision (memo {"specHash":"c2c6d37612e5839dc6267b77990b9ad910615e9807bf7c51641fc68ad088d087","specVersion":1,"revision":1})
+  PASS  watcher marked the job funded
+    oracle A: pass on spec c2c6d37612e5839dc6267b77990b9ad910615e9807bf7c51641fc68ad088d087 revision 1, judged the checks
+      format (objective): pass [json-schema: pass]
+      useful (subjective): pass [size-range: pass, contains-text: pass]
+      exact (objective): pass [sha256-match: pass]
+  PASS  signed verdict: pass, on the signed spec hash, every criterion passed
+    | [watcher] job aeb89492-5e4b-4396-ace2-f4a7c7d67298: status paid (EscrowFinish 4F6B0802BBC995759DDDD7D25ABE75555D5B7E9BE65114325C4806D5BE0D140E)
+  PASS  EscrowFinish -> tesSUCCESS (tesSUCCESS https://testnet.xrpl.org/transactions/4F6B0802BBC995759DDDD7D25ABE75555D5B7E9BE65114325C4806D5BE0D140E)
+  PASS  watcher marked the job paid
+  PASS  provider gains the price minus the finish fee (+4.999577 XRP)
+
+2. The provider hasn't signed
+    spec v1 revision 1, hash 6218d87c816a532daa7f18cb36a7dd4cfc48bf512323b8c7b4d1c8804fe53cec; rule: all 3 criteria
+      format (objective): "A JSON report with a summary, sources and findings" decided by json-schema
+      useful (subjective): "The research is useful" decided by size-range, contains-text
+      exact (objective): "It is the exact report agreed in advance" decided by sha256-match
+  PASS  the SDK refuses to lock XRP (refusing to lock XRP for job c4642415-a4b0-4a1d-8c45-0b9351f346da: the provider (rw2Yr7c83vhTwyMSdT7zEYP6ah1NF5V1QB) has not signed spec 6218d87c816a532daa7f18cb36a7dd4cfc48bf512323b8c7b4d1c8804fe53cec)
+  PASS  no EscrowCreate was sent: the client's balance is unchanged
+
+4. Subjective criterion with no check: "The research is useful", with no check behind it
+  PASS  the SDK refuses it before anything is sent (job spec refused before anything was sent: criterion useful is subjective ("The research is useful") and names no check. This kit can't judge that statement: add at least one check that both parties accept as its stand-in (a json-schema with required sections, a size-range, contains-text, or a source transaction), or leave the criterion out)
+  PASS  the registry refuses it too, in plain words (job spec refused: criterion useful is subjective ("The research is useful") and names no check. This kit can't judge that statement: add at least one check that both parties accept as its stand-in (a json-schema with required sections, a size-range, contains-text, or a source transaction), or leave the criterion out)
+
+5. At least 2 of 3 criteria: the report is useful and well formed, but not the exact file agreed
+    spec v1 revision 1, hash 8481edc595197d35995d03f8215200220233c239ec8379c8dc6c43d9acb0219c; rule: at least 2 of 3 criteria
+      format (objective): "A JSON report with a summary, sources and findings" decided by json-schema
+      useful (subjective): "The research is useful" decided by size-range, contains-text
+      exact (objective): "It is the exact report agreed in advance" decided by sha256-match
+  PASS  client and provider both signed the spec hash (client rDFzDtcCJfDKxDfXxWZ5KTTZxcmRmDvA4t, provider rw2Yr7c83vhTwyMSdT7zEYP6ah1NF5V1QB)
+    | [watcher] job de09d200-00d2-4cf9-b7b2-1b702ba8ae5c: status funded (EscrowCreate 73D325F28B1DA5CE49AB5A8D15164C3A647E1CF380FA967545764678CD2459D4)
+  PASS  EscrowCreate with the spec memo -> tesSUCCESS (tesSUCCESS https://testnet.xrpl.org/transactions/73D325F28B1DA5CE49AB5A8D15164C3A647E1CF380FA967545764678CD2459D4)
+  PASS  the validated EscrowCreate's memo holds the spec hash and revision (memo {"specHash":"8481edc595197d35995d03f8215200220233c239ec8379c8dc6c43d9acb0219c","specVersion":1,"revision":1})
+  PASS  watcher marked the job funded
+    oracle A: pass on spec 8481edc595197d35995d03f8215200220233c239ec8379c8dc6c43d9acb0219c revision 1, judged the checks
+      format (objective): pass [json-schema: pass]
+      useful (subjective): pass [size-range: pass, contains-text: pass]
+      exact (objective): fail [sha256-match: fail]
+  PASS  criteria: format pass, useful pass, exact fail; the rule is met
+    | [watcher] job de09d200-00d2-4cf9-b7b2-1b702ba8ae5c: status paid (EscrowFinish 28AD4BB8B02D49095F89FBBE4D451A804533B0ED8B250CE23B091F12AFCF6286)
+  PASS  EscrowFinish -> tesSUCCESS (tesSUCCESS https://testnet.xrpl.org/transactions/28AD4BB8B02D49095F89FBBE4D451A804533B0ED8B250CE23B091F12AFCF6286)
+  PASS  watcher marked the job paid
+  PASS  provider gains the price minus the finish fee (+4.999577 XRP)
+
+6. Shared job, one oracle given a different spec: oracle C reads jobs through a stand-in registry that loosens every spec
+    C | oracle (verdict key rEPtHRGHy5gnaFFLGtciaD5JqAmBRWXmLb, anchor account rQ9iciiGbNFjViwjK7ddx7VAoXErUDvnKQ) listening on http://127.0.0.1:8834
+    spec v1 revision 1, hash 0b195bdaac1a83b220426c2dc5eb1e8271f3204cecfa69a6f19bfda35f6ad4ae; rule: all 3 criteria
+      format (objective): "A JSON report with a summary, sources and findings" decided by json-schema
+      useful (subjective): "The research is useful" decided by size-range, contains-text
+      exact (objective): "It is the exact report agreed in advance" decided by sha256-match
+  PASS  client and provider both signed the spec hash (client rDFzDtcCJfDKxDfXxWZ5KTTZxcmRmDvA4t, provider rw2Yr7c83vhTwyMSdT7zEYP6ah1NF5V1QB)
+    | [watcher] job ef27cb41-39ff-4fd9-8ff4-0b0cca2cd3a4: flagged (23 s left before CancelAfter)
+    | [watcher] job c7f9545b-03bb-4ef3-8f09-e261cfcabc2a: status funded (EscrowCreate 5DC6A827ADEFB667BC3BFC5D0CAAE40892F46E6345F988EA9B4A14EE0899C5C9)
+  PASS  EscrowCreate with the spec memo -> tesSUCCESS (tesSUCCESS https://testnet.xrpl.org/transactions/5DC6A827ADEFB667BC3BFC5D0CAAE40892F46E6345F988EA9B4A14EE0899C5C9)
+  PASS  the validated EscrowCreate's memo holds the spec hash and revision (memo {"specHash":"0b195bdaac1a83b220426c2dc5eb1e8271f3204cecfa69a6f19bfda35f6ad4ae","specVersion":1,"revision":1})
+  PASS  watcher marked the job funded
+    oracle A: pass on spec 0b195bdaac1a83b220426c2dc5eb1e8271f3204cecfa69a6f19bfda35f6ad4ae revision 1, judged the checks
+      format (objective): pass [json-schema: pass]
+      useful (subjective): pass [size-range: pass, contains-text: pass]
+      exact (objective): pass [sha256-match: pass]
+    oracle B: pass on spec 0b195bdaac1a83b220426c2dc5eb1e8271f3204cecfa69a6f19bfda35f6ad4ae revision 1, judged the checks
+      format (objective): pass [json-schema: pass]
+      useful (subjective): pass [size-range: pass, contains-text: pass]
+      exact (objective): pass [sha256-match: pass]
+    oracle C: refused: spec check failed: the registry's spec (revision 1, hash b13d7ddb799b86c61a9563fc6387aeb14d63a10300b9cd2476db39fc90746222) is not the spec locked on the ledger (revision 1, hash 0b195bdaac1a83b220426c2dc5eb1e8271f3204cecfa69a6f19bfda35f6ad4ae). This oracle refuses the job and signs nothing; the client is refunded after the deadline
+  PASS  oracle C refuses: the spec it was given is not the one locked on the ledger
+  PASS  A and B pass on the signed spec hash
+  PASS  two shares rebuild the fulfillment (shares of A and B)
+    | [watcher] job c7f9545b-03bb-4ef3-8f09-e261cfcabc2a: status paid (EscrowFinish C17766B175C11774F2230807BF11B82455A6D88E1A1A91B61145C2DF4B55626C)
+  PASS  EscrowFinish -> tesSUCCESS (tesSUCCESS https://testnet.xrpl.org/transactions/C17766B175C11774F2230807BF11B82455A6D88E1A1A91B61145C2DF4B55626C)
+  PASS  watcher marked the job paid
+  PASS  provider gains the price minus the finish fee (+4.999577 XRP)
+    C | oracle (verdict key rEPtHRGHy5gnaFFLGtciaD5JqAmBRWXmLb, anchor account rQ9iciiGbNFjViwjK7ddx7VAoXErUDvnKQ) listening on http://127.0.0.1:8834
+
+3. Spec changed after the lock (after the deadline)
+    | [watcher] job ef27cb41-39ff-4fd9-8ff4-0b0cca2cd3a4: status refunded (EscrowCancel E79B6097ECA0C2295998B1D76BDA122016935DEAE53DF43B9CE6121ECB55DCA4)
+  PASS  EscrowCancel after CancelAfter -> tesSUCCESS (tesSUCCESS https://testnet.xrpl.org/transactions/E79B6097ECA0C2295998B1D76BDA122016935DEAE53DF43B9CE6121ECB55DCA4)
+  PASS  watcher marked the job refunded
+
+7. Verdict logs and spec memos: each used verdict is in its oracle's log (v2 entries), and its spec hash is the one in the EscrowCreate memo
+  PASS  oracle A, job aeb89492: log checks, entry v2 names spec c2c6d37612e5839d..., memo matches (entry 39 of 42)
+  PASS  oracle A, job de09d200: log checks, entry v2 names spec 8481edc595197d35..., memo matches (entry 40 of 42)
+  PASS  oracle A, job c7f9545b: log checks, entry v2 names spec 0b195bdaac1a83b2..., memo matches (entry 41 of 42)
+  PASS  oracle B, job c7f9545b: log checks, entry v2 names spec 0b195bdaac1a83b2..., memo matches (entry 19 of 20)
+  PASS  no job split: honest oracles that judge the same signed spec agree
+
+43/43 checks passed.

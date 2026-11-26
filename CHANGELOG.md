@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased (follow-up to 0.6.0)
+
+Still testnet only.
+
+### Fixed
+- Gpno finding N41 (low). The spec memo on a job's `EscrowCreate` is now read strictly, the same
+  way in both SDKs (`parseSpecMemo`, `parse_spec_memo`): its `MemoFormat` must be
+  `application/json`, and its `MemoData` must be byte for byte the RFC 8785 canonical JSON that
+  `specMemos` / `spec_memos` write, so a memo with duplicate keys (where `JSON.parse` keeps the
+  last one), extra spacing or another key order is refused. Memos of other types beside the spec
+  memo are still ignored, and a second spec memo is still refused.
+- The oracle's check (`specAgainstMemo`) compares the memo's `revision` with the registry spec's
+  revision as well as the hash, and the provider's verdict-log check (`verifyVerdictLog` /
+  `verify_verdict_log` with a job) compares it with the verdict's `specRevision`.
+- New vectors `strictBadMemos` in `test/vectors/job-spec.json`; the older `badMemos` now carry
+  `MemoFormat`, so each is still refused for its own reason.
+
 ## 0.6.0 (Phase 6 signed job spec, EDR-016) - unreleased
 
 Still testnet only, and every service listens on 127.0.0.1 only.

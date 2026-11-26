@@ -7,6 +7,7 @@
 //   problems     specs both SDKs refuse, with a word the reason must contain
 //   signatures   spec-hash signatures by fixed vector keys (deterministic)
 //   memos        the EscrowCreate memo for a spec, and memos that must not parse
+//   strictBadMemos  memos refused for their MemoFormat or non-canonical JSON (N41)
 //   rules        criterion results and whether they meet a rule
 //   log          a verdict log with Phase 5 (v1) entries followed by Phase 6 (v2)
 //                entries, which must verify, and a v1-after-v2 log, which must not
@@ -84,11 +85,27 @@ const signatures = [client, provider].flatMap((w) => specs.map((s) => ({ address
 const memos = specs.map((s) => ({ spec: s.specHash, revision: s.spec.revision, memos: specMemos(s.spec) }));
 const hexText = (t: string) => Buffer.from(t, "utf8").toString("hex").toUpperCase();
 const T = hexText("xrpl-escrow/job-spec");
+// These carry MemoFormat application/json, so each is refused for its own reason.
+const F = hexText("application/json");
 const badMemos = [
-  [{ Memo: { MemoType: T, MemoData: hexText("not json") } }],
-  [{ Memo: { MemoType: T, MemoData: hexText(JSON.stringify({ specHash: specs[0].specHash, specVersion: 1 })) } }],
-  [{ Memo: { MemoType: T, MemoData: hexText(JSON.stringify({ specHash: specs[0].specHash.toUpperCase(), specVersion: 1, revision: 1 })) } }],
+  [{ Memo: { MemoType: T, MemoFormat: F, MemoData: hexText("not json") } }],
+  [{ Memo: { MemoType: T, MemoFormat: F, MemoData: hexText(JSON.stringify({ specHash: specs[0].specHash, specVersion: 1 })) } }],
+  [{ Memo: { MemoType: T, MemoFormat: F, MemoData: hexText(JSON.stringify({ specHash: specs[0].specHash.toUpperCase(), specVersion: 1, revision: 1 })) } }],
   [...specMemos(specs[0].spec), ...specMemos(specs[2].spec)],
+];
+// Memos that a lax reader accepts but both SDKs must refuse (Gpno N41): each is a
+// correct spec memo for specs[0] apart from the one thing its name says.
+const h0 = specs[0].specHash;
+const strictMemo = (data: string, format: string | null = F) => [{ Memo: { MemoType: T, ...(format === null ? {} : { MemoFormat: format }), MemoData: hexText(data) } }];
+const canonical0 = `{"revision":1,"specHash":"${h0}","specVersion":1}`;
+const strictBadMemos = [
+  { name: "no MemoFormat", memos: strictMemo(canonical0, null), problem: "format" },
+  { name: "MemoFormat text/plain", memos: strictMemo(canonical0, hexText("text/plain")), problem: "format" },
+  { name: "MemoFormat not hex", memos: strictMemo(canonical0, "application/json"), problem: "format" },
+  { name: "duplicate revision key, last one wins in JSON.parse", memos: strictMemo(`{"revision":2,"revision":1,"specHash":"${h0}","specVersion":1}`), problem: "canonical" },
+  { name: "duplicate specHash key", memos: strictMemo(`{"revision":1,"specHash":"${"0".repeat(64)}","specHash":"${h0}","specVersion":1}`), problem: "canonical" },
+  { name: "spaces in the JSON", memos: strictMemo(`{"revision": 1, "specHash": "${h0}", "specVersion": 1}`), problem: "canonical" },
+  { name: "keys out of order", memos: strictMemo(`{"specHash":"${h0}","specVersion":1,"revision":1}`), problem: "canonical" },
 ];
 
 const rules = [
@@ -148,7 +165,7 @@ writeFileSync("test/vectors/job-spec.json", `${JSON.stringify({
   note: "Signed job spec v1 vectors (EDR-016). Keys from fixed entropy; vector keys only, never funded. Regenerate with npx tsx test/vectors/make-job-spec-vectors.ts",
   parties: { client: { address: client.address, publicKey: client.publicKey }, provider: { address: provider.address, publicKey: provider.publicKey } },
   oracle: oracle.address,
-  jcs: jcsCases, refusedJcs, specs, problems, signatures, memos, badMemos, rules,
+  jcs: jcsCases, refusedJcs, specs, problems, signatures, memos, badMemos, strictBadMemos, rules,
   log: {
     mixed: mixedLog, downgrade: downgradeLog,
     verdicts: [oldVerdict, newVerdict, unsignedVerdict, laterOld], verdictHashes: [oldVerdict, newVerdict, unsignedVerdict, laterOld].map(verdictHash),

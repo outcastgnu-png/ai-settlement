@@ -28,6 +28,7 @@ from .auth import canonical_json, sha256_hex
 
 SPEC_VERSION = 1
 SPEC_MEMO_TYPE = "xrpl-escrow/job-spec"
+SPEC_MEMO_FORMAT = "application/json"
 SPEC_SIGN_PREFIX = "xrpl-escrow/job-spec"
 MAX_CRITERIA = 8
 MAX_SPEC_BYTES = 32_768
@@ -274,13 +275,15 @@ def meets_rule(rule: Any, results: list[dict[str, Any]]) -> bool:
 def spec_memos(spec: JobSpec) -> list[dict[str, Any]]:
     """The Memos field of the EscrowCreate for this spec: one memo with its hash and version, as hex."""
     memo = {"specHash": spec_hash(spec), "specVersion": spec["specVersion"], "revision": spec["revision"]}
-    return [{"Memo": {"MemoType": _hex_of(SPEC_MEMO_TYPE), "MemoFormat": _hex_of("application/json"), "MemoData": _hex_of(jcs(memo))}}]
+    return [{"Memo": {"MemoType": _hex_of(SPEC_MEMO_TYPE), "MemoFormat": _hex_of(SPEC_MEMO_FORMAT), "MemoData": _hex_of(jcs(memo))}}]
 
 
 def parse_spec_memo(memos: Any) -> dict[str, Any] | None:
     """The spec memo in a transaction's Memos, None when there is none, or ``{"problem": ...}``.
-    Ledger data is data: only the exact memo type is read, with exactly the expected fields,
-    and more than one spec memo is refused."""
+    Ledger data is data: only the exact memo type is read, its MemoFormat must be application/json,
+    its JSON must have exactly the expected fields and be byte for byte the canonical (RFC 8785) form
+    that ``spec_memos()`` writes (so duplicate keys, spacing or another key order are refused), and
+    more than one spec memo is refused. Memos of other types beside it are ignored."""
     if memos is None:
         return None
     if not isinstance(memos, list):
@@ -293,11 +296,16 @@ def parse_spec_memo(memos: Any) -> dict[str, Any] | None:
         mt = memo["MemoType"]
         if not _HEX_BYTES.match(mt) or bytes.fromhex(mt).decode("utf-8", errors="replace") != SPEC_MEMO_TYPE:
             continue
+        fmt = memo.get("MemoFormat")
+        if (not isinstance(fmt, str) or not fmt or not _HEX_BYTES.match(fmt)
+                or bytes.fromhex(fmt).decode("utf-8", errors="replace") != SPEC_MEMO_FORMAT):
+            return {"problem": f"the spec memo's format is not {SPEC_MEMO_FORMAT}"}
         data = memo.get("MemoData")
         if not isinstance(data, str) or not _MEMO_DATA.match(data):
             return {"problem": "the spec memo's data is not hex"}
         try:
-            d = json.loads(bytes.fromhex(data).decode("utf-8"))
+            text = bytes.fromhex(data).decode("utf-8")
+            d = json.loads(text)
         except ValueError:
             return {"problem": "the spec memo's data is not JSON"}
         if not isinstance(d, dict) or sorted(d) != ["revision", "specHash", "specVersion"]:
@@ -305,7 +313,10 @@ def parse_spec_memo(memos: Any) -> dict[str, Any] | None:
         if (not isinstance(d["specHash"], str) or not _HEX64.match(d["specHash"]) or d["specVersion"] != SPEC_VERSION
                 or isinstance(d["specVersion"], bool) or not _whole(d["revision"], 1, 2**53 - 1)):
             return {"problem": "the spec memo has a malformed field"}
-        found.append({"specHash": d["specHash"], "specVersion": d["specVersion"], "revision": d["revision"]})
+        parsed = {"specHash": d["specHash"], "specVersion": d["specVersion"], "revision": d["revision"]}
+        if jcs(parsed) != text:
+            return {"problem": "the spec memo's data is not canonical JSON (RFC 8785): duplicate keys, spacing or key order"}
+        found.append(parsed)
     if len(found) > 1:
         return {"problem": "the EscrowCreate carries more than one spec memo"}
     return found[0] if found else None

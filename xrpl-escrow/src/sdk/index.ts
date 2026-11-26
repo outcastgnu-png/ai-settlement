@@ -380,6 +380,9 @@ export class EscrowKit {
     if (read.memo.specHash !== verdict.specHash) {
       return `the verdict judged spec ${verdict.specHash}, but the escrow was locked against spec ${read.memo.specHash}`;
     }
+    if (read.memo.revision !== verdict.specRevision) {
+      return `the verdict judged revision ${String(verdict.specRevision)} of the spec, but the escrow was locked against revision ${read.memo.revision}`;
+    }
     return null;
   }
 
